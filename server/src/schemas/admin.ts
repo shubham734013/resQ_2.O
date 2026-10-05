@@ -19,7 +19,7 @@ export const userListQuerySchema = z.object({
   to: z.coerce.date().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'name', 'email', 'role', 'accountStatus']).default('createdAt'),
   ...pagination,
-}).refine((v) => !v.from || !v.to || v.from <= v.to, { message: 'from must be before to' });
+}).strict().refine((v) => !v.from || !v.to || v.from <= v.to, { message: 'from must be before to' });
 
 export const hospitalListQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
@@ -29,7 +29,7 @@ export const hospitalListQuerySchema = z.object({
   hospitalType: z.string().trim().max(100).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'name', 'city', 'verificationStatus', 'accountStatus']).default('createdAt'),
   ...pagination,
-});
+}).strict();
 
 export const providerListQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
@@ -38,7 +38,7 @@ export const providerListQuerySchema = z.object({
   city: z.string().trim().max(100).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'name', 'city', 'verificationStatus', 'accountStatus']).default('createdAt'),
   ...pagination,
-});
+}).strict();
 
 export const ambulanceListQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
@@ -48,7 +48,7 @@ export const ambulanceListQuerySchema = z.object({
   provider: objectId.optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'registrationNumber', 'vehicleNumber', 'currentStatus', 'verificationStatus', 'accountStatus']).default('createdAt'),
   ...pagination,
-});
+}).strict();
 
 export const driverListQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
@@ -58,7 +58,7 @@ export const driverListQuerySchema = z.object({
   provider: objectId.optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'fullName', 'email', 'licenseVerificationStatus', 'availabilityStatus', 'accountStatus']).default('createdAt'),
   ...pagination,
-});
+}).strict();
 
-export const accountStatusSchema = z.object({ status: z.enum(['ACTIVE', 'SUSPENDED', 'REJECTED']) });
-export const verificationStatusSchema = z.object({ verificationStatus: z.enum(VERIFICATION_STATUSES) });
+export const accountStatusSchema = z.object({ status: z.enum(['ACTIVE', 'SUSPENDED', 'REJECTED']) }).strict();
+export const verificationStatusSchema = z.object({ verificationStatus: z.enum(VERIFICATION_STATUSES) }).strict();
