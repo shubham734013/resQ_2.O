@@ -9,13 +9,27 @@ const seedAdmin = async (): Promise<void> => {
   await connectDatabase();
 
   const email = env.RESQ_ADMIN_EMAIL.trim().toLowerCase();
-  const existing = await UserModel.findOne({ email }).exec();
+  const existing = await UserModel.findOne({ email }).select('+passwordHash').exec();
 
   if (existing) {
     if (existing.role !== 'ADMIN') {
       throw new Error('Configured admin email already belongs to a non-admin account');
     }
-    console.info('ResQ admin already exists; no changes made');
+
+    const passwordHash = await bcrypt.hash(env.RESQ_ADMIN_PASSWORD, BCRYPT_ROUNDS);
+    await UserModel.updateOne(
+      { _id: existing._id },
+      {
+        $set: {
+          passwordHash,
+          role: 'ADMIN',
+          accountStatus: 'ACTIVE',
+          emailVerified: true,
+        },
+      },
+    ).exec();
+
+    console.info('ResQ admin account synchronized');
     return;
   }
 
