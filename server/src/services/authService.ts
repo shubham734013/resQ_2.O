@@ -93,10 +93,17 @@ const findAccountByEmail = async (email: string): Promise<AccountWithPassword | 
 
   for (const entry of modelsWithRoles) {
     const account = await entry.model.findOne({ email: normalizedEmail }).select('+passwordHash').exec();
-    if (account) {
-      const document = account as unknown as { _id: { toString(): string }; email: string; passwordHash: string; accountStatus: AccountStatus };
-      return toAccount(document, entry.role, document.passwordHash);
-    }
+    if (!account) continue;
+
+    const document = account as unknown as {
+      _id: { toString(): string };
+      email: string;
+      passwordHash: string;
+      accountStatus: AccountStatus;
+      role?: Role;
+    };
+    const role = entry.model === UserModel && document.role ? document.role : entry.role;
+    return toAccount(document, role, document.passwordHash);
   }
   return null;
 };
@@ -113,7 +120,12 @@ const findAccountByIdentity = async (identity: AuthenticatedIdentity): Promise<A
   const account = await model.findById(identity.id).select('+passwordHash').exec();
   if (!account) return null;
 
-  const document = account as unknown as { _id: { toString(): string }; email: string; passwordHash: string; accountStatus: AccountStatus };
+  const document = account as unknown as {
+    _id: { toString(): string };
+    email: string;
+    passwordHash: string;
+    accountStatus: AccountStatus;
+  };
   return toAccount(document, identity.role, document.passwordHash);
 };
 
