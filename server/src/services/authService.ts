@@ -33,7 +33,7 @@ export interface AuthResult {
 }
 
 interface AccountWithPassword {
-  _id: { toString(): string };
+  id: string;
   email: string;
   passwordHash: string;
   role: Role;
@@ -58,9 +58,7 @@ const ensureUniqueRegistrationNumber = async (registrationNumber: string): Promi
     HospitalModel.exists({ registrationNumber }),
     AmbulanceProviderModel.exists({ registrationNumber }),
   ]);
-  if (hospital || provider) {
-    throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS', 'Registration number is already in use', 409);
-  }
+  if (hospital || provider) throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS', 'Registration number is already in use', 409);
 };
 
 const ensureUniqueLicenseNumber = async (licenseNumber: string): Promise<void> => {
@@ -69,8 +67,16 @@ const ensureUniqueLicenseNumber = async (licenseNumber: string): Promise<void> =
   }
 };
 
-const publicIdentity = (account: AccountWithPassword | { _id: { toString(): string }; email: string; role: Role; accountStatus: AccountStatus }): AuthenticatedIdentity => ({
-  id: account._id.toString(),
+const toAccount = <T extends { _id: { toString(): string }; email: string; accountStatus: AccountStatus }>(document: T, role: Role, passwordHash: string): AccountWithPassword => ({
+  id: document._id.toString(),
+  email: document.email,
+  passwordHash,
+  role,
+  accountStatus: document.accountStatus,
+});
+
+const publicIdentity = (account: AccountWithPassword): AuthenticatedIdentity => ({
+  id: account.id,
   email: account.email,
   role: account.role,
   accountStatus: account.accountStatus,
@@ -78,9 +84,19 @@ const publicIdentity = (account: AccountWithPassword | { _id: { toString(): stri
 
 const findAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
   const normalizedEmail = normalizeEmail(email);
-  for (const model of accountModels) {
-    const account = await model.findOne({ email: normalizedEmail }).select('+passwordHash').exec();
-    if (account) return account as unknown as AccountWithPassword;
+  const modelsWithRoles: ReadonlyArray<{ model: typeof UserModel; role: Role }> = [
+    { model: UserModel, role: 'USER' },
+    { model: HospitalModel, role: 'HOSPITAL' },
+    { model: AmbulanceProviderModel, role: 'AMBULANCE_PROVIDER' },
+    { model: AmbulanceDriverModel, role: 'AMBULANCE_DRIVER' },
+  ];
+
+  for (const entry of modelsWithRoles) {
+    const account = await entry.model.findOne({ email: normalizedEmail }).select('+passwordHash').exec();
+    if (account) {
+      const document = account as unknown as { _id: { toString(): string }; email: string; passwordHash: string; accountStatus: AccountStatus };
+      return toAccount(document, entry.role, document.passwordHash);
+    }
   }
   return null;
 };
@@ -95,7 +111,10 @@ const findAccountByIdentity = async (identity: AuthenticatedIdentity): Promise<A
         : AmbulanceDriverModel;
 
   const account = await model.findById(identity.id).select('+passwordHash').exec();
-  return account as unknown as AccountWithPassword | null;
+  if (!account) return null;
+
+  const document = account as unknown as { _id: { toString(): string }; email: string; passwordHash: string; accountStatus: AccountStatus };
+  return toAccount(document, identity.role, document.passwordHash);
 };
 
 const assertLoginAllowed = (status: AccountStatus): void => {
@@ -134,9 +153,7 @@ const verifyToken = (token: string, secret: string, expectedType: 'access' | 're
       typeof payload.role !== 'string' ||
       typeof payload.accountStatus !== 'string' ||
       payload.type !== expectedType
-    ) {
-      throw new Error('Invalid token payload');
-    }
+    ) throw new Error('Invalid token payload');
 
     return {
       sub: payload.sub,
@@ -169,11 +186,18 @@ const createAuthResult = async (account: AccountWithPassword): Promise<AuthResul
   return { user, accessToken, refreshToken };
 };
 
+const identityFromDocument = <T extends { _id: { toString(): string }; email: string; accountStatus: AccountStatus }>(document: T, role: Role): AuthenticatedIdentity => ({
+  id: document._id.toString(),
+  email: document.email,
+  role,
+  accountStatus: document.accountStatus,
+});
+
 export const registerUser = async (input: UserRegistrationInput): Promise<AuthenticatedIdentity> => {
   await ensureUniqueContact(input.email, input.phone);
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
   const account = await UserModel.create({ ...input, email: normalizeEmail(input.email), passwordHash, role: 'USER', accountStatus: 'ACTIVE' });
-  return publicIdentity(account as unknown as AccountWithPassword);
+  return identityFromDocument(account, 'USER');
 };
 
 export const registerHospital = async (input: HospitalRegistrationInput): Promise<AuthenticatedIdentity> => {
@@ -188,7 +212,7 @@ export const registerHospital = async (input: HospitalRegistrationInput): Promis
     accountStatus: 'PENDING',
     resourceSummary: {},
   });
-  return publicIdentity(account as unknown as AccountWithPassword);
+  return identityFromDocument(account, 'HOSPITAL');
 };
 
 export const registerAmbulanceProvider = async (input: AmbulanceProviderRegistrationInput): Promise<AuthenticatedIdentity> => {
@@ -202,7 +226,7 @@ export const registerAmbulanceProvider = async (input: AmbulanceProviderRegistra
     verificationStatus: 'PENDING',
     accountStatus: 'PENDING',
   });
-  return publicIdentity(account as unknown as AccountWithPassword);
+  return identityFromDocument(account, 'AMBULANCE_PROVIDER');
 };
 
 export const registerAmbulanceDriver = async (input: AmbulanceDriverRegistrationInput): Promise<AuthenticatedIdentity> => {
@@ -220,7 +244,7 @@ export const registerAmbulanceDriver = async (input: AmbulanceDriverRegistration
     licenseVerificationStatus: 'PENDING',
     accountStatus: 'PENDING',
   });
-  return publicIdentity(account as unknown as AccountWithPassword);
+  return identityFromDocument(account, 'AMBULANCE_DRIVER');
 };
 
 export const login = async (input: LoginInput): Promise<AuthResult> => {
