@@ -84,12 +84,12 @@ const publicIdentity = (account: AccountWithPassword): AuthenticatedIdentity => 
 
 const findAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
   const normalizedEmail = normalizeEmail(email);
-  const modelsWithRoles: ReadonlyArray<{ model: typeof UserModel; role: Role }> = [
-    { model: UserModel, role: 'USER' },
-    { model: HospitalModel, role: 'HOSPITAL' },
-    { model: AmbulanceProviderModel, role: 'AMBULANCE_PROVIDER' },
-    { model: AmbulanceDriverModel, role: 'AMBULANCE_DRIVER' },
-  ];
+  const modelsWithRoles = [
+    { model: UserModel, role: 'USER' as const },
+    { model: HospitalModel, role: 'HOSPITAL' as const },
+    { model: AmbulanceProviderModel, role: 'AMBULANCE_PROVIDER' as const },
+    { model: AmbulanceDriverModel, role: 'AMBULANCE_DRIVER' as const },
+  ] as const;
 
   for (const entry of modelsWithRoles) {
     const account = await entry.model.findOne({ email: normalizedEmail }).select('+passwordHash').exec();
