@@ -73,7 +73,6 @@ export const AmbulancePage = () => {
   const routeMode = pathname.replace('/ambulance', '').replace(/^\//, '');
   const [availability, setAvailability] = useState<AmbulanceAvailability>(MOCK_AMBULANCE.availability);
   const [tripStatus, setTripStatus] = useState<AmbulanceTripStatus | null>(null);
-  const [issueReported, setIssueReported] = useState(false);
 
   const goOnline = () => {
     setAvailability('available');
@@ -87,7 +86,6 @@ export const AmbulancePage = () => {
 
   const acceptRequest = () => {
     setAvailability('busy');
-    setIssueReported(false);
     setTripStatus('to-patient');
     navigate('/ambulance/navigation');
   };
@@ -134,7 +132,7 @@ export const AmbulancePage = () => {
         />
       )}
 
-      {routeMode === 'navigation' && effectiveTripStatus === 'to-patient' && (
+      {routeMode === 'navigation' && tripStatus === 'to-patient' && (
         <NavigationPanel
           title="Navigate to Patient"
           destinationName={MOCK_PICKUP.label}
@@ -149,7 +147,7 @@ export const AmbulancePage = () => {
         />
       )}
 
-      {routeMode === 'navigation' && effectiveTripStatus === 'to-hospital' && (
+      {routeMode === 'navigation' && tripStatus === 'to-hospital' && (
         <NavigationPanel
           title="Transporting to Hospital"
           destinationName={MOCK_HOSPITAL.name}
@@ -163,7 +161,7 @@ export const AmbulancePage = () => {
         />
       )}
 
-      {routeMode === 'trip' && effectiveTripStatus === 'at-patient' && (
+      {routeMode === 'trip' && tripStatus === 'at-patient' && (
         <div className="flex flex-1 flex-col">
           <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
             <div className="flex items-center gap-3">
@@ -202,7 +200,7 @@ export const AmbulancePage = () => {
         </div>
       )}
 
-      {routeMode === 'trip' && effectiveTripStatus === 'completed' && (
+      {routeMode === 'trip' && tripStatus === 'completed' && (
         <div className="flex flex-1 flex-col">
           <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Trip complete</p>
