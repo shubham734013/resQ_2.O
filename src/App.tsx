@@ -10,29 +10,53 @@ import { EmergencyPage } from './pages/EmergencyPage';
 import { FacilityDetailPage } from './pages/FacilityDetailPage';
 import { RouteNavigationPage } from './pages/RouteNavigationPage';
 import { HospitalPage } from './pages/HospitalPage';
+import { AmbulancePage } from './pages/AmbulancePage';
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false, retry: 1 } } });
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 export function App() {
-  return <QueryClientProvider client={queryClient}><BrowserRouter><Routes>
-    <Route element={<AppLayout />}>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/search" element={<SearchPage />} />
-      <Route path="/facility/:id" element={<FacilityDetailPage />} />
-      <Route path="/route/:facilityId" element={<RouteNavigationPage />} />
-      <Route path="/saved" element={<SavedPage />} />
-      <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/sos" element={<EmergencyPage />} />
-    </Route>
-    <Route path="/hospital" element={<HospitalLayout />}>
-      <Route index element={<HospitalPage />} />
-      <Route path="emergencies" element={<HospitalPage />} />
-      <Route path="patients" element={<HospitalPage />} />
-      <Route path="ambulances" element={<HospitalPage />} />
-      <Route path="resources" element={<HospitalPage />} />
-      <Route path="profile" element={<HospitalPage />} />
-    </Route>
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes></BrowserRouter></QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* User */}
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/facility/:id" element={<FacilityDetailPage />} />
+            <Route path="/route/:facilityId" element={<RouteNavigationPage />} />
+            <Route path="/saved" element={<SavedPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/sos" element={<EmergencyPage />} />
+          </Route>
+
+          {/* Hospital */}
+          <Route path="/hospital" element={<HospitalLayout />}>
+            <Route index element={<HospitalPage />} />
+            <Route path="emergencies" element={<HospitalPage />} />
+            <Route path="patients" element={<HospitalPage />} />
+            <Route path="ambulances" element={<HospitalPage />} />
+            <Route path="resources" element={<HospitalPage />} />
+            <Route path="profile" element={<HospitalPage />} />
+          </Route>
+
+          {/* Ambulance */}
+          <Route path="/ambulance/*" element={<AmbulancePage />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
 }
+
 export default App;

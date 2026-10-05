@@ -8,9 +8,10 @@ export const AppLayout = () => {
   const location = useLocation();
   const isEmergencyRoute = location.pathname.startsWith('/sos');
   const isRoutePage = location.pathname.startsWith('/route');
+  const isAmbulanceRoute = location.pathname.startsWith('/ambulance');
 
   // Emergency Mode and Route Navigation strip shell headers and bottom nav tabs for full immersion and focus
-  if (isEmergencyRoute || isRoutePage) {
+  if (isEmergencyRoute || isRoutePage || isAmbulanceRoute) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
         <main className="flex-1 flex flex-col overflow-hidden">
