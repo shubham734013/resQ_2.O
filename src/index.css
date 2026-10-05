@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-brand-primary: #0f172a;
+    --color-brand-emergency: #b91c1c;
+    --color-brand-accent: #0284c7;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}

@@ -1,0 +1,48 @@
+export type FacilityCategory =
+  | 'all'
+  | 'emergency'
+  | 'trauma'
+  | 'urgent_care'
+  | 'pediatric';
+
+export interface RouteSummary {
+  distance: string;
+  duration: string;
+  viaRoute: string;
+  trafficCondition: 'Light traffic' | 'Moderate traffic' | 'Heavy traffic';
+}
+
+export interface Facility {
+  id: string;
+  name: string;
+  type: string;
+  category: 'emergency' | 'trauma' | 'urgent_care' | 'pediatric';
+  distance: string;
+  distanceMeters: number;
+  estimatedTime: string;
+  emergencyAvailable: boolean;
+  verified: boolean;
+  lastUpdated: string;
+  latitude: number;
+  longitude: number;
+  address: string;
+  phone: string;
+  openStatus: string;
+  isOpen: boolean;
+  isAvailable?: boolean;
+  isStale?: boolean;
+  operatingStatus?: string;
+  capabilities: string[];
+  departments?: string[];
+  triageWaitTime?: string;
+  ambulanceAvailability?: 'Available' | 'Busy' | 'On Request' | 'Unavailable';
+  rating?: number;
+  routeSummary?: RouteSummary;
+}
+
+export interface UserLocation {
+  latitude: number;
+  longitude: number;
+  label: string;
+  accuracy: 'high' | 'approximate';
+}
