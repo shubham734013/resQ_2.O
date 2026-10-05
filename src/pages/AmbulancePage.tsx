@@ -73,7 +73,6 @@ export const AmbulancePage = () => {
   const routeMode = pathname.replace('/ambulance', '').replace(/^\//, '');
   const [availability, setAvailability] = useState<AmbulanceAvailability>(MOCK_AMBULANCE.availability);
   const [tripStatus, setTripStatus] = useState<AmbulanceTripStatus | null>(null);
-  const [issueReported, setIssueReported] = useState(false);
 
   const goOnline = () => {
     setAvailability('available');
@@ -87,7 +86,6 @@ export const AmbulancePage = () => {
 
   const acceptRequest = () => {
     setAvailability('busy');
-    setIssueReported(false);
     setTripStatus('to-patient');
     navigate('/ambulance/navigation');
   };
