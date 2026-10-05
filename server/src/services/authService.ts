@@ -40,17 +40,25 @@ interface AccountWithPassword {
   accountStatus: AccountStatus;
 }
 
-const accountModels = [UserModel, HospitalModel, AmbulanceProviderModel, AmbulanceDriverModel] as const;
-
 const ensureUniqueContact = async (email: string, phone: string): Promise<void> => {
   const normalizedEmail = normalizeEmail(email);
-  const [emailMatches, phoneMatches] = await Promise.all([
-    Promise.all(accountModels.map((model) => model.exists({ email: normalizedEmail }))),
-    Promise.all(accountModels.map((model) => model.exists({ phone }))),
+  const [userEmail, hospitalEmail, providerEmail, driverEmail, userPhone, hospitalPhone, providerPhone, driverPhone] = await Promise.all([
+    UserModel.exists({ email: normalizedEmail }),
+    HospitalModel.exists({ email: normalizedEmail }),
+    AmbulanceProviderModel.exists({ email: normalizedEmail }),
+    AmbulanceDriverModel.exists({ email: normalizedEmail }),
+    UserModel.exists({ phone }),
+    HospitalModel.exists({ phone }),
+    AmbulanceProviderModel.exists({ phone }),
+    AmbulanceDriverModel.exists({ phone }),
   ]);
 
-  if (emailMatches.some(Boolean)) throw new AppError('EMAIL_ALREADY_EXISTS', 'An account with this email already exists', 409);
-  if (phoneMatches.some(Boolean)) throw new AppError('PHONE_ALREADY_EXISTS', 'An account with this phone number already exists', 409);
+  if (userEmail || hospitalEmail || providerEmail || driverEmail) {
+    throw new AppError('EMAIL_ALREADY_EXISTS', 'An account with this email already exists', 409);
+  }
+  if (userPhone || hospitalPhone || providerPhone || driverPhone) {
+    throw new AppError('PHONE_ALREADY_EXISTS', 'An account with this phone number already exists', 409);
+  }
 };
 
 const ensureUniqueRegistrationNumber = async (registrationNumber: string): Promise<void> => {
@@ -58,7 +66,9 @@ const ensureUniqueRegistrationNumber = async (registrationNumber: string): Promi
     HospitalModel.exists({ registrationNumber }),
     AmbulanceProviderModel.exists({ registrationNumber }),
   ]);
-  if (hospital || provider) throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS', 'Registration number is already in use', 409);
+  if (hospital || provider) {
+    throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS', 'Registration number is already in use', 409);
+  }
 };
 
 const ensureUniqueLicenseNumber = async (licenseNumber: string): Promise<void> => {
@@ -67,7 +77,11 @@ const ensureUniqueLicenseNumber = async (licenseNumber: string): Promise<void> =
   }
 };
 
-const toAccount = <T extends { _id: { toString(): string }; email: string; accountStatus: AccountStatus }>(document: T, role: Role, passwordHash: string): AccountWithPassword => ({
+const toAccount = <T extends { _id: { toString(): string }; email: string; accountStatus: AccountStatus }>(
+  document: T,
+  role: Role,
+  passwordHash: string,
+): AccountWithPassword => ({
   id: document._id.toString(),
   email: document.email,
   passwordHash,
@@ -82,51 +96,92 @@ const publicIdentity = (account: AccountWithPassword): AuthenticatedIdentity => 
   accountStatus: account.accountStatus,
 });
 
+const findUserAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
+  const account = await UserModel.findOne({ email }).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, account.role, account.passwordHash);
+};
+
+const findHospitalAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
+  const account = await HospitalModel.findOne({ email }).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, 'HOSPITAL', account.passwordHash);
+};
+
+const findAmbulanceProviderAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
+  const account = await AmbulanceProviderModel.findOne({ email }).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, 'AMBULANCE_PROVIDER', account.passwordHash);
+};
+
+const findAmbulanceDriverAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
+  const account = await AmbulanceDriverModel.findOne({ email }).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, 'AMBULANCE_DRIVER', account.passwordHash);
+};
+
 const findAccountByEmail = async (email: string): Promise<AccountWithPassword | null> => {
   const normalizedEmail = normalizeEmail(email);
-  const modelsWithRoles = [
-    { model: UserModel, role: 'USER' as const },
-    { model: HospitalModel, role: 'HOSPITAL' as const },
-    { model: AmbulanceProviderModel, role: 'AMBULANCE_PROVIDER' as const },
-    { model: AmbulanceDriverModel, role: 'AMBULANCE_DRIVER' as const },
-  ] as const;
 
-  for (const entry of modelsWithRoles) {
-    const account = await entry.model.findOne({ email: normalizedEmail }).select('+passwordHash').exec();
-    if (!account) continue;
+  const finders = [
+    findUserAccountByEmail,
+    findHospitalAccountByEmail,
+    findAmbulanceProviderAccountByEmail,
+    findAmbulanceDriverAccountByEmail,
+  ];
 
-    const document = account as unknown as {
-      _id: { toString(): string };
-      email: string;
-      passwordHash: string;
-      accountStatus: AccountStatus;
-      role?: Role;
-    };
-    const role = entry.model === UserModel && document.role ? document.role : entry.role;
-    return toAccount(document, role, document.passwordHash);
+  for (const findAccount of finders) {
+    const account = await findAccount(normalizedEmail);
+    if (account) return account;
   }
+
   return null;
 };
 
-const findAccountByIdentity = async (identity: AuthenticatedIdentity): Promise<AccountWithPassword | null> => {
-  const model = identity.role === 'USER' || identity.role === 'ADMIN'
-    ? UserModel
-    : identity.role === 'HOSPITAL'
-      ? HospitalModel
-      : identity.role === 'AMBULANCE_PROVIDER'
-        ? AmbulanceProviderModel
-        : AmbulanceDriverModel;
-
-  const account = await model.findById(identity.id).select('+passwordHash').exec();
+const findUserAccountById = async (id: string): Promise<AccountWithPassword | null> => {
+  const account = await UserModel.findById(id).select('+passwordHash').exec();
   if (!account) return null;
 
-  const document = account as unknown as {
-    _id: { toString(): string };
-    email: string;
-    passwordHash: string;
-    accountStatus: AccountStatus;
-  };
-  return toAccount(document, identity.role, document.passwordHash);
+  return toAccount(account, account.role, account.passwordHash);
+};
+
+const findHospitalAccountById = async (id: string): Promise<AccountWithPassword | null> => {
+  const account = await HospitalModel.findById(id).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, 'HOSPITAL', account.passwordHash);
+};
+
+const findAmbulanceProviderAccountById = async (id: string): Promise<AccountWithPassword | null> => {
+  const account = await AmbulanceProviderModel.findById(id).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, 'AMBULANCE_PROVIDER', account.passwordHash);
+};
+
+const findAmbulanceDriverAccountById = async (id: string): Promise<AccountWithPassword | null> => {
+  const account = await AmbulanceDriverModel.findById(id).select('+passwordHash').exec();
+  if (!account) return null;
+
+  return toAccount(account, 'AMBULANCE_DRIVER', account.passwordHash);
+};
+
+const findAccountByIdentity = async (identity: AuthenticatedIdentity): Promise<AccountWithPassword | null> => {
+  switch (identity.role) {
+    case 'USER':
+    case 'ADMIN':
+      return findUserAccountById(identity.id);
+    case 'HOSPITAL':
+      return findHospitalAccountById(identity.id);
+    case 'AMBULANCE_PROVIDER':
+      return findAmbulanceProviderAccountById(identity.id);
+    case 'AMBULANCE_DRIVER':
+      return findAmbulanceDriverAccountById(identity.id);
+  }
 };
 
 export const assertLoginAllowed = (status: AccountStatus): void => {
@@ -198,7 +253,10 @@ const createAuthResult = async (account: AccountWithPassword): Promise<AuthResul
   return { user, accessToken, refreshToken };
 };
 
-const identityFromDocument = <T extends { _id: { toString(): string }; email: string; accountStatus: AccountStatus }>(document: T, role: Role): AuthenticatedIdentity => ({
+const identityFromDocument = <T extends { _id: { toString(): string }; email: string; accountStatus: AccountStatus }>(
+  document: T,
+  role: Role,
+): AuthenticatedIdentity => ({
   id: document._id.toString(),
   email: document.email,
   role,
@@ -273,7 +331,7 @@ export const login = async (input: LoginInput): Promise<AuthResult> => {
 export const adminLogin = async (input: LoginInput): Promise<AuthResult> => {
   if (normalizeEmail(input.email) !== normalizeEmail(env.RESQ_ADMIN_EMAIL)) throw INVALID_CREDENTIALS;
 
-  const account = await findAccountByEmail(input.email);
+  const account = await findUserAccountByEmail(input.email);
   if (!account || account.role !== 'ADMIN') throw INVALID_CREDENTIALS;
 
   const passwordMatches = await bcrypt.compare(input.password, account.passwordHash);
