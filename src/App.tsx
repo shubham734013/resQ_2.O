@@ -1,5 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './context/AuthContext';
+import { ProtectedRoute, RoleRoute } from './routes/ProtectedRoute';
 import { AppLayout } from './layouts/AppLayout';
 import { HospitalLayout } from './components/hospital/HospitalLayout';
 import { HomePage } from './pages/HomePage';
@@ -11,6 +13,10 @@ import { FacilityDetailPage } from './pages/FacilityDetailPage';
 import { RouteNavigationPage } from './pages/RouteNavigationPage';
 import { HospitalPage } from './pages/HospitalPage';
 import { AmbulancePage } from './pages/AmbulancePage';
+import { AdminLoginPage, UnauthorizedPage } from './pages/AuthPages';
+import { LoginPage } from './pages/LoginPage';
+import { RegistrationPage } from './pages/RegistrationPage';
+import { AmbulanceProviderDashboardPage } from './pages/AmbulanceProviderDashboardPage';
 import {
   AdminOverviewPage,
   AdminEmergenciesPage,
@@ -36,44 +42,68 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          {/* User */}
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/facility/:id" element={<FacilityDetailPage />} />
-            <Route path="/route/:facilityId" element={<RouteNavigationPage />} />
-            <Route path="/saved" element={<SavedPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/sos" element={<EmergencyPage />} />
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/register" element={<RegistrationPage kind="user" />} />
+            <Route path="/hospital/register" element={<RegistrationPage kind="hospital" />} />
+            <Route path="/ambulance-provider/register" element={<RegistrationPage kind="ambulance-provider" />} />
+            <Route path="/ambulance-driver/register" element={<RegistrationPage kind="ambulance-driver" />} />
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* Admin */}
-            <Route path="/admin" element={<AdminOverviewPage />} />
-            <Route path="/admin/emergencies" element={<AdminEmergenciesPage />} />
-            <Route path="/admin/hospitals" element={<AdminHospitalsPage />} />
-            <Route path="/admin/ambulances" element={<AdminAmbulancesPage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/reports" element={<AdminReportsPage />} />
-            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
-            <Route path="/admin/settings" element={<AdminSettingsPage />} />
-          </Route>
+            <Route element={<ProtectedRoute />}>
+              {/* User */}
+              <Route element={<RoleRoute allowedRoles={['USER']} />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/facility/:id" element={<FacilityDetailPage />} />
+                  <Route path="/route/:facilityId" element={<RouteNavigationPage />} />
+                  <Route path="/saved" element={<SavedPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/sos" element={<EmergencyPage />} />
+                </Route>
+              </Route>
 
-          {/* Hospital */}
-          <Route path="/hospital" element={<HospitalLayout />}>
-            <Route index element={<HospitalPage />} />
-            <Route path="emergencies" element={<HospitalPage />} />
-            <Route path="patients" element={<HospitalPage />} />
-            <Route path="ambulances" element={<HospitalPage />} />
-            <Route path="resources" element={<HospitalPage />} />
-            <Route path="profile" element={<HospitalPage />} />
-          </Route>
+              {/* Hospital */}
+              <Route element={<RoleRoute allowedRoles={['HOSPITAL']} />}>
+                <Route path="/hospital" element={<HospitalLayout />}>
+                  <Route index element={<HospitalPage />} />
+                  <Route path="emergencies" element={<HospitalPage />} />
+                  <Route path="patients" element={<HospitalPage />} />
+                  <Route path="ambulances" element={<HospitalPage />} />
+                  <Route path="resources" element={<HospitalPage />} />
+                  <Route path="profile" element={<HospitalPage />} />
+                </Route>
+              </Route>
 
-          {/* Ambulance */}
-          <Route path="/ambulance/*" element={<AmbulancePage />} />
+              {/* Ambulance driver */}
+              <Route element={<RoleRoute allowedRoles={['AMBULANCE_DRIVER']} />}>
+                <Route path="/ambulance/*" element={<AmbulancePage />} />
+              </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+              {/* Ambulance provider */}
+              <Route element={<RoleRoute allowedRoles={['AMBULANCE_PROVIDER']} />}>
+                <Route path="/ambulance/provider" element={<AmbulanceProviderDashboardPage />} />
+              </Route>
+
+              {/* Admin */}
+              <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+                <Route path="/admin" element={<AdminOverviewPage />} />
+                <Route path="/admin/emergencies" element={<AdminEmergenciesPage />} />
+                <Route path="/admin/hospitals" element={<AdminHospitalsPage />} />
+                <Route path="/admin/ambulances" element={<AdminAmbulancesPage />} />
+                <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route path="/admin/reports" element={<AdminReportsPage />} />
+                <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+                <Route path="/admin/settings" element={<AdminSettingsPage />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );
