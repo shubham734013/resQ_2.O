@@ -1,7 +1,9 @@
 import { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 
-export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request, res: Response, _next: NextFunction): void => {
+export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request, res: Response, next: NextFunction): void => {
+  void next;
+
   if (error instanceof mongoose.Error.ValidationError) {
     res.status(400).json({ success: false, error: { code: 'MONGO_VALIDATION_ERROR', message: 'Database validation failed' } });
     return;
