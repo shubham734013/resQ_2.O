@@ -9,9 +9,8 @@ export const AppLayout = () => {
   const isEmergencyRoute = location.pathname.startsWith('/sos');
   const isRoutePage = location.pathname.startsWith('/route');
   const isAmbulanceRoute = location.pathname.startsWith('/ambulance');
-  const isAdminRoute = location.pathname.startsWith('/admin');
 
-  if (isEmergencyRoute || isRoutePage || isAmbulanceRoute || isAdminRoute) {
+  if (isEmergencyRoute || isRoutePage || isAmbulanceRoute) {
     return <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased"><main className="flex-1 flex flex-col overflow-hidden"><Outlet context={{ currentLocation, refreshLocation, isUpdating }} /></main></div>;
   }
 
