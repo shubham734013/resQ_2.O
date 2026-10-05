@@ -11,6 +11,16 @@ import { FacilityDetailPage } from './pages/FacilityDetailPage';
 import { RouteNavigationPage } from './pages/RouteNavigationPage';
 import { HospitalPage } from './pages/HospitalPage';
 import { AmbulancePage } from './pages/AmbulancePage';
+import {
+  AdminOverviewPage,
+  AdminEmergenciesPage,
+  AdminHospitalsPage,
+  AdminAmbulancesPage,
+  AdminUsersPage,
+  AdminReportsPage,
+  AdminAnalyticsPage,
+  AdminSettingsPage,
+} from './pages/AdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +46,16 @@ export function App() {
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/sos" element={<EmergencyPage />} />
+
+            {/* Admin */}
+            <Route path="/admin" element={<AdminOverviewPage />} />
+            <Route path="/admin/emergencies" element={<AdminEmergenciesPage />} />
+            <Route path="/admin/hospitals" element={<AdminHospitalsPage />} />
+            <Route path="/admin/ambulances" element={<AdminAmbulancesPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
+            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Route>
 
           {/* Hospital */}
