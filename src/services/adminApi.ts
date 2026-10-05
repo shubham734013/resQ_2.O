@@ -1,12 +1,13 @@
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminList, AdminListParams, AdminOverview, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 
-const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:5001/api/v1').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '');
 
 export class AdminApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); this.name = 'AdminApiError'; }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!API_BASE) throw new AdminApiError(0, 'API_CONFIGURATION_ERROR', 'VITE_API_BASE_URL is not configured.');
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
