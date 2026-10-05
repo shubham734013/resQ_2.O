@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { userRegistrationSchema, hospitalRegistrationSchema, ambulanceProviderRegistrationSchema, ambulanceDriverRegistrationSchema, loginSchema } from '../schemas/auth.js';
 import { authorizeRole } from '../middlewares/authorizeRole.js';
 
+process.env.MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/resq-test';
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'unit-test-access-secret';
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'unit-test-refresh-secret';
+process.env.RESQ_ADMIN_EMAIL = process.env.RESQ_ADMIN_EMAIL ?? 'admin@example.com';
+process.env.RESQ_ADMIN_PASSWORD = process.env.RESQ_ADMIN_PASSWORD ?? 'UnitTestAdminPassword123!';
+
+const { assertLoginAllowed } = await import('../services/authService.js');
+
 const validBase = {
   name: 'Test User',
   email: 'TEST@EXAMPLE.COM',
@@ -78,5 +86,23 @@ describe('role authorization', () => {
       if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') errorCode = error.code;
     });
     assert.equal(errorCode, 'UNAUTHORIZED');
+  });
+});
+
+describe('account status policy', () => {
+  it('allows ACTIVE accounts', () => {
+    assert.doesNotThrow(() => assertLoginAllowed('ACTIVE'));
+  });
+
+  it('rejects SUSPENDED accounts', () => {
+    assert.throws(() => assertLoginAllowed('SUSPENDED'), { code: 'ACCOUNT_SUSPENDED' });
+  });
+
+  it('rejects REJECTED accounts', () => {
+    assert.throws(() => assertLoginAllowed('REJECTED'), { code: 'ACCOUNT_REJECTED' });
+  });
+
+  it('rejects PENDING accounts with an operational approval response', () => {
+    assert.throws(() => assertLoginAllowed('PENDING'), { code: 'ACCOUNT_PENDING' });
   });
 });
