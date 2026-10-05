@@ -17,96 +17,31 @@ import { AdminLoginPage, UnauthorizedPage } from './pages/AuthPages';
 import { LoginPage } from './pages/LoginPage';
 import { RegistrationPage } from './pages/RegistrationPage';
 import { AmbulanceProviderDashboardPage } from './pages/AmbulanceProviderDashboardPage';
-import {
-  AdminOverviewPage,
-  AdminEmergenciesPage,
-  AdminHospitalsPage,
-  AdminAmbulancesPage,
-  AdminUsersPage,
-  AdminReportsPage,
-  AdminAnalyticsPage,
-  AdminSettingsPage,
-} from './pages/AdminPage';
+import { AdminOverviewPage, AdminEmergenciesPage, AdminHospitalsPage, AdminAmbulancesPage, AdminUsersPage, AdminReportsPage, AdminAnalyticsPage, AdminSettingsPage, AdminProvidersPage, AdminDriversPage } from './pages/AdminPage';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false, retry: 1 } } });
 
 export function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/register" element={<RegistrationPage kind="user" />} />
-            <Route path="/hospital/register" element={<RegistrationPage kind="hospital" />} />
-            <Route path="/ambulance-provider/register" element={<RegistrationPage kind="ambulance-provider" />} />
-            <Route path="/ambulance-driver/register" element={<RegistrationPage kind="ambulance-driver" />} />
-            <Route path="/unauthorized" element={<UnauthorizedPage />} />
-
-            <Route element={<ProtectedRoute />}>
-              {/* User */}
-              <Route element={<RoleRoute allowedRoles={['USER']} />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/search" element={<SearchPage />} />
-                  <Route path="/facility/:id" element={<FacilityDetailPage />} />
-                  <Route path="/route/:facilityId" element={<RouteNavigationPage />} />
-                  <Route path="/saved" element={<SavedPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/sos" element={<EmergencyPage />} />
-                </Route>
-              </Route>
-
-              {/* Hospital */}
-              <Route element={<RoleRoute allowedRoles={['HOSPITAL']} />}>
-                <Route path="/hospital" element={<HospitalLayout />}>
-                  <Route index element={<HospitalPage />} />
-                  <Route path="emergencies" element={<HospitalPage />} />
-                  <Route path="patients" element={<HospitalPage />} />
-                  <Route path="ambulances" element={<HospitalPage />} />
-                  <Route path="resources" element={<HospitalPage />} />
-                  <Route path="profile" element={<HospitalPage />} />
-                </Route>
-              </Route>
-
-              {/* Ambulance driver */}
-              <Route element={<RoleRoute allowedRoles={['AMBULANCE_DRIVER']} />}>
-                <Route path="/ambulance/*" element={<AmbulancePage />} />
-              </Route>
-
-              {/* Ambulance provider */}
-              <Route element={<RoleRoute allowedRoles={['AMBULANCE_PROVIDER']} />}>
-                <Route path="/ambulance/provider" element={<AmbulanceProviderDashboardPage />} />
-              </Route>
-
-              {/* Admin */}
-              <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
-                <Route path="/admin" element={<AdminOverviewPage />} />
-                <Route path="/admin/emergencies" element={<AdminEmergenciesPage />} />
-                <Route path="/admin/hospitals" element={<AdminHospitalsPage />} />
-                <Route path="/admin/ambulances" element={<AdminAmbulancesPage />} />
-                <Route path="/admin/users" element={<AdminUsersPage />} />
-                <Route path="/admin/reports" element={<AdminReportsPage />} />
-                <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
-                <Route path="/admin/settings" element={<AdminSettingsPage />} />
-              </Route>
-            </Route>
-
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider><Routes>
+    <Route path="/login" element={<LoginPage />} />
+    <Route path="/admin/login" element={<AdminLoginPage />} />
+    <Route path="/register" element={<RegistrationPage kind="user" />} />
+    <Route path="/hospital/register" element={<RegistrationPage kind="hospital" />} />
+    <Route path="/ambulance-provider/register" element={<RegistrationPage kind="ambulance-provider" />} />
+    <Route path="/ambulance-driver/register" element={<RegistrationPage kind="ambulance-driver" />} />
+    <Route path="/unauthorized" element={<UnauthorizedPage />} />
+    <Route element={<ProtectedRoute />}>
+      <Route element={<RoleRoute allowedRoles={['USER']} />}><Route element={<AppLayout />}>
+        <Route path="/" element={<HomePage />} /><Route path="/search" element={<SearchPage />} /><Route path="/facility/:id" element={<FacilityDetailPage />} /><Route path="/route/:facilityId" element={<RouteNavigationPage />} /><Route path="/saved" element={<SavedPage />} /><Route path="/profile" element={<ProfilePage />} /><Route path="/sos" element={<EmergencyPage />} />
+      </Route></Route>
+      <Route element={<RoleRoute allowedRoles={['HOSPITAL']} />}><Route path="/hospital" element={<HospitalLayout />}><Route index element={<HospitalPage />} /><Route path="emergencies" element={<HospitalPage />} /><Route path="patients" element={<HospitalPage />} /><Route path="ambulances" element={<HospitalPage />} /><Route path="resources" element={<HospitalPage />} /><Route path="profile" element={<HospitalPage />} /></Route></Route>
+      <Route element={<RoleRoute allowedRoles={['AMBULANCE_DRIVER']} />}><Route path="/ambulance/*" element={<AmbulancePage />} /></Route>
+      <Route element={<RoleRoute allowedRoles={['AMBULANCE_PROVIDER']} />}><Route path="/ambulance/provider" element={<AmbulanceProviderDashboardPage />} /></Route>
+      <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+        <Route path="/admin" element={<AdminOverviewPage />} /><Route path="/admin/emergencies" element={<AdminEmergenciesPage />} /><Route path="/admin/hospitals" element={<AdminHospitalsPage />} /><Route path="/admin/ambulances" element={<AdminAmbulancesPage />} /><Route path="/admin/users" element={<AdminUsersPage />} /><Route path="/admin/providers" element={<AdminProvidersPage />} /><Route path="/admin/drivers" element={<AdminDriversPage />} /><Route path="/admin/reports" element={<AdminReportsPage />} /><Route path="/admin/analytics" element={<AdminAnalyticsPage />} /><Route path="/admin/settings" element={<AdminSettingsPage />} />
+      </Route>
+    </Route>
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes></AuthProvider></BrowserRouter></QueryClientProvider>;
 }
-
 export default App;
