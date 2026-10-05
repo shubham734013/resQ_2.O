@@ -129,7 +129,7 @@ const findAccountByIdentity = async (identity: AuthenticatedIdentity): Promise<A
   return toAccount(document, identity.role, document.passwordHash);
 };
 
-const assertLoginAllowed = (status: AccountStatus): void => {
+export const assertLoginAllowed = (status: AccountStatus): void => {
   if (status === 'SUSPENDED') throw new AppError('ACCOUNT_SUSPENDED', 'This account is suspended', 403);
   if (status === 'REJECTED') throw new AppError('ACCOUNT_REJECTED', 'This account has been rejected', 403);
   if (status === 'PENDING') throw new AppError('ACCOUNT_PENDING', 'This account is pending operational approval', 403);
