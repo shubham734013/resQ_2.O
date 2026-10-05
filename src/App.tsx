@@ -8,16 +8,10 @@ import { ProfilePage } from './pages/ProfilePage';
 import { EmergencyPage } from './pages/EmergencyPage';
 import { FacilityDetailPage } from './pages/FacilityDetailPage';
 import { RouteNavigationPage } from './pages/RouteNavigationPage';
+import { AdminOverviewPage, AdminEmergenciesPage, AdminHospitalsPage, AdminAmbulancesPage, AdminUsersPage, AdminReportsPage, AdminAnalyticsPage, AdminSettingsPage } from './pages/AdminPage';
 
-// Configure TanStack Query client with production-ready defaults
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes cache
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
+  defaultOptions: { queries: { staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false, retry: 1 } },
 });
 
 export function App() {
@@ -33,6 +27,14 @@ export function App() {
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/sos" element={<EmergencyPage />} />
+            <Route path="/admin" element={<AdminOverviewPage />} />
+            <Route path="/admin/emergencies" element={<AdminEmergenciesPage />} />
+            <Route path="/admin/hospitals" element={<AdminHospitalsPage />} />
+            <Route path="/admin/ambulances" element={<AdminAmbulancesPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
+            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

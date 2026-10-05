@@ -1,0 +1,10 @@
+import { Activity, Ambulance, Building2 } from 'lucide-react';
+import { DEMAND_AREAS } from '../../data/adminMock';
+
+export const MapOperationsView = () => <div className="relative h-[360px] overflow-hidden bg-slate-100 sm:h-[430px]">
+  <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)', backgroundSize: '42px 42px' }} />
+  <div className="absolute inset-8 rounded-[35%] border-2 border-slate-300/70" /><div className="absolute left-[18%] top-[18%] h-40 w-72 rotate-12 rounded-[45%] border-2 border-slate-300/60" /><div className="absolute bottom-[15%] right-[15%] h-52 w-80 -rotate-12 rounded-[45%] border-2 border-slate-300/60" />
+  {DEMAND_AREAS.map((area, index) => <div key={area.label} className="absolute" style={{ left: `${18 + (index * 17) % 65}%`, top: `${24 + (index * 13) % 55}%` }}><div className="relative flex h-12 w-12 items-center justify-center rounded-full border-4 border-white bg-slate-800 text-white shadow-lg"><Activity className="h-4 w-4" /><span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-rose-600 px-1 text-[9px] font-bold">{area.requests}</span></div><div className="mt-1 whitespace-nowrap rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold shadow-sm">{area.label}</div></div>)}
+  <div className="absolute right-4 top-4 w-48 border border-slate-200 bg-white/95 p-3 shadow-sm"><p className="text-xs font-semibold text-slate-900">Operations map</p><div className="mt-2 space-y-2 text-[11px] text-slate-600"><div className="flex items-center gap-2"><Activity className="h-3.5 w-3.5" />Active emergency</div><div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5" />Hospital network</div><div className="flex items-center gap-2"><Ambulance className="h-3.5 w-3.5" />Ambulance fleet</div></div></div>
+  <div className="absolute bottom-4 left-4 border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-500 shadow-sm">Map placeholder · ready for existing MapView / Google Maps integration</div>
+</div>;

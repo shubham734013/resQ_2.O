@@ -8,9 +8,9 @@ export const AppLayout = () => {
   const location = useLocation();
   const isEmergencyRoute = location.pathname.startsWith('/sos');
   const isRoutePage = location.pathname.startsWith('/route');
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
-  // Emergency Mode and Route Navigation strip shell headers and bottom nav tabs for full immersion and focus
-  if (isEmergencyRoute || isRoutePage) {
+  if (isEmergencyRoute || isRoutePage || isAdminRoute) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -22,19 +22,10 @@ export const AppLayout = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
-      {/* Persistent App Header */}
-      <AppHeader
-        userLocation={currentLocation}
-        isUpdatingLocation={isUpdating}
-        onRefreshLocation={refreshLocation}
-      />
-
-      {/* Main Content Area */}
+      <AppHeader userLocation={currentLocation} isUpdatingLocation={isUpdating} onRefreshLocation={refreshLocation} />
       <main className="flex-1 flex flex-col pb-16 md:pb-0 overflow-x-hidden">
         <Outlet context={{ currentLocation, refreshLocation, isUpdating }} />
       </main>
-
-      {/* Mobile Bottom Navigation */}
       <BottomNavigation />
     </div>
   );
