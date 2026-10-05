@@ -8,6 +8,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { EmergencyPage } from './pages/EmergencyPage';
 import { FacilityDetailPage } from './pages/FacilityDetailPage';
 import { RouteNavigationPage } from './pages/RouteNavigationPage';
+import { AmbulancePage } from './pages/AmbulancePage';
 
 // Configure TanStack Query client with production-ready defaults
 const queryClient = new QueryClient({
@@ -33,6 +34,7 @@ export function App() {
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/sos" element={<EmergencyPage />} />
+            <Route path="/ambulance/*" element={<AmbulancePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
