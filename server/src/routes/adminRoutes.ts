@@ -5,7 +5,14 @@ import { validateBody } from '../middlewares/validate.js';
 import { accountStatusSchema, ambulanceListQuerySchema, driverListQuerySchema, hospitalListQuerySchema, providerListQuerySchema, userListQuerySchema, verificationStatusSchema } from '../schemas/admin.js';
 import { overviewController,usersController,userController,userStatusController,hospitalsController,hospitalController,hospitalVerificationController,hospitalStatusController,providersController,providerController,providerVerificationController,providerStatusController,ambulancesController,ambulanceController,driversController,driverController,driverVerificationController,driverStatusController } from '../controllers/adminController.js';
 import type { z } from 'zod';
-const validateQuery=(schema:z.ZodType)=> (req:Request,_res:Response,next:NextFunction):void=>{const result=schema.safeParse(req.query);if(!result.success){next(result.error);return;}req.query=result.data;next();};
+
+const validateQuery=(schema:z.ZodType)=> (req:Request,_res:Response,next:NextFunction):void=>{
+  const result=schema.safeParse(req.query);
+  if(!result.success){next(result.error);return;}
+  req.query = result.data as Request['query'];
+  next();
+};
+
 export const adminRouter=Router();
 adminRouter.use(authenticate,authorizeRole('ADMIN'));
 adminRouter.get('/overview',overviewController);
