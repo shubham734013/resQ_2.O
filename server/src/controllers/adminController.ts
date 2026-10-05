@@ -13,7 +13,7 @@ const getValidatedQuery = <T>(res: Response): T => res.locals.validatedQuery as 
 export const overviewController = async (_req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.getOverview());
 
-export const usersController = async (req: Request, res: Response): Promise<void> =>
+export const usersController = async (_req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.listUsers(getValidatedQuery(res)));
 
 export const userController = async (req: Request, res: Response): Promise<void> =>
@@ -22,7 +22,7 @@ export const userController = async (req: Request, res: Response): Promise<void>
 export const userStatusController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.updateUserStatus(getId(req), (req.body as { status: 'ACTIVE' | 'SUSPENDED' | 'REJECTED' }).status));
 
-export const hospitalsController = async (req: Request, res: Response): Promise<void> =>
+export const hospitalsController = async (_req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.listHospitals(getValidatedQuery(res)));
 
 export const hospitalController = async (req: Request, res: Response): Promise<void> =>
@@ -34,7 +34,7 @@ export const hospitalVerificationController = async (req: Request, res: Response
 export const hospitalStatusController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.updateHospitalStatus(getId(req), (req.body as { status: 'ACTIVE' | 'SUSPENDED' | 'REJECTED' }).status));
 
-export const providersController = async (req: Request, res: Response): Promise<void> =>
+export const providersController = async (_req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.listProviders(getValidatedQuery(res)));
 
 export const providerController = async (req: Request, res: Response): Promise<void> =>
@@ -46,13 +46,13 @@ export const providerVerificationController = async (req: Request, res: Response
 export const providerStatusController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.updateProviderStatus(getId(req), (req.body as { status: 'ACTIVE' | 'SUSPENDED' | 'REJECTED' }).status));
 
-export const ambulancesController = async (req: Request, res: Response): Promise<void> =>
+export const ambulancesController = async (_req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.listAmbulances(getValidatedQuery(res)));
 
 export const ambulanceController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.getAmbulance(getId(req)));
 
-export const driversController = async (req: Request, res: Response): Promise<void> =>
+export const driversController = async (_req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.listDrivers(getValidatedQuery(res)));
 
 export const driverController = async (req: Request, res: Response): Promise<void> =>
