@@ -154,24 +154,80 @@ const emergencyOut = (x: Record<string, unknown>): HospitalEmergency => ({
   longitude: typeof x.longitude === 'number' ? x.longitude : undefined,
   status: x.status as HospitalEmergencyStatus,
   ambulanceId: x.ambulanceId ? String(x.ambulanceId) : undefined,
+  ambulanceProviderId: x.ambulanceProviderId ? String(x.ambulanceProviderId) : undefined,
+  driverId: x.driverId ? String(x.driverId) : undefined,
   patientId: x.patientId ? String(x.patientId) : undefined,
   etaMinutes: typeof x.etaMinutes === 'number' ? x.etaMinutes : undefined,
+  createdAt: x.createdAt as Date,
   updatedAt: x.updatedAt as Date,
 });
 
 export const listEmergencies = async (hospitalId: string, query: EmergencyQuery) => {
-  hospitalOwnershipFilter(hospitalId);
-  const filter: Record<string, unknown> = { ...hospitalOwnershipFilter(hospitalId) };
+  const ownership = hospitalOwnershipFilter(hospitalId);
+  const filter: Record<string, unknown> = { ...ownership };
   if (query.status) filter.status = query.status;
   if (query.situationType) filter.situationType = new RegExp(escapeRegex(query.situationType), 'i');
+  if (query.search) {
+    const search = escapeRegex(query.search);
+    const clauses: Record<string, unknown>[] = [{ requestCode: new RegExp(search, 'i') }];
+    if (Types.ObjectId.isValid(query.search)) clauses.push({ patientId: new Types.ObjectId(query.search) });
+    filter.$or = clauses;
+  }
   if (query.from || query.to) filter.reportedAt = { ...(query.from ? { $gte: query.from } : {}), ...(query.to ? { $lte: query.to } : {}) };
 
-  const [items, total] = await Promise.all([
-    EmergencyRequestModel.find(filter).sort({ reportedAt: query.sortOrder === 'asc' ? 1 : -1 }).skip((query.page - 1) * query.limit).limit(query.limit).lean().exec(),
-    EmergencyRequestModel.countDocuments(filter).exec(),
-  ]);
+  const statusPriority = {
+    $switch: {
+      branches: [
+        { case: { $eq: ['$status', 'RECEIVED'] }, then: 1 },
+        { case: { $eq: ['$status', 'REVIEWING'] }, then: 2 },
+        { case: { $eq: ['$status', 'PREPARING'] }, then: 3 },
+        { case: { $eq: ['$status', 'AMBULANCE_COORDINATION'] }, then: 4 },
+        { case: { $eq: ['$status', 'RESOLVED'] }, then: 5 },
+        { case: { $eq: ['$status', 'CANCELLED'] }, then: 6 },
+      ],
+      default: 99,
+    },
+  };
 
+  const [result] = await EmergencyRequestModel.aggregate<{
+    items: EmergencyRequestDocument[];
+    total: Array<{ count: number }>;
+  }>([
+    { $match: filter },
+    { $facet: {
+      items: [
+        { $addFields: { statusPriority } },
+        { $sort: { statusPriority: 1, reportedAt: query.sortOrder === 'asc' ? 1 : -1, _id: 1 } },
+        { $skip: (query.page - 1) * query.limit },
+        { $limit: query.limit },
+        { $project: { statusPriority: 0 } },
+      ],
+      total: [{ $count: 'count' }],
+    } },
+  ]).exec();
+
+  const items = result?.items ?? [];
+  const total = result?.total[0]?.count ?? 0;
   return pagination(items.map((x) => emergencyOut(x as unknown as Record<string, unknown>)), total, query.page, query.limit);
+};
+
+export const getEmergencySummary = async (hospitalId: string) => {
+  const ownership = hospitalOwnershipFilter(hospitalId);
+  const grouped = await EmergencyRequestModel.aggregate<{ _id: HospitalEmergencyStatus; count: number }>([
+    { $match: ownership },
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+  ]).exec();
+
+  const summary: Record<HospitalEmergencyStatus, number> = {
+    RECEIVED: 0,
+    REVIEWING: 0,
+    PREPARING: 0,
+    AMBULANCE_COORDINATION: 0,
+    RESOLVED: 0,
+    CANCELLED: 0,
+  };
+  grouped.forEach((row) => { summary[row._id] = row.count; });
+  return summary;
 };
 
 export const getEmergency = async (hospitalId: string, emergencyId: string) => {
@@ -192,16 +248,37 @@ const allowedEmergencyTransition: Record<HospitalEmergencyStatus, HospitalEmerge
 };
 
 export const updateEmergencyStatus = async (hospitalId: string, emergencyId: string, status: HospitalEmergencyStatus) => {
-  assertHospitalId(hospitalId);
+  const hospitalObjectId = assertHospitalId(hospitalId);
   if (!Types.ObjectId.isValid(emergencyId)) throw new AppError('INVALID_ID', 'Invalid emergency id', 400);
-  const emergency = await EmergencyRequestModel.findOne({ _id: emergencyId, ...hospitalOwnershipFilter(hospitalId) }).exec();
-  if (!emergency) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
-  if (emergency.status !== status && !allowedEmergencyTransition[emergency.status].includes(status)) {
+  const requestObjectId = new Types.ObjectId(emergencyId);
+
+  const current = await EmergencyRequestModel.findOne({ _id: requestObjectId, hospitalId: hospitalObjectId }).select('status').lean().exec();
+  if (!current) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
+  if (current.status === status) {
+    const unchanged = await EmergencyRequestModel.findOne({ _id: requestObjectId, hospitalId: hospitalObjectId }).lean().exec();
+    if (!unchanged) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
+    return emergencyOut(unchanged as unknown as Record<string, unknown>);
+  }
+
+  const previousStatuses = (Object.entries(allowedEmergencyTransition) as Array<[HospitalEmergencyStatus, HospitalEmergencyStatus[]]>)
+    .filter(([, nextStatuses]) => nextStatuses.includes(status))
+    .map(([previous]) => previous);
+
+  if (!previousStatuses.length) {
     throw new AppError('INVALID_STATUS_TRANSITION', 'Emergency status transition is not allowed', 409);
   }
-  emergency.status = status;
-  await emergency.save();
-  return emergencyOut(emergency.toObject() as unknown as Record<string, unknown>);
+
+  const updated = await EmergencyRequestModel.findOneAndUpdate(
+    { _id: requestObjectId, hospitalId: hospitalObjectId, status: { $in: previousStatuses } },
+    { $set: { status } },
+    { new: true, runValidators: true },
+  ).lean().exec();
+
+  if (!updated) {
+    throw new AppError('STALE_EMERGENCY_UPDATE', 'Emergency request changed before this action could be applied', 409);
+  }
+
+  return emergencyOut(updated as unknown as Record<string, unknown>);
 };
 
 const patientOut = (x: Record<string, unknown>): HospitalPatient => ({
