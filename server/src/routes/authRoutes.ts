@@ -1,34 +1,23 @@
 import { Router } from 'express';
-import {
-  adminLoginController,
-  loginController,
-  logoutController,
-  meController,
-  refreshController,
-  registerAmbulanceDriverController,
-  registerAmbulanceProviderController,
-  registerHospitalController,
-  registerUserController,
-} from '../controllers/authController.js';
+import { adminLoginController, driverProfileController, linkSocialController, loginController, logoutController, meController, providerProfileController, refreshController, registerAmbulanceDriverController, registerAmbulanceProviderController, registerHospitalController, registerUserController, socialLoginController } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/authenticate.js';
+import { authorizeRole } from '../middlewares/authorizeRole.js';
 import { validateBody } from '../middlewares/validate.js';
-import {
-  ambulanceDriverRegistrationSchema,
-  ambulanceProviderRegistrationSchema,
-  hospitalRegistrationSchema,
-  loginSchema,
-  userRegistrationSchema,
-} from '../schemas/auth.js';
+import { ambulanceDriverRegistrationSchema, ambulanceProviderRegistrationSchema, hospitalRegistrationSchema, loginSchema, userRegistrationSchema, socialAuthSchema, driverProfileSchema, providerProfileSchema } from '../schemas/auth.js';
 
-export const authRouter = Router();
-
-authRouter.post('/register/user', validateBody(userRegistrationSchema), registerUserController);
-authRouter.post('/register/hospital', validateBody(hospitalRegistrationSchema), registerHospitalController);
-authRouter.post('/register/ambulance-provider', validateBody(ambulanceProviderRegistrationSchema), registerAmbulanceProviderController);
-authRouter.post('/register/ambulance-driver', validateBody(ambulanceDriverRegistrationSchema), registerAmbulanceDriverController);
-
-authRouter.post('/login', validateBody(loginSchema), loginController);
-authRouter.post('/admin/login', validateBody(loginSchema), adminLoginController);
-authRouter.get('/me', authenticate, meController);
-authRouter.post('/logout', logoutController);
-authRouter.post('/refresh', refreshController);
+export const authRouter=Router();
+authRouter.post('/register/user',validateBody(userRegistrationSchema),registerUserController);
+authRouter.post('/register/hospital',validateBody(hospitalRegistrationSchema),registerHospitalController);
+authRouter.post('/register/ambulance-provider',validateBody(ambulanceProviderRegistrationSchema),registerAmbulanceProviderController);
+authRouter.post('/register/ambulance-driver',validateBody(ambulanceDriverRegistrationSchema),registerAmbulanceDriverController);
+authRouter.post('/login',validateBody(loginSchema),loginController);
+authRouter.post('/admin/login',validateBody(loginSchema),adminLoginController);
+authRouter.post('/google',validateBody(socialAuthSchema), (req,res,next)=>{req.params.provider='GOOGLE';void socialLoginController(req,res).catch(next);});
+authRouter.post('/microsoft',validateBody(socialAuthSchema), (req,res,next)=>{req.params.provider='MICROSOFT';void socialLoginController(req,res).catch(next);});
+authRouter.post('/link/google',authenticate,authorizeRole('USER','AMBULANCE_PROVIDER'),validateBody(socialAuthSchema),(req,res,next)=>{req.params.provider='GOOGLE';void linkSocialController(req,res).catch(next);});
+authRouter.post('/link/microsoft',authenticate,authorizeRole('USER','AMBULANCE_PROVIDER'),validateBody(socialAuthSchema),(req,res,next)=>{req.params.provider='MICROSOFT';void linkSocialController(req,res).catch(next);});
+authRouter.patch('/driver/profile',authenticate,authorizeRole('AMBULANCE_DRIVER'),validateBody(driverProfileSchema),driverProfileController);
+authRouter.patch('/provider/profile',authenticate,authorizeRole('AMBULANCE_PROVIDER'),validateBody(providerProfileSchema),providerProfileController);
+authRouter.get('/me',authenticate,meController);
+authRouter.post('/logout',logoutController);
+authRouter.post('/refresh',refreshController);
