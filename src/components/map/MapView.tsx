@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LocateFixed, Minus, Plus, RefreshCw } from 'lucide-react';
 import type { MapViewProps } from '../../types/route';
-// Leaflet ships as a browser library without bundled TypeScript declarations.
-// The package is installed and bundled locally; this keeps runtime loading out of the CDN path.
-// @ts-ignore
-import L from 'leaflet';
+import type * as Leaflet from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 type LatLng = [number, number];
@@ -20,7 +17,7 @@ const escapeHtml = (value: string): string => {
   return value.replace(/[&<>"']/g, (character) => entities[character] ?? character);
 };
 
-const markerIcon = (label: string, emphasis = false) => ({
+const markerIcon = (L: typeof Leaflet, label: string, emphasis = false) => ({
   className: 'resq-leaflet-marker',
   html: `<span class="resq-leaflet-marker__dot ${emphasis ? 'resq-leaflet-marker__dot--emergency' : ''}">${escapeHtml(label.slice(0, 12))}</span>`,
   iconSize: [92, 28] as [number, number],
@@ -41,8 +38,9 @@ export const MapView = ({
   className = '',
 }: MapViewProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const layerRefs = useRef<L.Layer[]>([]);
+  const mapRef = useRef<Leaflet.Map | null>(null);
+  const leafletRef = useRef<typeof Leaflet | null>(null);
+  const layerRefs = useRef<Leaflet.Layer[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(zoom);
@@ -54,56 +52,88 @@ export const MapView = ({
   );
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    let cancelled = false;
 
-    try {
-      const map = L.map(containerRef.current, {
-        center: [fallbackCenter.latitude, fallbackCenter.longitude],
-        zoom,
-        zoomControl: false,
-        attributionControl: true,
-      });
+    const initialize = async () => {
+      const container = containerRef.current;
+      if (!container) return;
 
-      L.tileLayer(
-        (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim()
-          || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors',
-        },
-      ).addTo(map);
+      try {
+        setStatus('loading');
 
-      mapRef.current = map;
-      setZoomLevel(zoom);
-      setStatus('ready');
-      setError(null);
+        // Force a real layout box before Leaflet measures the container.
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.minHeight = '240px';
 
-      requestAnimationFrame(() => map.invalidateSize());
-      window.setTimeout(() => map.invalidateSize(), 150);
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
 
-      return () => {
-        layerRefs.current.forEach((layer) => layer.remove());
-        layerRefs.current = [];
-        map.remove();
-        mapRef.current = null;
-      };
-    } catch (reason) {
-      setStatus('error');
-      setError(reason instanceof Error ? reason.message : 'MAP_INITIALIZATION_FAILED');
-      return undefined;
-    }
+        if (cancelled || !containerRef.current) return;
+
+        const module = await import('leaflet');
+        const L = (module.default ?? module) as typeof Leaflet;
+
+        if (cancelled || !containerRef.current) return;
+
+        const map = L.map(containerRef.current, {
+          center: [fallbackCenter.latitude, fallbackCenter.longitude],
+          zoom,
+          zoomControl: false,
+          attributionControl: true,
+          preferCanvas: true,
+        });
+
+        L.tileLayer(
+          (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim()
+            || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors',
+          },
+        ).addTo(map);
+
+        mapRef.current = map;
+        leafletRef.current = L;
+        setZoomLevel(zoom);
+        setError(null);
+        setStatus('ready');
+
+        requestAnimationFrame(() => map.invalidateSize());
+        window.setTimeout(() => map.invalidateSize(), 250);
+      } catch (reason) {
+        if (!cancelled) {
+          setStatus('error');
+          setError(reason instanceof Error ? reason.message : 'MAP_INITIALIZATION_FAILED');
+        }
+      }
+    };
+
+    void initialize();
+
+    return () => {
+      cancelled = true;
+      layerRefs.current.forEach((layer) => layer.remove());
+      layerRefs.current = [];
+      mapRef.current?.remove();
+      mapRef.current = null;
+      leafletRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    mapRef.current.setView(
+    mapRef.current?.setView(
       [fallbackCenter.latitude, fallbackCenter.longitude],
       zoomLevel,
     );
   }, [fallbackCenter.latitude, fallbackCenter.longitude, zoomLevel]);
 
   useEffect(() => {
-    if (!mapRef.current || status !== 'ready') return;
+    const map = mapRef.current;
+    const L = leafletRef.current;
+
+    if (!map || !L || status !== 'ready') return;
 
     layerRefs.current.forEach((layer) => layer.remove());
     layerRefs.current = [];
@@ -124,7 +154,7 @@ export const MapView = ({
           iconAnchor: [24, 14],
         }),
         title: 'Your current location',
-      }).addTo(mapRef.current);
+      }).addTo(map);
 
       marker.bindPopup('Your current location');
       layerRefs.current.push(marker);
@@ -136,9 +166,9 @@ export const MapView = ({
 
       const position: LatLng = [item.latitude, item.longitude];
       const marker = L.marker(position, {
-        icon: L.divIcon(markerIcon(item.title, Boolean(item.isEmergency))),
+        icon: L.divIcon(markerIcon(L, item.title, Boolean(item.isEmergency))),
         title: item.title,
-      }).addTo(mapRef.current);
+      }).addTo(map);
 
       const title = escapeHtml(item.title);
       const subtitle = item.subtitle ? `<br/>${escapeHtml(item.subtitle)}` : '';
@@ -156,9 +186,9 @@ export const MapView = ({
     ) {
       const position: LatLng = [destination.latitude, destination.longitude];
       const marker = L.marker(position, {
-        icon: L.divIcon(markerIcon(destination.name, Boolean(destination.isEmergency))),
+        icon: L.divIcon(markerIcon(L, destination.name, Boolean(destination.isEmergency))),
         title: destination.name,
-      }).addTo(mapRef.current);
+      }).addTo(map);
 
       const name = escapeHtml(destination.name);
       const address = destination.address ? `<br/>${escapeHtml(destination.address)}` : '';
@@ -172,7 +202,7 @@ export const MapView = ({
       const route = L.polyline(
         activeRoute.googlePath.map((point) => [point.latitude, point.longitude] as LatLng),
         { color: '#2563eb', opacity: 0.95, weight: 6, lineJoin: 'round' },
-      ).addTo(mapRef.current);
+      ).addTo(map);
       layerRefs.current.push(route);
     }
 
@@ -181,15 +211,15 @@ export const MapView = ({
       const route = L.polyline(
         routeOption.googlePath.map((point) => [point.latitude, point.longitude] as LatLng),
         { color: '#64748b', opacity: 0.55, weight: 4, lineJoin: 'round' },
-      ).addTo(mapRef.current);
+      ).addTo(map);
       layerRefs.current.push(route);
     }
 
     if (points.length > 1 && !activeRoute?.googlePath?.length) {
-      mapRef.current.fitBounds(points, { padding: [32, 32] });
+      map.fitBounds(points, { padding: [32, 32] });
     }
 
-    requestAnimationFrame(() => mapRef.current?.invalidateSize());
+    requestAnimationFrame(() => map.invalidateSize());
   }, [activeRoute, alternativeRoutes, destination, markers, status, userLocation]);
 
   const changeZoom = (delta: number) => {
@@ -211,8 +241,16 @@ export const MapView = ({
   };
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="OpenStreetMap">
-      <div ref={containerRef} className="absolute inset-0" />
+    <div
+      className={`relative w-full h-full min-h-[240px] overflow-hidden bg-slate-100 ${className}`}
+      role="region"
+      aria-label="OpenStreetMap"
+    >
+      <div
+        ref={containerRef}
+        className="absolute inset-0 z-0"
+        style={{ width: '100%', height: '100%', minHeight: '240px' }}
+      />
 
       {status === 'loading' && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100/90">
@@ -225,7 +263,11 @@ export const MapView = ({
           <div className="max-w-sm rounded-xl border border-rose-200 bg-white p-5 text-center shadow-sm">
             <p className="font-semibold text-slate-900">Map unavailable</p>
             <p className="mt-1 text-xs text-slate-500">{error || 'The map could not be initialized.'}</p>
-            <button type="button" onClick={() => window.location.reload()} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
+            >
               <RefreshCw className="h-3.5 w-3.5" />Retry
             </button>
           </div>
