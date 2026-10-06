@@ -16,7 +16,7 @@ const mapRoute = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][num
       ? 'moderate'
       : 'unknown',
   summary: route.summary,
-  viaRoute: 'OpenStreetMap route',
+  viaRoute: 'Google route',
   isRecommended: route.recommended,
   polylinePoints: route.polyline.map((p) => ({ x: 0, y: 0, latitude: p.latitude, longitude: p.longitude })),
   googlePath: route.polyline,
@@ -25,12 +25,12 @@ const mapRoute = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][num
 
 export function useAmbulanceRoute(origin: Coordinate | null, destination: Coordinate | null) {
   const query = useQuery({
-    queryKey: ['ambulance-osm-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
+    queryKey: ['ambulance-google-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
     queryFn: () => mapsApi.route({
       origin: origin as Coordinate,
       destination: destination as Coordinate,
       travelMode: 'DRIVE',
-      routingPreference: 'TRAFFIC_UNAWARE',
+      routingPreference: 'TRAFFIC_AWARE',
     }),
     enabled: Boolean(origin && destination),
     staleTime: 30_000,
