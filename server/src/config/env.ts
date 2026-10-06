@@ -7,7 +7,12 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1),
   JWT_REFRESH_SECRET: z.string().min(1),
   RESQ_ADMIN_EMAIL: z.string().email(),
-  RESQ_ADMIN_PASSWORD: z.string().min(12),
+  RESQ_ADMIN_PASSWORD: z.string().min(8),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_TENANT_ID: z.string().min(1).optional(),
+  MICROSOFT_AUTHORITY: z.string().url().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
