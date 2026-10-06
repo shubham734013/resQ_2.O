@@ -1,0 +1,2 @@
+import { z } from 'zod';
+export const createEmergencyRequestSchema=z.object({hospitalId:z.string().regex(/^[0-9a-fA-F]{24}$/,'Invalid hospital id'),situationType:z.string().trim().min(2).max(120),location:z.string().trim().max(300).optional(),latitude:z.number().finite().min(-90).max(90).optional(),longitude:z.number().finite().min(-180).max(180).optional()}).strict();

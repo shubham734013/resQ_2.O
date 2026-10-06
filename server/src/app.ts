@@ -8,28 +8,23 @@ import { mapsRouter } from './routes/mapsRoutes.js';
 import { geospatialRouter } from './routes/geospatialRoutes.js';
 import { facilityRouter } from './routes/facilityRoutes.js';
 import { geocodingRouter } from './routes/geocodingRoutes.js';
-import { ambulanceProviderRouter, ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
+import { ambulanceProviderRouter,ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
+import { emergencyRouter } from './routes/emergencyRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
-
-export const app = express();
-
+export const app=express();
 app.disable('x-powered-by');
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
-
-app.use('/api/v1/health', healthRouter);
-app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/admin', adminRouter);
-app.use('/api/v1/hospital', hospitalRouter);
-app.use('/api/v1', geospatialRouter);
-app.use('/api/v1/facilities', facilityRouter);
-app.use('/api/v1/maps', mapsRouter);
-app.use('/api/v1/geocoding', geocodingRouter);
-app.use('/api/v1/ambulance-provider', ambulanceProviderRouter);
-app.use('/api/v1/ambulance-driver', ambulanceDriverRouter);
-
-app.use((_req, res) => {
-  res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
-});
-
+app.use(cors({origin:true,credentials:true}));
+app.use(express.json({limit:'1mb'}));
+app.use('/api/v1/health',healthRouter);
+app.use('/api/v1/auth',authRouter);
+app.use('/api/v1/admin',adminRouter);
+app.use('/api/v1/hospital',hospitalRouter);
+app.use('/api/v1',geospatialRouter);
+app.use('/api/v1/facilities',facilityRouter);
+app.use('/api/v1/maps',mapsRouter);
+app.use('/api/v1/geocoding',geocodingRouter);
+app.use('/api/v1/ambulance-provider',ambulanceProviderRouter);
+app.use('/api/v1/ambulance-driver',ambulanceDriverRouter);
+app.use('/api/v1/emergencies',emergencyRouter);
+app.use((_req,res)=>{res.status(404).json({success:false,error:{code:'NOT_FOUND',message:'Route not found'}});});
 app.use(errorHandler);
