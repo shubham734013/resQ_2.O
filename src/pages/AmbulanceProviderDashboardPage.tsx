@@ -1,30 +1,39 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { ambulanceProviderApi } from '../services/ambulanceProviderApi';
 
-export const AmbulanceProviderDashboardPage = () => {
-  const { user } = useAuth();
+const card='rounded-xl border border-slate-200 bg-white p-5';
+const input='mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-slate-500';
+const button='inline-flex h-10 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-50';
 
-  return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-500">Ambulance provider</p>
-            <h1 className="text-2xl font-bold text-slate-950">Operations workspace</h1>
-          </div>
-          <span className="text-sm text-slate-500">{user?.email}</span>
-        </div>
-        <section className="mt-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Account status</p><p className="mt-2 text-lg font-bold text-slate-950">{user?.accountStatus}</p></div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</p><p className="mt-2 text-lg font-bold text-slate-950">{user?.role}</p></div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fleet APIs</p><p className="mt-2 text-lg font-bold text-slate-950">Coming next</p></div>
-        </section>
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
-          <h2 className="font-semibold text-slate-950">Provider authentication is ready</h2>
-          <p className="mt-1 text-sm text-slate-600">Operational fleet management will connect here in a separate backend feature.</p>
-          <Link to="/login" className="mt-5 inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700">Back to sign in</Link>
-        </section>
-      </div>
-    </main>
-  );
+export const AmbulanceProviderDashboardPage=()=>{
+ const qc=useQueryClient(); const [section,setSection]=useState<'overview'|'ambulances'|'drivers'|'requests'|'trips'|'profile'>('overview');
+ const [showAmb,setShowAmb]=useState(false); const [showDriver,setShowDriver]=useState(false);
+ const profile=useQuery({queryKey:['ambulance-provider','profile'],queryFn:ambulanceProviderApi.getProfile});
+ const ambulances=useQuery({queryKey:['ambulance-provider','ambulances'],queryFn:()=>ambulanceProviderApi.getAmbulances({limit:100})});
+ const drivers=useQuery({queryKey:['ambulance-provider','drivers'],queryFn:()=>ambulanceProviderApi.getDrivers({limit:100})});
+ const requests=useQuery({queryKey:['ambulance-provider','requests'],queryFn:()=>ambulanceProviderApi.getRequests({limit:100})});
+ const trips=useQuery({queryKey:['ambulance-provider','trips'],queryFn:()=>ambulanceProviderApi.getTrips({limit:100})});
+ const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['ambulance-provider']})]);
+ const addAmb=useMutation({mutationFn:ambulanceProviderApi.createAmbulance,onSuccess:async()=>{setShowAmb(false);await refresh();}});
+ const addDriver=useMutation({mutationFn:ambulanceProviderApi.createDriver,onSuccess:async()=>{setShowDriver(false);await refresh();}});
+ const assignDriver=useMutation({mutationFn:({ambulanceId,driverId}:{ambulanceId:string;driverId:string})=>ambulanceProviderApi.assignDriver(ambulanceId,driverId),onSuccess:refresh});
+ const assignRequest=useMutation({mutationFn:({id,ambulanceId}:{id:string;ambulanceId:string})=>ambulanceProviderApi.assignRequest(id,ambulanceId),onSuccess:refresh});
+ const updateAmbStatus=useMutation({mutationFn:({id,status}:{id:string;status:string})=>ambulanceProviderApi.updateAmbulanceStatus(id,status),onSuccess:refresh});
+ const activeAmb=(ambulances.data?.items??[]).filter(x=>x.currentStatus==='AVAILABLE').length;
+ const busyAmb=(ambulances.data?.items??[]).filter(x=>x.currentStatus==='BUSY').length;
+ const onlineDrivers=(drivers.data?.items??[]).filter(x=>x.availabilityStatus==='ONLINE').length;
+ const busyDrivers=(drivers.data?.items??[]).filter(x=>x.availabilityStatus==='BUSY').length;
+ const nav=useMemo(()=>['overview','ambulances','drivers','requests','trips','profile'] as const,[]);
+ return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">ResQ Operations</p><h1 className="text-2xl font-bold">{profile.data?.name??'Ambulance Provider'}</h1></div><Link to="/login" className="text-sm font-semibold text-slate-600">Sign in</Link></div></header>
+ <div className="mx-auto max-w-7xl px-4 py-6"><nav className="mb-6 flex flex-wrap gap-2">{nav.map(x=><button key={x} onClick={()=>setSection(x)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${section===x?'bg-slate-900 text-white':'bg-white text-slate-600 border border-slate-200'}`}>{x[0].toUpperCase()+x.slice(1)}</button>)}</nav>
+ {section==='overview'&&<><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[['Ambulances',ambulances.data?.pagination.total??0],['Available',activeAmb],['Busy',busyAmb],['Drivers online',onlineDrivers]].map(([k,v])=><div className={card} key={String(k)}><p className="text-xs uppercase tracking-wide text-slate-500">{k}</p><p className="mt-2 text-3xl font-bold">{v}</p></div>)}</div><div className="mt-4 grid gap-4 lg:grid-cols-2"><div className={card}><h2 className="font-semibold">Request queue</h2><p className="mt-2 text-3xl font-bold">{requests.data?.pagination.total??0}</p><p className="text-sm text-slate-500">Operational emergency requests visible to this provider.</p></div><div className={card}><h2 className="font-semibold">Active trips</h2><p className="mt-2 text-3xl font-bold">{(trips.data?.items??[]).filter(x=>!['COMPLETED','CANCELLED'].includes(x.status)).length}</p><p className="text-sm text-slate-500">Trips involving this provider's fleet.</p></div></div></>}
+ {section==='ambulances'&&<div className="space-y-4"><div className="flex justify-between"><h2 className="text-xl font-bold">Ambulances</h2><button className={button} onClick={()=>setShowAmb(v=>!v)}>Add ambulance</button></div>{showAmb&&<form className={card} onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);addAmb.mutate({registrationNumber:String(f.get('registrationNumber')),vehicleNumber:String(f.get('vehicleNumber')),ambulanceType:String(f.get('ambulanceType')),capabilities:String(f.get('capabilities')??'').split(',').map(x=>x.trim()).filter(Boolean),serviceArea:String(f.get('serviceArea')||'')||undefined})}}><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Registration<input name="registrationNumber" required className={input}/></label><label className="text-sm">Vehicle number<input name="vehicleNumber" required className={input}/></label><label className="text-sm">Type<input name="ambulanceType" required className={input}/></label><label className="text-sm">Service area<input name="serviceArea" className={input}/></label><label className="text-sm sm:col-span-2">Capabilities (comma separated)<input name="capabilities" className={input}/></label></div><button className={`${button} mt-4`} disabled={addAmb.isPending}>Create</button></form>}<div className="grid gap-4 lg:grid-cols-2">{(ambulances.data?.items??[]).map(a=><div className={card} key={a.id}><div className="flex justify-between"><div><p className="font-semibold">{a.registrationNumber}</p><p className="text-sm text-slate-500">{a.vehicleNumber} · {a.ambulanceType}</p></div><span className="text-xs font-bold">{a.currentStatus}</span></div><p className="mt-3 text-sm">Driver: {a.assignedDriver?.fullName??'Unassigned'}</p><div className="mt-4 flex flex-wrap gap-2">{(['AVAILABLE','OFFLINE','MAINTENANCE'] as const).map(s=><button key={s} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold" disabled={updateAmbStatus.isPending} onClick={()=>updateAmbStatus.mutate({id:a.id,status:s})}>{s}</button>)}{drivers.data?.items.length&&<select className="rounded-lg border border-slate-300 px-3 text-xs" defaultValue="" onChange={e=>e.target.value&&assignDriver.mutate({ambulanceId:a.id,driverId:e.target.value})}><option value="">Assign driver</option>{drivers.data.items.filter(d=>!d.assignedAmbulanceId).map(d=><option key={d.id} value={d.id}>{d.fullName}</option>)}</select>}</div></div>)}</div></div>}
+ {section==='drivers'&&<div className="space-y-4"><div className="flex justify-between"><h2 className="text-xl font-bold">Drivers</h2><button className={button} onClick={()=>setShowDriver(v=>!v)}>Add driver</button></div>{showDriver&&<form className={card} onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);addDriver.mutate({fullName:String(f.get('fullName')),email:String(f.get('email')),phone:String(f.get('phone')),password:String(f.get('password')),licenseNumber:String(f.get('licenseNumber'))})}}><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Full name<input name="fullName" required className={input}/></label><label className="text-sm">Email<input type="email" name="email" required className={input}/></label><label className="text-sm">Phone<input name="phone" required className={input}/></label><label className="text-sm">License number<input name="licenseNumber" required className={input}/></label><label className="text-sm">Initial password<input type="password" name="password" minLength={12} required className={input}/></label></div><button className={`${button} mt-4`} disabled={addDriver.isPending}>Create driver</button></form>}<div className="grid gap-4 lg:grid-cols-2">{(drivers.data?.items??[]).map(d=><div className={card} key={d.id}><p className="font-semibold">{d.fullName}</p><p className="text-sm text-slate-500">{d.email} · {d.phone}</p><div className="mt-3 flex gap-2 text-xs"><span>{d.availabilityStatus}</span><span>·</span><span>{d.licenseVerificationStatus}</span><span>·</span><span>{d.assignedAmbulanceId?'Assigned':'Unassigned'}</span></div></div>)}</div></div>}
+ {section==='requests'&&<div className="space-y-4"><h2 className="text-xl font-bold">Emergency requests</h2>{(requests.data?.items??[]).map(r=><div className={card} key={r.id}><div className="flex justify-between"><div><p className="font-semibold">{r.requestCode}</p><p className="text-sm text-slate-600">{r.situationType}</p><p className="text-xs text-slate-500 mt-1">{r.location??'Location unavailable'}</p></div><span className="text-xs font-bold">{r.driverId?'Driver assigned':r.ambulanceId?'Ambulance assigned':'Unassigned'}</span></div>{!r.ambulanceId&&<select className="mt-4 rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue="" onChange={e=>e.target.value&&assignRequest.mutate({id:r.id,ambulanceId:e.target.value})}><option value="">Assign available ambulance</option>{(ambulances.data?.items??[]).filter(a=>a.currentStatus==='AVAILABLE'&&a.accountStatus==='ACTIVE'&&a.verificationStatus==='VERIFIED').map(a=><option key={a.id} value={a.id}>{a.registrationNumber}</option>)}</select>}</div>)}</div>}
+ {section==='trips'&&<div className="space-y-4"><h2 className="text-xl font-bold">Trips</h2>{(trips.data?.items??[]).map(t=><div className={card} key={t.id}><div className="flex justify-between"><p className="font-semibold">{t.id.slice(-8)}</p><span className="text-xs font-bold">{t.status}</span></div><p className="mt-2 text-sm text-slate-500">Request {t.emergencyRequestId} · Ambulance {t.ambulanceId}</p></div>)}</div>}
+ {section==='profile'&&profile.data&&<div className={card}><h2 className="text-xl font-bold">Provider profile</h2><dl className="mt-4 grid gap-3 sm:grid-cols-2">{[['Name',profile.data.name],['Registration',profile.data.registrationNumber],['Phone',profile.data.phone],['Service',profile.data.serviceType],['Verification',profile.data.verificationStatus],['Account',profile.data.accountStatus]].map(([k,v])=><div key={k}><dt className="text-xs text-slate-500">{k}</dt><dd className="font-semibold">{v}</dd></div>)}</dl></div>}
+ {(profile.isError||ambulances.isError||drivers.isError||requests.isError||trips.isError)&&<div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">Unable to load operational data. Retry the page to request the latest state.</div>}
+ </div></main>;
 };
