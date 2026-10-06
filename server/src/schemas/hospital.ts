@@ -34,6 +34,7 @@ export const hospitalResourcesUpdateSchema = z.object({ resourceSummary: resourc
 
 export const hospitalEmergencyListQuerySchema = z.object({
   status: z.enum(HOSPITAL_EMERGENCY_STATUSES).optional(),
+  search: z.string().trim().max(100).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   situationType: z.string().trim().max(100).optional(),
