@@ -1,4 +1,4 @@
-import { useGoogleRoute } from '../../hooks/useGoogleRoute';
+import { useMapRoute } from '../../hooks/useMapRoute';
 import { Navigation, Clock, MapPin, Compass, RefreshCw } from 'lucide-react';
 import type { Facility, UserLocation } from '../../types/facility';
 import { MapView } from '../map/MapView';
@@ -6,7 +6,7 @@ import { MapView } from '../map/MapView';
 export interface FacilityLocationProps { facility: Facility; userLocation: UserLocation; className?: string; }
 
 export const FacilityLocation = ({ facility, userLocation, className = '' }: FacilityLocationProps) => {
-  const { routes, isLoading, isError, refetch } = useGoogleRoute(facility, userLocation);
+  const { routes, isLoading, isError, refetch } = useMapRoute(facility, userLocation);
   const route = routes[0] ?? null;
 
   return (
