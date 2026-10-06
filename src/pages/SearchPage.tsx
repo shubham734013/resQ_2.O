@@ -14,7 +14,8 @@ export const SearchPage = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<FacilityCategory>('all');
-  const [emergencyOnly, setEmergencyOnly] = useState(false);\n  const placeSearch = usePlaceSearch(searchQuery);
+  const [emergencyOnly, setEmergencyOnly] = useState(false);
+  const placeSearch = usePlaceSearch(searchQuery);
 
   const {
     facilities,
