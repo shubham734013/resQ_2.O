@@ -85,7 +85,7 @@ export const getProfile = async (hospitalId: string): Promise<HospitalProfile> =
 
 export const updateProfile = async (hospitalId: string, input: ProfileInput): Promise<HospitalProfile> => {
   const id = assertHospitalId(hospitalId);
-  const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: input }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
+  const update: Record<string, unknown> = { ...input };\n  if (typeof input.latitude === 'number' && typeof input.longitude === 'number') {\n    update.location = { type: 'Point', coordinates: [input.longitude, input.latitude] };\n    delete update.latitude;\n    delete update.longitude;\n  }\n  const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
   if (!hospital) notFound('Hospital profile not found');
   return profileOut(hospital as unknown as Record<string, unknown>);
 };
