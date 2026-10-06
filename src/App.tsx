@@ -17,7 +17,9 @@ import { AdminLoginPage, UnauthorizedPage } from './pages/AuthPages';
 import { LoginPage } from './pages/LoginPage';
 import { RegistrationPage } from './pages/RegistrationPage';
 import { AmbulanceProviderDashboardPage } from './pages/AmbulanceProviderDashboardPage';
-import { AdminOverviewPage, AdminEmergenciesPage, AdminHospitalsPage, AdminAmbulancesPage, AdminUsersPage, AdminReportsPage, AdminAnalyticsPage, AdminSettingsPage, AdminProvidersPage, AdminDriversPage } from './pages/AdminPage';
+import { AdminOverviewPage, AdminEmergenciesPage, AdminReportsPage, AdminAnalyticsPage, AdminSettingsPage } from './pages/AdminPage';
+import { AdminUsersManagementPage, AdminHospitalsManagementPage, AdminProvidersManagementPage, AdminAmbulancesManagementPage, AdminDriversManagementPage } from './pages/AdminManagementPages';
+import { AdminUserDetailPage, AdminHospitalDetailPage, AdminProviderDetailPage, AdminAmbulanceDetailPage, AdminDriverDetailPage } from './pages/AdminDetailPages';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false, retry: 1 } } });
 
@@ -38,7 +40,7 @@ export function App() {
       <Route element={<RoleRoute allowedRoles={['AMBULANCE_DRIVER']} />}><Route path="/ambulance/*" element={<AmbulancePage />} /></Route>
       <Route element={<RoleRoute allowedRoles={['AMBULANCE_PROVIDER']} />}><Route path="/ambulance/provider" element={<AmbulanceProviderDashboardPage />} /></Route>
       <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
-        <Route path="/admin" element={<AdminOverviewPage />} /><Route path="/admin/emergencies" element={<AdminEmergenciesPage />} /><Route path="/admin/hospitals" element={<AdminHospitalsPage />} /><Route path="/admin/ambulances" element={<AdminAmbulancesPage />} /><Route path="/admin/users" element={<AdminUsersPage />} /><Route path="/admin/providers" element={<AdminProvidersPage />} /><Route path="/admin/drivers" element={<AdminDriversPage />} /><Route path="/admin/reports" element={<AdminReportsPage />} /><Route path="/admin/analytics" element={<AdminAnalyticsPage />} /><Route path="/admin/settings" element={<AdminSettingsPage />} />
+        <Route path="/admin" element={<AdminOverviewPage />} /><Route path="/admin/emergencies" element={<AdminEmergenciesPage />} /><Route path="/admin/hospitals" element={<AdminHospitalsManagementPage />} /><Route path="/admin/hospitals/:id" element={<AdminHospitalDetailPage />} /><Route path="/admin/ambulances" element={<AdminAmbulancesManagementPage />} /><Route path="/admin/ambulances/:id" element={<AdminAmbulanceDetailPage />} /><Route path="/admin/users" element={<AdminUsersManagementPage />} /><Route path="/admin/users/:id" element={<AdminUserDetailPage />} /><Route path="/admin/providers" element={<AdminProvidersManagementPage />} /><Route path="/admin/providers/:id" element={<AdminProviderDetailPage />} /><Route path="/admin/drivers" element={<AdminDriversManagementPage />} /><Route path="/admin/drivers/:id" element={<AdminDriverDetailPage />} /><Route path="/admin/reports" element={<AdminReportsPage />} /><Route path="/admin/analytics" element={<AdminAnalyticsPage />} /><Route path="/admin/settings" element={<AdminSettingsPage />} />
       </Route>
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
