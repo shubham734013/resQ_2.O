@@ -1,7 +1,5 @@
-import { Types } from 'mongoose';
 import { HospitalModel } from '../models/Hospital.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
-import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type { nearbyQuerySchema } from '../schemas/maps.js';
 
@@ -49,7 +47,6 @@ export const listNearbyFacilities = async (query: NearbyQuery) => {
 };
 
 export const listNearbyAmbulances = async (query: NearbyQuery) => {
-  if (!Types.ObjectId.isValid(query.latitude.toString()) && query.latitude.toString() === '') throw new AppError('INVALID_COORDINATES', 'Invalid coordinates', 400);
   const center = point(query.latitude, query.longitude);
   const items = await AmbulanceModel.find({
     location: { $near: { $geometry: center, $maxDistance: query.radius } },
