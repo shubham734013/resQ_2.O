@@ -1,28 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { LocateFixed, Minus, Plus, RefreshCw } from 'lucide-react';
 import type { MapViewProps } from '../../types/route';
-import type * as Leaflet from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import type { GoogleAdvancedMarker, GoogleMapInstance, GooglePolyline } from '../../types/googleMaps';
+import { loadGoogleMaps } from '../../services/googleMapsLoader';
 
-type LatLng = [number, number];
+interface AdvancedMarkerConstructor {
+  new (options: { map: GoogleMapInstance; position: { lat: number; lng: number }; title?: string; content?: HTMLElement; gmpClickable?: boolean }): GoogleAdvancedMarker;
+}
 
-const escapeHtml = (value: string): string => {
-  const entities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  };
-  return value.replace(/[&<>"']/g, (character) => entities[character] ?? character);
+interface MapLibrary {
+  Map: new (element: HTMLElement, options: { center: { lat: number; lng: number }; zoom: number; mapId?: string; streetViewControl?: boolean; mapTypeControl?: boolean; fullscreenControl?: boolean; clickableIcons?: boolean }) => GoogleMapInstance;
+  LatLngBounds: new () => { extend(point: { lat: number; lng: number }): void };
+  Polyline: new (options: { map?: GoogleMapInstance; path: { lat: number; lng: number }[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number }) => GooglePolyline;
+}
+
+const toGoogle = (latitude: number, longitude: number) => ({ lat: latitude, lng: longitude });
+
+const markerElement = (label: string, emergency = false): HTMLElement => {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.setAttribute('aria-label', label);
+  element.title = label;
+  element.className = 'rounded-full border-2 border-white px-2 py-1 text-[10px] font-semibold shadow-md bg-white text-slate-800';
+  if (emergency) element.className += ' text-rose-700';
+  element.textContent = label;
+  return element;
 };
-
-const markerIcon = (L: typeof Leaflet, label: string, emphasis = false) => ({
-  className: 'resq-leaflet-marker',
-  html: `<span class="resq-leaflet-marker__dot ${emphasis ? 'resq-leaflet-marker__dot--emergency' : ''}">${escapeHtml(label.slice(0, 12))}</span>`,
-  iconSize: [92, 28] as [number, number],
-  iconAnchor: [46, 14] as [number, number],
-});
 
 export const MapView = ({
   center,
@@ -38,192 +41,137 @@ export const MapView = ({
   className = '',
 }: MapViewProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<Leaflet.Map | null>(null);
-  const leafletRef = useRef<typeof Leaflet | null>(null);
-  const layerRefs = useRef<Leaflet.Layer[]>([]);
+  const mapRef = useRef<GoogleMapInstance | null>(null);
+  const markersRef = useRef<GoogleAdvancedMarker[]>([]);
+  const polylinesRef = useRef<GooglePolyline[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(zoom);
 
-  const fallbackCenter = center ?? (
-    userLocation
-      ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
-      : destination ?? { latitude: 20.5937, longitude: 78.9629 }
-  );
+  const fallbackCenter = center ?? (userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : destination ?? { latitude: 0, longitude: 0 });
 
   useEffect(() => {
     let cancelled = false;
-
     const initialize = async () => {
-      const container = containerRef.current;
-      if (!container) return;
-
+      if (!containerRef.current) return;
       try {
         setStatus('loading');
-
-        // Force a real layout box before Leaflet measures the container.
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.minHeight = '240px';
-
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-        });
-
+        const googleMaps = await loadGoogleMaps();
         if (cancelled || !containerRef.current) return;
-
-        const module = await import('leaflet');
-        const L = (module.default ?? module) as typeof Leaflet;
-
-        if (cancelled || !containerRef.current) return;
-
-        const map = L.map(containerRef.current, {
-          center: [fallbackCenter.latitude, fallbackCenter.longitude],
+        const maps = await googleMaps.maps.importLibrary('maps') as unknown as MapLibrary;
+        const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || 'DEMO_MAP_ID';
+        mapRef.current = new maps.Map(containerRef.current, {
+          center: toGoogle(fallbackCenter.latitude, fallbackCenter.longitude),
           zoom,
-          zoomControl: false,
-          attributionControl: true,
-          preferCanvas: true,
+          ...(mapId ? { mapId } : {}),
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
         });
-
-        L.tileLayer(
-          (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim()
-            || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors',
-          },
-        ).addTo(map);
-
-        mapRef.current = map;
-        leafletRef.current = L;
         setZoomLevel(zoom);
-        setError(null);
         setStatus('ready');
-
-        requestAnimationFrame(() => map.invalidateSize());
-        window.setTimeout(() => map.invalidateSize(), 250);
+        setError(null);
       } catch (reason) {
         if (!cancelled) {
           setStatus('error');
-          setError(reason instanceof Error ? reason.message : 'MAP_INITIALIZATION_FAILED');
+          setError(reason instanceof Error ? reason.message : 'MAPS_API_LOAD_FAILED');
         }
       }
     };
-
     void initialize();
-
-    return () => {
-      cancelled = true;
-      layerRefs.current.forEach((layer) => layer.remove());
-      layerRefs.current = [];
-      mapRef.current?.remove();
-      mapRef.current = null;
-      leafletRef.current = null;
-    };
+    return () => { cancelled = true; };
+  // Map construction is intentionally one-time; prop changes are applied by the following effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    mapRef.current?.setView(
-      [fallbackCenter.latitude, fallbackCenter.longitude],
-      zoomLevel,
-    );
-  }, [fallbackCenter.latitude, fallbackCenter.longitude, zoomLevel]);
+    if (!mapRef.current || status !== 'ready') return;
+    mapRef.current.setCenter(toGoogle(fallbackCenter.latitude, fallbackCenter.longitude));
+  }, [fallbackCenter.latitude, fallbackCenter.longitude, status]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    const L = leafletRef.current;
+    let cancelled = false;
+    const renderOverlays = async () => {
+      if (!mapRef.current || status !== 'ready') return;
+      const googleMaps = await loadGoogleMaps();
+      const markerLibrary = await googleMaps.maps.importLibrary('marker');
+      if (cancelled) return;
+      const AdvancedMarkerElement = (markerLibrary as unknown as { AdvancedMarkerElement: AdvancedMarkerConstructor }).AdvancedMarkerElement;
+      markersRef.current.forEach((marker) => { marker.map = null; });
+      markersRef.current = [];
+      polylinesRef.current.forEach((line) => line.setMap(null));
+      polylinesRef.current = [];
 
-    if (!map || !L || status !== 'ready') return;
+      const allPoints: Array<{ lat: number; lng: number }> = [];
+      if (userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)) {
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: toGoogle(userLocation.latitude, userLocation.longitude),
+          title: 'Your current location',
+          content: markerElement('You'),
+        });
+        markersRef.current.push(marker);
+        allPoints.push(toGoogle(userLocation.latitude, userLocation.longitude));
+      }
 
-    layerRefs.current.forEach((layer) => layer.remove());
-    layerRefs.current = [];
+      for (const item of markers) {
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: toGoogle(item.latitude, item.longitude),
+          title: item.title,
+          content: markerElement(item.title, item.isEmergency),
+          gmpClickable: Boolean(item.onClick),
+        });
+        if (item.onClick) marker.addListener('click', item.onClick);
+        markersRef.current.push(marker);
+        allPoints.push(toGoogle(item.latitude, item.longitude));
+      }
 
-    const points: LatLng[] = [];
+      if (destination) {
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: toGoogle(destination.latitude, destination.longitude),
+          title: destination.name,
+          content: markerElement(destination.name, destination.isEmergency),
+        });
+        markersRef.current.push(marker);
+        allPoints.push(toGoogle(destination.latitude, destination.longitude));
+      }
 
-    if (
-      userLocation
-      && Number.isFinite(userLocation.latitude)
-      && Number.isFinite(userLocation.longitude)
-    ) {
-      const position: LatLng = [userLocation.latitude, userLocation.longitude];
-      const marker = L.marker(position, {
-        icon: L.divIcon({
-          className: 'resq-leaflet-marker',
-          html: '<span class="resq-leaflet-marker__you">You</span>',
-          iconSize: [48, 28],
-          iconAnchor: [24, 14],
-        }),
-        title: 'Your current location',
-      }).addTo(map);
+      if (activeRoute?.googlePath?.length) {
+        polylinesRef.current.push(new googleMaps.maps.Polyline({
+          map: mapRef.current,
+          path: activeRoute.googlePath.map((point) => toGoogle(point.latitude, point.longitude)),
+          strokeColor: '#2563eb',
+          strokeOpacity: 0.95,
+          strokeWeight: 6,
+        }));
+      }
 
-      marker.bindPopup('Your current location');
-      layerRefs.current.push(marker);
-      points.push(position);
-    }
+      for (const route of alternativeRoutes) {
+        if (!route.googlePath?.length) continue;
+        polylinesRef.current.push(new googleMaps.maps.Polyline({
+          map: mapRef.current,
+          path: route.googlePath.map((point) => toGoogle(point.latitude, point.longitude)),
+          strokeColor: '#64748b',
+          strokeOpacity: 0.55,
+          strokeWeight: 4,
+        }));
+      }
 
-    for (const item of markers) {
-      if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) continue;
-
-      const position: LatLng = [item.latitude, item.longitude];
-      const marker = L.marker(position, {
-        icon: L.divIcon(markerIcon(L, item.title, Boolean(item.isEmergency))),
-        title: item.title,
-      }).addTo(map);
-
-      const title = escapeHtml(item.title);
-      const subtitle = item.subtitle ? `<br/>${escapeHtml(item.subtitle)}` : '';
-      marker.bindPopup(`<strong>${title}</strong>${subtitle}`);
-
-      if (item.onClick) marker.on('click', item.onClick);
-      layerRefs.current.push(marker);
-      points.push(position);
-    }
-
-    if (
-      destination
-      && Number.isFinite(destination.latitude)
-      && Number.isFinite(destination.longitude)
-    ) {
-      const position: LatLng = [destination.latitude, destination.longitude];
-      const marker = L.marker(position, {
-        icon: L.divIcon(markerIcon(L, destination.name, Boolean(destination.isEmergency))),
-        title: destination.name,
-      }).addTo(map);
-
-      const name = escapeHtml(destination.name);
-      const address = destination.address ? `<br/>${escapeHtml(destination.address)}` : '';
-      marker.bindPopup(`<strong>${name}</strong>${address}`);
-
-      layerRefs.current.push(marker);
-      points.push(position);
-    }
-
-    if (activeRoute?.googlePath?.length) {
-      const route = L.polyline(
-        activeRoute.googlePath.map((point) => [point.latitude, point.longitude] as LatLng),
-        { color: '#2563eb', opacity: 0.95, weight: 6, lineJoin: 'round' },
-      ).addTo(map);
-      layerRefs.current.push(route);
-    }
-
-    for (const routeOption of alternativeRoutes) {
-      if (!routeOption.googlePath?.length) continue;
-      const route = L.polyline(
-        routeOption.googlePath.map((point) => [point.latitude, point.longitude] as LatLng),
-        { color: '#64748b', opacity: 0.55, weight: 4, lineJoin: 'round' },
-      ).addTo(map);
-      layerRefs.current.push(route);
-    }
-
-    if (points.length > 1 && !activeRoute?.googlePath?.length) {
-      map.fitBounds(points, { padding: [32, 32] });
-    }
-
-    requestAnimationFrame(() => map.invalidateSize());
+      if (allPoints.length > 1 && !activeRoute?.googlePath?.length) {
+        const bounds = new googleMaps.maps.LatLngBounds();
+        allPoints.forEach((point) => bounds.extend(point));
+        mapRef.current.fitBounds(bounds);
+      }
+    };
+    void renderOverlays();
+    return () => { cancelled = true; };
   }, [activeRoute, alternativeRoutes, destination, markers, status, userLocation]);
 
   const changeZoom = (delta: number) => {
-    const next = Math.min(19, Math.max(3, zoomLevel + delta));
+    const next = Math.min(20, Math.max(2, zoomLevel + delta));
     setZoomLevel(next);
     mapRef.current?.setZoom(next);
   };
@@ -233,67 +181,40 @@ export const MapView = ({
       onRecenter?.();
       return;
     }
-
-    const nextZoom = 16;
-    setZoomLevel(nextZoom);
-    mapRef.current?.setView([userLocation.latitude, userLocation.longitude], nextZoom);
+    mapRef.current?.setCenter(toGoogle(userLocation.latitude, userLocation.longitude));
+    mapRef.current?.setZoom(16);
+    setZoomLevel(16);
     onRecenter?.();
   };
 
   return (
-    <div
-      className={`relative w-full h-full min-h-[240px] overflow-hidden bg-slate-100 ${className}`}
-      role="region"
-      aria-label="OpenStreetMap"
-    >
-      <div
-        ref={containerRef}
-        className="absolute inset-0 z-0"
-        style={{ width: '100%', height: '100%', minHeight: '240px' }}
-      />
-
+    <div className={`relative w-full h-full overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google Maps">
+      <div ref={containerRef} className="absolute inset-0" />
       {status === 'loading' && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100/90">
-          <p className="text-sm font-medium text-slate-600">Loading map…</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 z-10">
+          <p className="text-sm font-medium text-slate-600">Loading Google Maps…</p>
         </div>
       )}
-
       {status === 'error' && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100 p-6">
-          <div className="max-w-sm rounded-xl border border-rose-200 bg-white p-5 text-center shadow-sm">
+        <div className="absolute inset-0 flex items-center justify-center p-6 bg-slate-100 z-10">
+          <div className="max-w-sm rounded-xl border border-rose-200 bg-white p-5 shadow-sm text-center">
             <p className="font-semibold text-slate-900">Map unavailable</p>
-            <p className="mt-1 text-xs text-slate-500">{error || 'The map could not be initialized.'}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />Retry
-            </button>
+            <p className="mt-1 text-xs text-slate-500">{error === 'MAPS_API_KEY_MISSING' ? 'Google Maps is not configured. Add VITE_GOOGLE_MAPS_API_KEY to the frontend environment.' : 'Google Maps could not be loaded.'}</p>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"><RefreshCw className="h-3.5 w-3.5" /> Retry</button>
           </div>
         </div>
       )}
-
       {status === 'ready' && interactive && (
         <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
-          <button type="button" aria-label="Zoom in" onClick={() => changeZoom(1)} className="rounded-lg bg-white p-2 shadow-md">
-            <Plus className="h-4 w-4" />
-          </button>
-          <button type="button" aria-label="Zoom out" onClick={() => changeZoom(-1)} className="rounded-lg bg-white p-2 shadow-md">
-            <Minus className="h-4 w-4" />
-          </button>
-          <button type="button" aria-label="Center on me" onClick={recenter} disabled={!userLocation} className="rounded-lg bg-white p-2 shadow-md disabled:opacity-50">
-            <LocateFixed className="h-4 w-4" />
-          </button>
+          <button type="button" aria-label="Zoom in" onClick={() => changeZoom(1)} className="rounded-lg bg-white p-2 shadow-md"><Plus className="h-4 w-4" /></button>
+          <button type="button" aria-label="Zoom out" onClick={() => changeZoom(-1)} className="rounded-lg bg-white p-2 shadow-md"><Minus className="h-4 w-4" /></button>
+          <button type="button" aria-label="Center on me" onClick={recenter} disabled={!userLocation} className="rounded-lg bg-white p-2 shadow-md disabled:opacity-50"><LocateFixed className="h-4 w-4" /></button>
         </div>
       )}
-
       {status === 'ready' && alternativeRoutes.length > 0 && (
-        <div className="absolute bottom-3 right-3 z-20 rounded-lg bg-white/95 px-3 py-2 text-[11px] text-slate-600 shadow-md">
+        <div className="absolute bottom-3 right-3 z-20 rounded-lg bg-white/95 px-3 py-2 shadow-md text-[11px] text-slate-600">
           {alternativeRoutes.map((route) => (
-            <button key={route.id} type="button" onClick={() => onSelectRoute?.(route.id)} className="mr-2 font-semibold text-slate-800 last:mr-0">
-              {route.name}
-            </button>
+            <button key={route.id} type="button" onClick={() => onSelectRoute?.(route.id)} className="mr-2 font-semibold text-slate-800 last:mr-0">{route.name}</button>
           ))}
         </div>
       )}
