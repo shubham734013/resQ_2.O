@@ -13,7 +13,7 @@ import {
 import type { UserLocation } from '../types/facility';
 import type { NavigationMode } from '../types/route';
 import { useFacility } from '../hooks/useFacility';
-import { getMockRoutesForFacility } from '../data/mockRoutes';
+import { useGoogleRoute } from '../hooks/useGoogleRoute';
 import { MapView } from '../components/map/MapView';
 import { RouteOption } from '../components/route/RouteOption';
 import { RouteSummary } from '../components/route/RouteSummary';
@@ -24,6 +24,9 @@ import { Button } from '../components/common/Button';
 
 interface LayoutContext {
   currentLocation: UserLocation;
+  location: { latitude: number; longitude: number; accuracyMeters?: number; timestamp: number } | null;
+  permissionState: 'prompt' | 'granted' | 'denied' | 'unsupported' | 'unknown';
+  locationError: string | null;
   refreshLocation: () => void;
   isUpdating: boolean;
 }
@@ -34,21 +37,16 @@ export const RouteNavigationPage = () => {
   const [searchParams] = useSearchParams();
   const isEmergency = searchParams.get('emergency') === 'true';
 
-  const { currentLocation } = useOutletContext<LayoutContext>();
+  const { currentLocation, location, permissionState, locationError, refreshLocation } = useOutletContext<LayoutContext>();
   const { facility, isLoading, isNotFound } = useFacility(facilityId);
+  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useGoogleRoute(facility, location);
 
   // Navigation State Machine
   const [navigationMode, setNavigationMode] = useState<NavigationMode>('preview');
   const [selectedRouteId, setSelectedRouteId] = useState<string>('route-recommended');
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [isMobilePanelExpanded, setIsMobilePanelExpanded] = useState<boolean>(true);
-  const [isRouteUnavailable, setIsRouteUnavailable] = useState<boolean>(false);
-
-  // Generate routes for this facility based on user's current location
-  const availableRoutes = useMemo(() => {
-    if (!facility) return [];
-    return getMockRoutesForFacility(facility, currentLocation);
-  }, [facility, currentLocation]);
+  const isRouteUnavailable = isRouteError || (!isRouteLoading && Boolean(facility) && !location);
 
   const activeRoute = useMemo(() => {
     return availableRoutes.find((r) => r.id === selectedRouteId) || availableRoutes[0] || null;
@@ -157,7 +155,7 @@ export const RouteNavigationPage = () => {
   }
 
   // 3. Route Unavailable Fallback State
-  if (isRouteUnavailable) {
+  if (isRouteUnavailable || isRouteLoading) {
     return (
       <div className="flex-1 max-w-md w-full mx-auto p-6 sm:p-12 text-center space-y-4 my-auto">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
@@ -166,7 +164,7 @@ export const RouteNavigationPage = () => {
         <div className="space-y-1">
           <h2 className="text-lg font-bold text-slate-900">Route Telemetry Unavailable</h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-            Unable to compute optimal driving directions to <strong className="text-slate-800">{facility.name}</strong> at this time.
+            {permissionState !== 'granted' ? 'Allow location access to calculate a real driving route.' : <>Unable to compute a real driving route to <strong className="text-slate-800">{facility.name}</strong> at this time.</>}
           </p>
         </div>
         <div className="pt-2 flex flex-col sm:flex-row justify-center gap-2">
@@ -174,9 +172,9 @@ export const RouteNavigationPage = () => {
             variant="outline"
             size="md"
             icon={<RefreshCw className="w-4 h-4" />}
-            onClick={() => setIsRouteUnavailable(false)}
+            onClick={() => { if (permissionState !== 'granted') refreshLocation(); else void refetchRoute(); }}
           >
-            Retry Route
+            {permissionState !== 'granted' ? 'Try location again' : 'Retry Route'}
           </Button>
           <Button
             variant="primary"
