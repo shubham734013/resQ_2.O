@@ -8,6 +8,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(1),
   RESQ_ADMIN_EMAIL: z.string().email(),
   RESQ_ADMIN_PASSWORD: z.string().min(12),
+  GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
