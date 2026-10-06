@@ -62,5 +62,16 @@ export const useHospitalResourcesMutation = () => {
 };
 export const useHospitalEmergencyStatusMutation = () => {
   const client = useQueryClient();
-  return useMutation({ mutationFn: ({ id, status }: { id: string; status: HospitalEmergencyStatus }) => hospitalApi.updateEmergencyStatus(id, status), onSuccess: (data) => { client.setQueryData(hospitalKeys.emergency(data.id), data); client.invalidateQueries({ queryKey: hospitalKeys.all }); } });
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: HospitalEmergencyStatus }) => hospitalApi.updateEmergencyStatus(id, status),
+    onSuccess: (data) => {
+      client.setQueryData(hospitalKeys.emergency(data.id), data);
+      client.invalidateQueries({ queryKey: hospitalKeys.all });
+    },
+    onError: (_error, variables) => {
+      client.invalidateQueries({ queryKey: hospitalKeys.emergency(variables.id) });
+      client.invalidateQueries({ queryKey: hospitalKeys.emergencies({}) });
+      client.invalidateQueries({ queryKey: hospitalKeys.emergencySummary() });
+    },
+  });
 };
