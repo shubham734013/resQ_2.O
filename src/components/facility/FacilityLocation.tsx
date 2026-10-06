@@ -13,9 +13,9 @@ export const FacilityLocation = ({ facility, userLocation, className = '' }: Fac
     <div className={`space-y-3 ${className}`}>
       <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Road route & navigation</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Google Maps route & navigation</span>
           <span className={`text-[11px] font-medium px-2 py-0.5 rounded border ${route ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-            {route ? 'OpenStreetMap route' : 'Route unavailable'}
+            {route ? 'Google route' : 'Route unavailable'}
           </span>
         </div>
         <div className="flex items-center justify-between text-xs gap-3">
@@ -27,7 +27,7 @@ export const FacilityLocation = ({ facility, userLocation, className = '' }: Fac
             </div>
           ) : (
             <div className="text-slate-500">
-              {isLoading ? 'Calculating road-network route…' : isError ? 'Route could not be calculated.' : 'Allow location access for a route.'}
+              {isLoading ? 'Calculating Google route…' : isError ? 'Route could not be calculated.' : 'Allow location access for a route.'}
             </div>
           )}
           {isError && <button type="button" onClick={() => void refetch()} className="inline-flex items-center gap-1 font-semibold text-slate-700"><RefreshCw className="w-3 h-3" />Retry</button>}
