@@ -34,7 +34,6 @@ test('emergency transition rules allow only the operational state machine', () =
   assert.deepEqual(allowedEmergencyTransition.RESOLVED, []);
   assert.deepEqual(allowedEmergencyTransition.CANCELLED, []);
   assert.equal(allowedEmergencyTransition.RECEIVED.includes('PREPARING'), false);
-  assert.equal(allowedEmergencyTransition.RESOLVED.includes('REVIEWING'), false);
 });
 
 test('emergency queue query validates search and bounded pagination', () => {
