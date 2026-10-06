@@ -19,7 +19,7 @@ import {
   getCapabilitiesController, updateCapabilitiesController,
   getAvailabilityController, updateAvailabilityController,
   getResourcesController, updateResourcesController,
-  listEmergenciesController, getEmergencyController, updateEmergencyStatusController,
+  listEmergenciesController, getEmergencySummaryController, getEmergencyController, updateEmergencyStatusController,
   listPatientsController, getPatientController,
   listAmbulancesController, getAmbulanceController,
 } from '../controllers/hospitalController.js';
@@ -50,6 +50,7 @@ hospitalRouter.patch('/availability', validateBody(hospitalAvailabilityUpdateSch
 hospitalRouter.get('/resources', getResourcesController);
 hospitalRouter.patch('/resources', validateBody(hospitalResourcesUpdateSchema), updateResourcesController);
 
+hospitalRouter.get('/emergencies/summary', getEmergencySummaryController);
 hospitalRouter.get('/emergencies', validateQuery(hospitalEmergencyListQuerySchema), listEmergenciesController);
 hospitalRouter.get('/emergencies/:id', getEmergencyController);
 hospitalRouter.patch('/emergencies/:id/status', validateBody(hospitalEmergencyStatusUpdateSchema), updateEmergencyStatusController);
