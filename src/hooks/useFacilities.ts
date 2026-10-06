@@ -25,7 +25,8 @@ export function useFacilities(filters: UseFacilitiesFilter = {}) {
     staleTime: 60_000,
   });
 
-  const facilities = query.data?.items ?? [];
+  const facilitiesData = query.data?.items;
+  const facilities = useMemo(() => facilitiesData ?? [], [facilitiesData]);
   const selectedFacility = useMemo(
     () => (selectedFacilityId ? facilities.find((facility) => facility.id === selectedFacilityId) ?? null : null),
     [facilities, selectedFacilityId],

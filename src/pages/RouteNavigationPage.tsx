@@ -13,7 +13,7 @@ import {
 import type { UserLocation } from '../types/facility';
 import type { NavigationMode } from '../types/route';
 import { useFacility } from '../hooks/useFacility';
-import { useGoogleRoute } from '../hooks/useGoogleRoute';
+import { useMapRoute } from '../hooks/useMapRoute';
 import { MapView } from '../components/map/MapView';
 import { RouteOption } from '../components/route/RouteOption';
 import { RouteSummary } from '../components/route/RouteSummary';
@@ -39,7 +39,7 @@ export const RouteNavigationPage = () => {
 
   const { currentLocation, location, permissionState, refreshLocation } = useOutletContext<LayoutContext>();
   const { facility, isLoading, isNotFound } = useFacility(facilityId);
-  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useGoogleRoute(facility, location ? currentLocation : null);
+  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useMapRoute(facility, location ? currentLocation : null);
   useEffect(() => {
     if (permissionState === 'prompt') refreshLocation();
   }, [permissionState, refreshLocation]);
@@ -126,7 +126,7 @@ export const RouteNavigationPage = () => {
       <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-4 min-h-[60vh]">
         <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-xs text-slate-500 font-medium">
-          Calculating optimal route telemetry...
+          Calculating Google Maps route...
         </p>
       </div>
     );
@@ -165,7 +165,7 @@ export const RouteNavigationPage = () => {
           <AlertTriangle className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-lg font-bold text-slate-900">Route Telemetry Unavailable</h2>
+          <h2 className="text-lg font-bold text-slate-900">Google Maps route unavailable</h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
             {permissionState !== 'granted' ? 'Allow location access to calculate a real driving route.' : <>Unable to compute a real driving route to <strong className="text-slate-800">{facility.name}</strong> at this time.</>}
           </p>

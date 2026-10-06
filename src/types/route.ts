@@ -1,7 +1,7 @@
 import type { UserLocation } from './facility';
 import type { MapCoordinate } from './maps';
 
-export type TrafficCondition = 'light' | 'moderate' | 'heavy';
+export type TrafficCondition = 'light' | 'moderate' | 'heavy' | 'unknown';
 
 export type ManeuverType = 'straight' | 'turn-right' | 'turn-left' | 'slight-right' | 'slight-left' | 'u-turn' | 'arrive';
 

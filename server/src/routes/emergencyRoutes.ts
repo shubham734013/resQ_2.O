@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { authenticate } from '../middlewares/authenticate.js';
+import { authorizeRole } from '../middlewares/authorizeRole.js';
+import { validateBody } from '../middlewares/validate.js';
+import { createEmergencyRequestSchema } from '../schemas/emergency.js';
+import { createEmergency,getEmergency } from '../controllers/emergencyController.js';
+export const emergencyRouter=Router();
+emergencyRouter.use(authenticate,authorizeRole('USER'));
+emergencyRouter.post('/',validateBody(createEmergencyRequestSchema),createEmergency);
+emergencyRouter.get('/:id',getEmergency);

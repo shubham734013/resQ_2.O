@@ -9,24 +9,37 @@ const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][
   distance: route.distanceText,
   duration: route.durationText,
   durationSeconds: route.durationSeconds,
-  trafficCondition: route.trafficCondition === 'HEAVY' ? 'heavy' : route.trafficCondition === 'MODERATE' ? 'moderate' : 'light',
+  trafficCondition: route.trafficCondition === 'HEAVY'
+    ? 'heavy'
+    : route.trafficCondition === 'MODERATE'
+      ? 'moderate'
+      : route.trafficCondition === 'UNKNOWN'
+        ? 'unknown'
+        : 'light',
   summary: route.summary,
-  viaRoute: route.trafficCondition === 'UNKNOWN' ? 'Google route' : route.trafficCondition === 'HEAVY' ? 'Traffic-aware' : 'Traffic-aware route',
+  viaRoute: 'Google route',
   isRecommended: route.recommended,
   polylinePoints: route.polyline.map((point) => ({ x: 0, y: 0, latitude: point.latitude, longitude: point.longitude })),
   googlePath: route.polyline,
   instructions: route.instructions,
 });
 
-export function useGoogleRoute(facility: Facility | null, location: UserLocation | null) {
+export function useMapRoute(facility: Facility | null, location: UserLocation | null) {
   const origin = location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
     ? { latitude: location.latitude, longitude: location.longitude }
     : null;
-  const destination = facility ? { latitude: facility.latitude, longitude: facility.longitude } : null;
+  const destination = facility
+    ? { latitude: facility.latitude, longitude: facility.longitude }
+    : null;
 
   const query = useQuery({
     queryKey: ['google-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
-    queryFn: () => mapsApi.route({ origin: origin as { latitude: number; longitude: number }, destination: destination as { latitude: number; longitude: number }, travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE' }),
+    queryFn: () => mapsApi.route({
+      origin: origin as { latitude: number; longitude: number },
+      destination: destination as { latitude: number; longitude: number },
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
+    }),
     enabled: Boolean(origin && destination),
     staleTime: 30_000,
     retry: 1,
