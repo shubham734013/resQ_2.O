@@ -68,12 +68,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [setAuthenticatedUser]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void refreshUser().catch(() => {
       setAuthenticatedUser(null);
     });
   }, [refreshUser, setAuthenticatedUser]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(async (input: LoginRequest): Promise<AuthUser> => {
     const response = await authApi.login(input);
