@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-const latitude = z.number().finite().min(-90).max(90);
-const longitude = z.number().finite().min(-180).max(180);
+const latitude = z.coerce.number().finite().min(-90).max(90);
+const longitude = z.coerce.number().finite().min(-180).max(180);
 
 export const coordinateSchema = z.object({ latitude, longitude }).strict();
 
