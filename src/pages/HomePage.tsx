@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   List,
@@ -10,7 +10,8 @@ import { SearchBar } from '../components/search/SearchBar';
 import { FacilityFilterChips } from '../components/facility/FacilityFilterChips';
 import { FacilityList } from '../components/facility/FacilityList';
 import { FacilityPreview } from '../components/facility/FacilityPreview';
-import { MapPlaceholder } from '../components/map/MapPlaceholder';
+import { MapView } from '../components/map/MapView';
+import { useNearbyFacilities } from '../hooks/useNearbyFacilities';
 import { useFacilities } from '../hooks/useFacilities';
 import type { Facility, FacilityCategory, UserLocation } from '../types/facility';
 
@@ -22,6 +23,8 @@ interface LayoutContext {
 
 export const HomePage = () => {
   const { currentLocation, refreshLocation } = useOutletContext<LayoutContext>();
+  const hasLocation = Number.isFinite(currentLocation.latitude) && Number.isFinite(currentLocation.longitude) && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
+  const nearby = useNearbyFacilities(hasLocation ? currentLocation.latitude : null, hasLocation ? currentLocation.longitude : null);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,9 +49,9 @@ export const HomePage = () => {
     emergencyOnly,
   });
 
-  const handleSelectFacility = (facility: Facility) => {
+  const handleSelectFacility = useCallback((facility: Facility) => {
     setSelectedFacilityId(facility.id);
-  };
+  }, [setSelectedFacilityId]);
 
   const handleDismissSelection = () => {
     setSelectedFacilityId(null);
@@ -67,6 +70,35 @@ export const HomePage = () => {
   const handleSuggestionClick = (suggestion: string) => {
     setSearchQuery(suggestion);
   };
+
+  const mapMarkers = useMemo(() => {
+    const source = nearby.data?.items ?? [];
+    if (source.length > 0) {
+      return source.map((item) => ({
+        id: item.id,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        title: item.name,
+        subtitle: item.emergencyAvailability,
+        isEmergency: item.emergencyAvailability === 'AVAILABLE',
+        onClick: () => {
+          const facility = facilities.find((candidate) => candidate.id === item.id);
+          if (facility) handleSelectFacility(facility);
+        },
+      }));
+    }
+    return facilities
+      .filter((facility) => Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude))
+      .map((facility) => ({
+        id: facility.id,
+        latitude: facility.latitude,
+        longitude: facility.longitude,
+        title: facility.name,
+        subtitle: facility.openStatus,
+        isEmergency: facility.emergencyAvailable,
+        onClick: () => handleSelectFacility(facility),
+      }));
+  }, [nearby.data?.items, facilities, handleSelectFacility]);
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-slate-100">
@@ -166,11 +198,11 @@ export const HomePage = () => {
           aria-label="Map view"
           className="flex-1 h-full relative overflow-hidden bg-slate-200"
         >
-          <MapPlaceholder
-            facilities={facilities}
-            selectedFacility={selectedFacility}
-            userLocation={currentLocation}
-            onSelectFacility={handleSelectFacility}
+          <MapView
+            center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (facilities[0] ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude } : undefined)}
+            userLocation={hasLocation ? currentLocation : undefined}
+            markers={mapMarkers}
+            interactive
             onRecenter={refreshLocation}
           />
         </section>
@@ -228,11 +260,11 @@ export const HomePage = () => {
           <div className="relative w-full h-full flex flex-col">
             {/* Map Canvas */}
             <div className="flex-1 w-full h-full">
-              <MapPlaceholder
-                facilities={facilities}
-                selectedFacility={selectedFacility}
-                userLocation={currentLocation}
-                onSelectFacility={handleSelectFacility}
+              <MapView
+                center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (facilities[0] ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude } : undefined)}
+                userLocation={hasLocation ? currentLocation : undefined}
+                markers={mapMarkers}
+                interactive
                 onRecenter={refreshLocation}
               />
             </div>

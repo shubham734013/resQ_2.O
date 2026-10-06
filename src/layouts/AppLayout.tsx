@@ -4,30 +4,28 @@ import { BottomNavigation } from '../components/navigation/BottomNavigation';
 import { useLocationState } from '../hooks/useLocationState';
 
 export const AppLayout = () => {
-  const { currentLocation, isUpdating, refreshLocation } = useLocationState();
-  const location = useLocation();
+  const { currentLocation, location: currentGeoLocation, isUpdating, permissionState, locationError, refreshLocation } = useLocationState();
+  const routeLocation = useLocation();
 
-  const isEmergencyRoute = location.pathname.startsWith('/sos');
-  const isRoutePage = location.pathname.startsWith('/route');
-  const isAmbulanceRoute = location.pathname.startsWith('/ambulance');
-  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isEmergencyRoute = routeLocation.pathname.startsWith('/sos');
+  const isRoutePage = routeLocation.pathname.startsWith('/route');
+  const isAmbulanceRoute = routeLocation.pathname.startsWith('/ambulance');
+  const isAdminRoute = routeLocation.pathname.startsWith('/admin');
 
-  if (
-    isEmergencyRoute ||
-    isRoutePage ||
-    isAmbulanceRoute ||
-    isAdminRoute
-  ) {
+  const context = {
+    currentLocation,
+    location: currentGeoLocation,
+    permissionState,
+    locationError,
+    refreshLocation,
+    isUpdating,
+  };
+
+  if (isEmergencyRoute || isRoutePage || isAmbulanceRoute || isAdminRoute) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
         <main className="flex-1 flex flex-col overflow-hidden">
-          <Outlet
-            context={{
-              currentLocation,
-              refreshLocation,
-              isUpdating,
-            }}
-          />
+          <Outlet context={context} />
         </main>
       </div>
     );
@@ -35,22 +33,10 @@ export const AppLayout = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
-      <AppHeader
-        userLocation={currentLocation}
-        isUpdatingLocation={isUpdating}
-        onRefreshLocation={refreshLocation}
-      />
-
+      <AppHeader userLocation={currentLocation} isUpdatingLocation={isUpdating} onRefreshLocation={refreshLocation} />
       <main className="flex-1 flex flex-col pb-16 md:pb-0 overflow-x-hidden">
-        <Outlet
-          context={{
-            currentLocation,
-            refreshLocation,
-            isUpdating,
-          }}
-        />
+        <Outlet context={context} />
       </main>
-
       <BottomNavigation />
     </div>
   );
