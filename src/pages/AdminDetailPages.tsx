@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { AdminLayout } from '../components/admin/AdminLayout';
@@ -140,10 +140,4 @@ export const AdminDriverDetailPage = () => {
     <Field label="Registered location" value={d.registeredLatitude !== undefined && d.registeredLongitude !== undefined ? `${d.registeredLatitude}, ${d.registeredLongitude}` : 'Not provided'} />
     <Field label="Created" value={new Date(d.createdAt).toLocaleString()} /><Field label="Updated" value={new Date(d.updatedAt).toLocaleString()} />
   </DetailGrid></Panel></Shell>;
-};
-
-export const AdminManagementFilter = ({ children, onClear }: { children: ReactNode; onClear: () => void }) => {
-  const [hasFilters, setHasFilters] = useState(false);
-  useEffect(() => setHasFilters(true), []);
-  return <div className="flex flex-wrap items-end gap-2 border-b border-slate-200 p-4">{children}<Button size="sm" variant="ghost" disabled={!hasFilters} onClick={onClear}>Clear</Button></div>;
 };
