@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
-import { AlertCircle, CheckCircle2, Hospital, MapPin, Phone, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Hospital, RefreshCw } from 'lucide-react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/common/Button';
 import { AmbulanceStatus } from '../components/ambulance/AmbulanceStatus';
 import { AmbulanceLayout } from '../components/ambulance/AmbulanceLayout';
 import { NavigationPanel } from '../components/ambulance/NavigationPanel';
-import { TripAction } from '../components/ambulance/TripAction';
 import { MapView } from '../components/map/MapView';
 import { ambulanceDriverApi } from '../services/ambulanceDriverApi';
 import { useAmbulanceRoute } from '../hooks/useAmbulanceRoute';
