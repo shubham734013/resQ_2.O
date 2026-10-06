@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
@@ -31,7 +31,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
