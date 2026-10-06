@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   List,
@@ -10,7 +10,8 @@ import { SearchBar } from '../components/search/SearchBar';
 import { FacilityFilterChips } from '../components/facility/FacilityFilterChips';
 import { FacilityList } from '../components/facility/FacilityList';
 import { FacilityPreview } from '../components/facility/FacilityPreview';
-import { MapPlaceholder } from '../components/map/MapPlaceholder';
+import { MapView } from '../components/map/MapView';
+import { useNearbyFacilities } from '../hooks/useNearbyFacilities';
 import { useFacilities } from '../hooks/useFacilities';
 import type { Facility, FacilityCategory, UserLocation } from '../types/facility';
 
@@ -22,6 +23,8 @@ interface LayoutContext {
 
 export const HomePage = () => {
   const { currentLocation, refreshLocation } = useOutletContext<LayoutContext>();
+  const hasLocation = Number.isFinite(currentLocation.latitude) && Number.isFinite(currentLocation.longitude) && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
+  const nearby = useNearbyFacilities(hasLocation ? currentLocation.latitude : null, hasLocation ? currentLocation.longitude : null);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,11 +169,11 @@ export const HomePage = () => {
           aria-label="Map view"
           className="flex-1 h-full relative overflow-hidden bg-slate-200"
         >
-          <MapPlaceholder
-            facilities={facilities}
-            selectedFacility={selectedFacility}
-            userLocation={currentLocation}
-            onSelectFacility={handleSelectFacility}
+          <MapView
+            center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (facilities[0] ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude } : undefined)}
+            userLocation={hasLocation ? currentLocation : undefined}
+            markers={mapMarkers}
+            interactive
             onRecenter={refreshLocation}
           />
         </section>
