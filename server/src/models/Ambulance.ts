@@ -3,9 +3,46 @@ import { ACCOUNT_STATUSES, VERIFICATION_STATUSES, type AccountStatus, type Verif
 
 export const AMBULANCE_STATUSES = ['AVAILABLE', 'BUSY', 'OFFLINE', 'MAINTENANCE'] as const;
 export type AmbulanceStatus = (typeof AMBULANCE_STATUSES)[number];
-export interface AmbulanceDocument { registrationNumber: string; vehicleNumber: string; providerId: Types.ObjectId; ambulanceType: string; capabilities: string[]; currentStatus: AmbulanceStatus; currentLatitude?: number; currentLongitude?: number; serviceArea?: string; verificationStatus: VerificationStatus; accountStatus: AccountStatus; createdAt: Date; updatedAt: Date; }
+export interface AmbulanceLocation { type: 'Point'; coordinates: [number, number]; }
+
+export interface AmbulanceDocument {
+  registrationNumber: string;
+  vehicleNumber: string;
+  providerId: Types.ObjectId;
+  ambulanceType: string;
+  capabilities: string[];
+  currentStatus: AmbulanceStatus;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  location?: AmbulanceLocation;
+  locationUpdatedAt?: Date;
+  serviceArea?: string;
+  verificationStatus: VerificationStatus;
+  accountStatus: AccountStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 const schema = new Schema<AmbulanceDocument>({
-  registrationNumber: { type: String, required: true, unique: true, index: true }, vehicleNumber: { type: String, required: true, unique: true, index: true }, providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true }, ambulanceType: { type: String, required: true }, capabilities: { type: [String], default: [] }, currentStatus: { type: String, enum: AMBULANCE_STATUSES, default: 'OFFLINE', index: true }, currentLatitude: Number, currentLongitude: Number, serviceArea: String, verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' }, accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
+  registrationNumber: { type: String, required: true, unique: true, index: true },
+  vehicleNumber: { type: String, required: true, unique: true, index: true },
+  providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true },
+  ambulanceType: { type: String, required: true },
+  capabilities: { type: [String], default: [] },
+  currentStatus: { type: String, enum: AMBULANCE_STATUSES, default: 'OFFLINE', index: true },
+  currentLatitude: Number,
+  currentLongitude: Number,
+  location: {
+    type: { type: String, enum: ['Point'], required: false },
+    coordinates: { type: [Number], required: false },
+  },
+  locationUpdatedAt: Date,
+  serviceArea: String,
+  verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' },
+  accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
 }, { timestamps: true });
+
+schema.index({ location: '2dsphere' });
 schema.index({ currentLatitude: 1, currentLongitude: 1 });
+
 export const AmbulanceModel = model<AmbulanceDocument>('Ambulance', schema);
