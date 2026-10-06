@@ -3,7 +3,7 @@ import { useCurrentLocation } from './useCurrentLocation';
 import type { UserLocation } from '../types/facility';
 
 export function useLocationState() {
-  const { location, loading, permissionState, error, refreshLocation } = useCurrentLocation(false);
+  const { location, loading, permissionState, error, refreshLocation } = useCurrentLocation();
 
   const currentLocation = useMemo<UserLocation>(() => {
     if (!location) {
