@@ -23,7 +23,7 @@ export const authApi={
  socialLogin:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<AuthResponse>=>postJson(`/auth/${provider}`,input),
  linkSocial:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<{success:true;data:AuthUser}>=>postJson(`/auth/link/${provider}`,input),
  me:():Promise<CurrentUserResponse>=>request('/auth/me'),
- logout:():Promise<{success:true;data:{loggedOut:boolean}}=>postJson('/auth/logout',{}),
+ logout:():Promise<{success:true;data:{loggedOut:boolean}}>=>postJson('/auth/logout',{}),
  refresh:():Promise<AuthResponse>=>postJson('/auth/refresh',{}),
 };
 export const getAuthApiBaseUrl=():string=>API_BASE_URL;
