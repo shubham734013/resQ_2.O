@@ -29,10 +29,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const mapsApi = {
-  nearbyFacilities: (latitude: number, longitude: number, radius = 10000, page = 1, limit = 50) =>
-    request<{ items: FacilityMapItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
-      '/facilities/nearby?latitude=' + latitude + '&longitude=' + longitude + '&radius=' + radius + '&page=' + page + '&limit=' + limit,
-    ),
+  nearbyFacilities: (latitude: number, longitude: number, options: { radius?: number; page?: number; limit?: number; emergencyAvailability?: string; hospitalType?: string; service?: string; capability?: string } = {}) => {
+    const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), radius: String(options.radius ?? 10000), page: String(options.page ?? 1), limit: String(options.limit ?? 50) });
+    if (options.emergencyAvailability) params.set('emergencyAvailability', options.emergencyAvailability);
+    if (options.hospitalType) params.set('hospitalType', options.hospitalType);
+    if (options.service) params.set('service', options.service);
+    if (options.capability) params.set('capability', options.capability);
+    return request<{ items: FacilityMapItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>('/facilities/nearby?' + params.toString());
+  },
   nearbyAmbulances: (latitude: number, longitude: number, radius = 10000) =>
     request<{ items: AmbulanceMapItem[]; updatedAt: string }>(
       '/ambulances/nearby?latitude=' + latitude + '&longitude=' + longitude + '&radius=' + radius,
