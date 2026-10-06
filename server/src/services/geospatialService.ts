@@ -10,7 +10,7 @@ const point = (latitude: number, longitude: number) => ({
   coordinates: [longitude, latitude] as [number, number],
 });
 
-const escapeRegex = (value: string): string => value.replace(/[.*+?^()|[\\]\\]/g, '\\$&');
+const escapeRegex = (value: string): string => value.replace(/[\\^$.*+?()[\\]{}|]/g, '\\const escapeRegex = (value: string): string => value.replace(/[.*+?^()|[\\]\\]/g, '\\$&');');
 
 const pagination = <T>(items: T[], total: number, query: NearbyQuery) => ({
   items,
