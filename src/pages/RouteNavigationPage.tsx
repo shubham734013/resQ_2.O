@@ -40,7 +40,10 @@ export const RouteNavigationPage = () => {
   const { currentLocation, location, permissionState, locationError, refreshLocation } = useOutletContext<LayoutContext>();
   const { facility, isLoading, isNotFound } = useFacility(facilityId);
   const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useGoogleRoute(facility, location);
-  useEffect(() => {\n    if (permissionState === 'prompt') refreshLocation();\n  }, [permissionState, refreshLocation]);\n
+  useEffect(() => {
+    if (permissionState === 'prompt') refreshLocation();
+  }, [permissionState, refreshLocation]);
+
   // Navigation State Machine
   const [navigationMode, setNavigationMode] = useState<NavigationMode>('preview');
   const [selectedRouteId, setSelectedRouteId] = useState<string>('route-recommended');
