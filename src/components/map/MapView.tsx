@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LocateFixed, Minus, Plus, RefreshCw } from 'lucide-react';
 import type { MapViewProps } from '../../types/route';
-import type { GoogleAdvancedMarker, GoogleMapInstance, GoogleMapsApi, GooglePolyline } from '../../types/googleMaps';
+import type { GoogleAdvancedMarker, GoogleMapInstance, GooglePolyline } from '../../types/googleMaps';
 import { loadGoogleMaps } from '../../services/googleMapsLoader';
 
 interface AdvancedMarkerConstructor {
