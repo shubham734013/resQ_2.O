@@ -85,9 +85,19 @@ const verifyMicrosoft = async (credential: string): Promise<VerifiedSocialIdenti
     authority + '/v2.0/.well-known/openid-configuration',
     60 * 60 * 1000,
   );
-  const payload = await verifyJwtWithJwks(credential, oidc.jwks_uri, oidc.issuer, env.MICROSOFT_CLIENT_ID);
-  if (env.MICROSOFT_TENANT_ID && payload.tid !== env.MICROSOFT_TENANT_ID) {
+  const decoded = jwt.decode(credential);
+  const tokenTenant = decoded && typeof decoded === 'object' && typeof decoded.tid === 'string' ? decoded.tid : '';
+  if (!tokenTenant) throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Microsoft account identity could not be verified', 401);
+  const configuredTenant = env.MICROSOFT_TENANT_ID;
+  const expectedIssuer = oidc.issuer.includes('{tenantid}')
+    ? oidc.issuer.replace('{tenantid}', tokenTenant)
+    : oidc.issuer;
+  const payload = await verifyJwtWithJwks(credential, oidc.jwks_uri, expectedIssuer, env.MICROSOFT_CLIENT_ID);
+  if (configuredTenant && !['common', 'organizations', 'consumers'].includes(configuredTenant) && payload.tid !== configuredTenant) {
     throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Microsoft tenant is not allowed', 401);
+  }
+  if (payload.tid !== tokenTenant || payload.iss !== expectedIssuer) {
+    throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Microsoft token issuer is invalid', 401);
   }
   const providerSubject = typeof payload.sub === 'string' ? payload.sub : '';
   const candidate = typeof payload.email === 'string'
