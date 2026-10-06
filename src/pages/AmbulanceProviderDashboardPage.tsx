@@ -24,7 +24,7 @@ export const AmbulanceProviderDashboardPage=()=>{
  const activeAmb=(ambulances.data?.items??[]).filter(x=>x.currentStatus==='AVAILABLE').length;
  const busyAmb=(ambulances.data?.items??[]).filter(x=>x.currentStatus==='BUSY').length;
  const onlineDrivers=(drivers.data?.items??[]).filter(x=>x.availabilityStatus==='ONLINE').length;
- const busyDrivers=(drivers.data?.items??[]).filter(x=>x.availabilityStatus==='BUSY').length;
+
  const nav=useMemo(()=>['overview','ambulances','drivers','requests','trips','profile'] as const,[]);
  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">ResQ Operations</p><h1 className="text-2xl font-bold">{profile.data?.name??'Ambulance Provider'}</h1></div><Link to="/login" className="text-sm font-semibold text-slate-600">Sign in</Link></div></header>
  <div className="mx-auto max-w-7xl px-4 py-6"><nav className="mb-6 flex flex-wrap gap-2">{nav.map(x=><button key={x} onClick={()=>setSection(x)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${section===x?'bg-slate-900 text-white':'bg-white text-slate-600 border border-slate-200'}`}>{x[0].toUpperCase()+x.slice(1)}</button>)}</nav>
