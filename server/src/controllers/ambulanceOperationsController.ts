@@ -1,0 +1,42 @@
+import type { Request, Response } from 'express';
+import type { AuthenticatedRequest } from '../types/auth.js';
+import { sendSuccess } from '../utils/apiResponse.js';
+import * as service from '../services/ambulanceOperationsService.js';
+
+const authId=(req:Request,role:'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER')=>{const a=(req as AuthenticatedRequest).auth;if(!a||a.role!==role)throw new Error('Authentication required');return a.id;};
+const id=(req:Request,name='id')=>{const v=req.params[name];if(typeof v!=='string')throw new Error(`Invalid ${name}`);return v;};
+const q=<T>(res:Response)=>res.locals.validatedQuery as T;
+
+export const providerProfile=async(req:Request,res:Response)=>sendSuccess(res,await service.getProviderProfile(authId(req,'AMBULANCE_PROVIDER')));
+export const providerProfileUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateProviderProfile(authId(req,'AMBULANCE_PROVIDER'),req.body));
+export const providerAmbulances=async(req:Request,res:Response)=>sendSuccess(res,await service.listAmbulances(authId(req,'AMBULANCE_PROVIDER'),q(res)));
+export const providerAmbulance=async(req:Request,res:Response)=>sendSuccess(res,await service.getAmbulance(authId(req,'AMBULANCE_PROVIDER'),id(req)));
+export const providerAmbulanceCreate=async(req:Request,res:Response)=>sendSuccess(res,await service.createAmbulance(authId(req,'AMBULANCE_PROVIDER'),req.body),201);
+export const providerAmbulanceUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateAmbulance(authId(req,'AMBULANCE_PROVIDER'),id(req),req.body));
+export const providerAmbulanceStatus=async(req:Request,res:Response)=>sendSuccess(res,await service.updateAmbulanceStatus(authId(req,'AMBULANCE_PROVIDER'),id(req),req.body.status));
+export const providerDrivers=async(req:Request,res:Response)=>sendSuccess(res,await service.listDrivers(authId(req,'AMBULANCE_PROVIDER'),q(res)));
+export const providerDriver=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriver(authId(req,'AMBULANCE_PROVIDER'),id(req)));
+export const providerDriverCreate=async(req:Request,res:Response)=>sendSuccess(res,await service.createDriver(authId(req,'AMBULANCE_PROVIDER'),req.body),201);
+export const providerDriverUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriver(authId(req,'AMBULANCE_PROVIDER'),id(req),req.body));
+export const assignDriver=async(req:Request,res:Response)=>sendSuccess(res,await service.assignDriver(authId(req,'AMBULANCE_PROVIDER'),id(req,'ambulanceId'),req.body.driverId));
+export const unassignDriver=async(req:Request,res:Response)=>sendSuccess(res,await service.unassignDriver(authId(req,'AMBULANCE_PROVIDER'),id(req,'ambulanceId')));
+export const providerRequests=async(req:Request,res:Response)=>sendSuccess(res,await service.listProviderRequests(authId(req,'AMBULANCE_PROVIDER'),q(res)));
+export const providerRequest=async(req:Request,res:Response)=>sendSuccess(res,await service.getProviderRequest(authId(req,'AMBULANCE_PROVIDER'),id(req)));
+export const assignRequest=async(req:Request,res:Response)=>sendSuccess(res,await service.assignRequest(authId(req,'AMBULANCE_PROVIDER'),id(req),req.body.ambulanceId));
+export const providerTrips=async(req:Request,res:Response)=>sendSuccess(res,await service.listProviderTrips(authId(req,'AMBULANCE_PROVIDER'),q(res)));
+export const providerTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.getProviderTrip(authId(req,'AMBULANCE_PROVIDER'),id(req)));
+
+export const driverProfile=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverProfile(authId(req,'AMBULANCE_DRIVER')));
+export const driverProfileUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverProfile(authId(req,'AMBULANCE_DRIVER'),req.body));
+export const driverStatus=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverStatus(authId(req,'AMBULANCE_DRIVER')));
+export const driverStatusUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverStatus(authId(req,'AMBULANCE_DRIVER'),req.body.status));
+export const driverRequests=async(req:Request,res:Response)=>sendSuccess(res,await service.listDriverRequests(authId(req,'AMBULANCE_DRIVER'),q(res)));
+export const driverRequest=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const driverAccept=async(req:Request,res:Response)=>sendSuccess(res,await service.acceptRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const driverReject=async(req:Request,res:Response)=>sendSuccess(res,await service.rejectRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const driverTrips=async(req:Request,res:Response)=>sendSuccess(res,await service.listDriverTrips(authId(req,'AMBULANCE_DRIVER'),q(res)));
+export const driverTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const arrivedPickup=async(req:Request,res:Response)=>sendSuccess(res,await service.arrivedPickup(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const patientPickedUp=async(req:Request,res:Response)=>sendSuccess(res,await service.patientPickedUp(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const arrivedHospital=async(req:Request,res:Response)=>sendSuccess(res,await service.arrivedHospital(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const completeTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.completeTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));
