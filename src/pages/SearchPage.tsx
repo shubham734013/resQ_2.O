@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { List, Map as MapIcon, ShieldAlert } from 'lucide-react';
 import { SearchBar } from '../components/search/SearchBar';
 import { FacilityFilterChips } from '../components/facility/FacilityFilterChips';
@@ -18,7 +18,6 @@ interface LayoutContext {
 const QUICK_TERMS = ['Hospital', 'Emergency', 'Trauma', 'Clinic', 'City Hospital'];
 
 export const SearchPage = () => {
-  const navigate = useNavigate();
   const { currentLocation, refreshLocation } = useOutletContext<LayoutContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<FacilityCategory>('all');
