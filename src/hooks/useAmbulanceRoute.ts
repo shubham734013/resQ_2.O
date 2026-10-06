@@ -2,18 +2,40 @@ import { useQuery } from '@tanstack/react-query';
 import { mapsApi } from '../services/mapsApi';
 import type { RouteOptionItem } from '../types/route';
 
-interface Coordinate { latitude:number; longitude:number }
+interface Coordinate { latitude: number; longitude: number }
 
-const mapRoute=(route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][number]):RouteOptionItem=>({
- id:route.id,name:route.recommended?'Fastest route':'Alternative route',distance:route.distanceText,duration:route.durationText,durationSeconds:route.durationSeconds,
- trafficCondition:route.trafficCondition==='HEAVY'?'heavy':route.trafficCondition==='MODERATE'?'moderate':'light',summary:route.summary,
- viaRoute:route.trafficCondition==='HEAVY'?'Traffic-aware':route.trafficCondition==='UNKNOWN'?'Google route':'Traffic-aware route',
- isRecommended:route.recommended,polylinePoints:route.polyline.map(p=>({x:0,y:0,latitude:p.latitude,longitude:p.longitude})),googlePath:route.polyline,instructions:route.instructions,
+const mapRoute = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][number]): RouteOptionItem => ({
+  id: route.id,
+  name: route.recommended ? 'Fastest route' : 'Alternative route',
+  distance: route.distanceText,
+  duration: route.durationText,
+  durationSeconds: route.durationSeconds,
+  trafficCondition: route.trafficCondition === 'HEAVY'
+    ? 'heavy'
+    : route.trafficCondition === 'MODERATE'
+      ? 'moderate'
+      : 'unknown',
+  summary: route.summary,
+  viaRoute: 'OpenStreetMap route',
+  isRecommended: route.recommended,
+  polylinePoints: route.polyline.map((p) => ({ x: 0, y: 0, latitude: p.latitude, longitude: p.longitude })),
+  googlePath: route.polyline,
+  instructions: route.instructions,
 });
 
-export function useAmbulanceRoute(origin:Coordinate|null,destination:Coordinate|null){
- const query=useQuery({queryKey:['ambulance-google-route',origin?.latitude,origin?.longitude,destination?.latitude,destination?.longitude],
- queryFn:()=>mapsApi.route({origin:origin as Coordinate,destination:destination as Coordinate,travelMode:'DRIVE',routingPreference:'TRAFFIC_AWARE'}),
- enabled:Boolean(origin&&destination),staleTime:30000,retry:1});
- return {...query,routes:query.data?.routes.map(mapRoute)??[]};
+export function useAmbulanceRoute(origin: Coordinate | null, destination: Coordinate | null) {
+  const query = useQuery({
+    queryKey: ['ambulance-osm-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
+    queryFn: () => mapsApi.route({
+      origin: origin as Coordinate,
+      destination: destination as Coordinate,
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_UNAWARE',
+    }),
+    enabled: Boolean(origin && destination),
+    staleTime: 30_000,
+    retry: 1,
+  });
+
+  return { ...query, routes: query.data?.routes.map(mapRoute) ?? [] };
 }
