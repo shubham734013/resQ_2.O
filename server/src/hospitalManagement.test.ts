@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hospitalProfileUpdateSchema, hospitalEmergencyStatusUpdateSchema, hospitalResourcesUpdateSchema } from './schemas/hospital.js';
+import { hospitalProfileUpdateSchema, hospitalEmergencyStatusUpdateSchema, hospitalResourcesUpdateSchema, hospitalEmergencyListQuerySchema } from './schemas/hospital.js';
 import { allowedEmergencyTransition, hospitalOwnershipFilter } from './services/hospitalService.js';
 
 test('hospital profile rejects admin-owned fields', () => {
@@ -38,7 +38,6 @@ test('emergency transition rules allow only the operational state machine', () =
 });
 
 test('emergency queue query validates search and bounded pagination', () => {
-  const { hospitalEmergencyListQuerySchema } = require('./schemas/hospital.js');
   assert.equal(hospitalEmergencyListQuerySchema.safeParse({ search: 'RSQ-ABC123', page: 1, limit: 50 }).success, true);
   assert.equal(hospitalEmergencyListQuerySchema.safeParse({ page: 0 }).success, false);
   assert.equal(hospitalEmergencyListQuerySchema.safeParse({ limit: 101 }).success, false);
