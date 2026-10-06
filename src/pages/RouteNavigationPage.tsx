@@ -37,9 +37,9 @@ export const RouteNavigationPage = () => {
   const [searchParams] = useSearchParams();
   const isEmergency = searchParams.get('emergency') === 'true';
 
-  const { currentLocation, location, permissionState, locationError, refreshLocation } = useOutletContext<LayoutContext>();
+  const { currentLocation, location, permissionState, refreshLocation } = useOutletContext<LayoutContext>();
   const { facility, isLoading, isNotFound } = useFacility(facilityId);
-  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useGoogleRoute(facility, location);
+  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useGoogleRoute(facility, location ? currentLocation : null);
   useEffect(() => {
     if (permissionState === 'prompt') refreshLocation();
   }, [permissionState, refreshLocation]);
