@@ -6,25 +6,37 @@ import { AmbulanceModel } from '../models/Ambulance.js';
 const migrate = async () => {
   await connectDatabase();
 
-  const hospitals = await HospitalModel.find({
-    location: { $exists: false },
+  const hospitals = await HospitalModel.collection.find({
     latitude: { $type: 'number' },
     longitude: { $type: 'number' },
-  }).exec();
+    $or: [{ location: { $exists: false } }, { location: null }],
+  }).toArray();
+
   for (const hospital of hospitals) {
-    hospital.location = { type: 'Point', coordinates: [hospital.longitude as number, hospital.latitude as number] };
-    await hospital.save();
+    if (typeof hospital.latitude !== 'number' || typeof hospital.longitude !== 'number') continue;
+    await HospitalModel.collection.updateOne(
+      { _id: hospital._id },
+      { $set: { location: { type: 'Point', coordinates: [hospital.longitude, hospital.latitude] } } },
+    );
   }
 
-  const ambulances = await AmbulanceModel.find({
-    location: { $exists: false },
+  const ambulances = await AmbulanceModel.collection.find({
     currentLatitude: { $type: 'number' },
     currentLongitude: { $type: 'number' },
-  }).exec();
+    $or: [{ location: { $exists: false } }, { location: null }],
+  }).toArray();
+
   for (const ambulance of ambulances) {
-    ambulance.location = { type: 'Point', coordinates: [ambulance.currentLongitude as number, ambulance.currentLatitude as number] };
-    ambulance.locationUpdatedAt = ambulance.updatedAt;
-    await ambulance.save();
+    if (typeof ambulance.currentLatitude !== 'number' || typeof ambulance.currentLongitude !== 'number') continue;
+    await AmbulanceModel.collection.updateOne(
+      { _id: ambulance._id },
+      {
+        $set: {
+          location: { type: 'Point', coordinates: [ambulance.currentLongitude, ambulance.currentLatitude] },
+          locationUpdatedAt: ambulance.updatedAt ?? new Date(),
+        },
+      },
+    );
   }
 
   console.log('Migrated hospital locations:', hospitals.length);
