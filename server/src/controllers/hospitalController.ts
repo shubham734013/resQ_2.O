@@ -29,6 +29,7 @@ export const getResourcesController = async (req: Request, res: Response): Promi
 export const updateResourcesController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.updateResources(hospitalId(req), req.body));
 
 export const listEmergenciesController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.listEmergencies(hospitalId(req), query(res)));
+export const getEmergencySummaryController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.getEmergencySummary(hospitalId(req)));
 export const getEmergencyController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.getEmergency(hospitalId(req), id(req)));
 export const updateEmergencyStatusController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.updateEmergencyStatus(hospitalId(req), id(req), req.body.status));
 
