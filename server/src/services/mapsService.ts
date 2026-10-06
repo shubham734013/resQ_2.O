@@ -105,10 +105,10 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
     let remainingSeconds = durationSeconds;
     let remainingMeters = distanceMeters;
     const instructions = steps.map((step, stepIndex) => {
-      const stepSeconds = secondsFromDuration(step.duration);
       const stepMeters = step.distanceMeters ?? 0;
-      remainingSeconds = Math.max(0, remainingSeconds - (stepIndex === 0 ? 0 : steps[stepIndex - 1] ? secondsFromDuration(steps[stepIndex - 1].duration) : 0));
-      remainingMeters = Math.max(0, remainingMeters - (stepIndex === 0 ? 0 : steps[stepIndex - 1]?.distanceMeters ?? 0));
+      const previousStep = stepIndex > 0 ? steps[stepIndex - 1] : undefined;
+      remainingSeconds = Math.max(0, remainingSeconds - secondsFromDuration(previousStep?.duration));
+      remainingMeters = Math.max(0, remainingMeters - (previousStep?.distanceMeters ?? 0));
       return {
         id: 'step-' + index + '-' + stepIndex,
         stepNumber: stepIndex + 1,
