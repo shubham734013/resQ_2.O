@@ -1,20 +1,11 @@
-import { useState } from 'react';
-import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
-import {
-  AlertTriangle,
-  Building2,
-  RefreshCw,
-  Phone,
-  ArrowLeft,
-} from 'lucide-react';
-import type { Facility, UserLocation } from '../types/facility';
-import type {
-  EmergencyFlowStep,
-  EmergencySituationId,
-  FacilityRecommendationItem,
-} from '../types/emergency';
-import { EMERGENCY_SITUATIONS, getRecommendedFacilities } from '../data/emergencySituations';
-import { MOCK_FACILITIES } from '../data/mockFacilities';
+import { useEffect,useMemo,useState } from 'react';
+import { useNavigate,useOutletContext,useSearchParams } from 'react-router-dom';
+import { AlertTriangle,Building2,RefreshCw,Phone,ArrowLeft } from 'lucide-react';
+import type { Facility,UserLocation } from '../types/facility';
+import type { EmergencyFlowStep,EmergencySituationId,FacilityRecommendationItem } from '../types/emergency';
+import { EMERGENCY_SITUATIONS,getRecommendedFacilities } from '../data/emergencySituations';
+import { mapsApi } from '../services/mapsApi';
+import { emergencyApi } from '../services/emergencyApi';
 import { EmergencyMode } from '../components/emergency/EmergencyMode';
 import { SituationSelector } from '../components/emergency/SituationSelector';
 import { LocationConfirmation } from '../components/emergency/LocationConfirmation';
@@ -22,293 +13,21 @@ import { EmergencySearchState } from '../components/emergency/EmergencySearchSta
 import { FacilityRecommendation } from '../components/emergency/FacilityRecommendation';
 import { CoordinationStatus } from '../components/emergency/CoordinationStatus';
 import { Button } from '../components/common/Button';
-
-interface LayoutContext {
-  currentLocation: UserLocation;
-  refreshLocation: () => void;
-  isUpdating: boolean;
-}
-
-export const EmergencyPage = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { currentLocation } = useOutletContext<LayoutContext>();
-
-  // Check if redirected with pre-selected facility (e.g. from /facility/:id back to emergency coordination)
-  const preselectedId = searchParams.get('facility');
-  const preselectedFacility = preselectedId
-    ? MOCK_FACILITIES.find((f) => f.id === preselectedId) ?? null
-    : null;
-
-  // Flow State
-  const [currentStep, setCurrentStep] = useState<EmergencyFlowStep>(
-    preselectedFacility ? 'coordination' : 'situation'
-  );
-  const [selectedSituationId, setSelectedSituationId] = useState<EmergencySituationId | null>(null);
-  const [confirmedLocation, setConfirmedLocation] = useState<UserLocation>(currentLocation);
-  const [recommendations, setRecommendations] = useState<FacilityRecommendationItem[]>([]);
-  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(
-    preselectedFacility
-  );
-
-  // Simulated failure/edge states for prototype demonstration
-  const [isSimulatingSearch, setIsSimulatingSearch] = useState(false);
-  const [hasSearchError, setHasSearchError] = useState(false);
-  const [hasNoFacilitiesError, setHasNoFacilitiesError] = useState(false);
-  const [isLocationUnavailable, setIsLocationUnavailable] = useState(false);
-
-  // Step 1 -> Step 2
-  const handleSituationContinue = () => {
-    if (!selectedSituationId) return;
-    setCurrentStep('location');
-  };
-
-  // Step 2 -> Step 3 (Finding Care) -> Step 4 (Recommendations)
-  const handleLocationConfirm = (location: UserLocation) => {
-    setConfirmedLocation(location);
-    setCurrentStep('searching');
-    setIsSimulatingSearch(true);
-
-    // Simulate short intelligent search (~900ms)
-    setTimeout(() => {
-      if (hasSearchError) {
-        setIsSimulatingSearch(false);
-        return;
-      }
-
-      if (hasNoFacilitiesError) {
-        setRecommendations([]);
-        setIsSimulatingSearch(false);
-        setCurrentStep('recommendations');
-        return;
-      }
-
-      const recs = getRecommendedFacilities(
-        selectedSituationId ?? 'other',
-        MOCK_FACILITIES
-      );
-      setRecommendations(recs);
-      setIsSimulatingSearch(false);
-      setCurrentStep('recommendations');
-    }, 900);
-  };
-
-  // Step 4 -> Step 5 (Select Recommendation)
-  const handleSelectRecommendation = (item: FacilityRecommendationItem) => {
-    setSelectedFacility(item.facility);
-    setCurrentStep('coordination');
-  };
-
-  // Step 4: View Details
-  const handleViewDetails = (item: FacilityRecommendationItem) => {
-    navigate(`/facility/${item.facility.id}?emergency=true`);
-  };
-
-  // Exit Emergency Mode safely
-  const handleExitEmergency = () => {
-    navigate('/');
-  };
-
-  const selectedSituation = EMERGENCY_SITUATIONS.find((s) => s.id === selectedSituationId);
-
-  // Determine header step metadata
-  const getStepMetadata = () => {
-    switch (currentStep) {
-      case 'situation':
-        return { step: 1, label: 'Situation' };
-      case 'location':
-        return { step: 2, label: 'Location' };
-      case 'searching':
-      case 'recommendations':
-        return { step: 3, label: 'Care Options' };
-      case 'coordination':
-        return { step: 4, label: 'Coordination' };
-    }
-  };
-
-  const { step, label } = getStepMetadata();
-
-  return (
-    <EmergencyMode
-      stepNumber={step}
-      totalSteps={4}
-      currentStepLabel={label}
-      onExit={handleExitEmergency}
-    >
-      {/* ========================================================
-          STEP 1: EMERGENCY SITUATION SELECTION
-          ======================================================== */}
-      {currentStep === 'situation' && (
-        <SituationSelector
-          selectedSituation={selectedSituationId}
-          onSelectSituation={setSelectedSituationId}
-          onContinue={handleSituationContinue}
-        />
-      )}
-
-      {/* ========================================================
-          STEP 2: LOCATION CONFIRMATION
-          ======================================================== */}
-      {currentStep === 'location' && (
-        <LocationConfirmation
-          currentLocation={confirmedLocation}
-          onConfirmLocation={handleLocationConfirm}
-          onBack={() => setCurrentStep('situation')}
-          isLocationUnavailable={isLocationUnavailable}
-          onRetryLocation={() => setIsLocationUnavailable(false)}
-        />
-      )}
-
-      {/* ========================================================
-          STEP 3: FINDING SUITABLE CARE (SEARCHING ANIMATION)
-          ======================================================== */}
-      {currentStep === 'searching' && isSimulatingSearch && (
-        <EmergencySearchState situationLabel={selectedSituation?.label} />
-      )}
-
-      {/* ========================================================
-          STEP 4: RECOMMENDED FACILITIES
-          ======================================================== */}
-      {currentStep === 'recommendations' && !isSimulatingSearch && (
-        <div className="space-y-6 flex-1 flex flex-col justify-between">
-          <div className="space-y-4">
-            {/* Header with Situation Summary & Back action */}
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setCurrentStep('location')}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-xs cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Change Location</span>
-              </button>
-
-              {selectedSituation && (
-                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
-                  For: {selectedSituation.label}
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950">
-                Recommended Facilities
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Ranked by active emergency intake readiness, relevant clinical capability, and driving transit time.
-              </p>
-            </div>
-
-            {/* Error State Fallback */}
-            {hasSearchError && (
-              <div
-                role="alert"
-                className="p-5 bg-white border border-rose-200 rounded-xl text-center space-y-3 shadow-xs"
-              >
-                <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-700 flex items-center justify-center mx-auto">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <h3 className="font-bold text-slate-900 text-sm">Connection Error</h3>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  Could not retrieve live hospital readiness data. You can retry or call emergency services directly.
-                </p>
-                <div className="pt-2 flex justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={<RefreshCw className="w-3.5 h-3.5" />}
-                    onClick={() => {
-                      setHasSearchError(false);
-                      handleLocationConfirm(confirmedLocation);
-                    }}
-                  >
-                    Retry Search
-                  </Button>
-                  <Button
-                    variant="emergency"
-                    size="sm"
-                    icon={<Phone className="w-3.5 h-3.5" />}
-                    onClick={() => {
-                      window.location.href = 'tel:911';
-                    }}
-                  >
-                    Call 911
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* No Facilities Found State */}
-            {!hasSearchError && recommendations.length === 0 && (
-              <div
-                role="alert"
-                className="p-6 bg-white border border-slate-200 rounded-xl text-center space-y-4 shadow-xs"
-              >
-                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mx-auto">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">No Suitable Facility Found Nearby</h3>
-                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                    No verified facilities within immediate radius currently report active intake for {selectedSituation?.label}. Please call emergency services immediately.
-                  </p>
-                </div>
-                <div className="pt-2 flex justify-center gap-2">
-                  <Button
-                    variant="emergency"
-                    size="md"
-                    icon={<Phone className="w-4 h-4" />}
-                    onClick={() => {
-                      window.location.href = 'tel:911';
-                    }}
-                  >
-                    Call Emergency 911
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="md"
-                    onClick={() => {
-                      setHasNoFacilitiesError(false);
-                      handleLocationConfirm(confirmedLocation);
-                    }}
-                  >
-                    Broaden Search Area
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Recommendation Cards List */}
-            {!hasSearchError && recommendations.length > 0 && (
-              <div
-                role="feed"
-                aria-label="Recommended facilities"
-                className="space-y-3 pt-1"
-              >
-                {recommendations.map((item, idx) => (
-                  <FacilityRecommendation
-                    key={item.facility.id}
-                    item={item}
-                    isPrimary={idx === 0}
-                    onSelect={handleSelectRecommendation}
-                    onViewDetails={handleViewDetails}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================
-          STEP 5: COORDINATION STATUS
-          ======================================================== */}
-      {currentStep === 'coordination' && selectedFacility && (
-        <CoordinationStatus
-          facility={selectedFacility}
-          onExit={handleExitEmergency}
-        />
-      )}
-    </EmergencyMode>
-  );
+interface LayoutContext{currentLocation:UserLocation;refreshLocation:()=>void;isUpdating:boolean;permissionState:'prompt'|'granted'|'denied'|'unsupported'|'unknown';locationError?:string|null;}
+const formatDistance=(meters:number)=>meters>=1000?`${(meters/1000).toFixed(1)} km`:`${Math.round(meters)} m`;
+const relativeUpdated=(iso:string)=>{const minutes=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/60000));if(minutes<1)return'just now';if(minutes<60)return`${minutes} min ago`;return`${Math.round(minutes/60)} hr ago`;};
+const toFacility=(item:Awaited<ReturnType<typeof mapsApi.nearbyFacilities>>['items'][number]):Facility=>({id:item.id,name:item.name,type:item.type,category:(()=>{const text=[item.type,...item.services,...item.capabilities].join(' ').toLowerCase();if(text.includes('trauma'))return'trauma';if(text.includes('pediatric')||text.includes('paediatric'))return'pediatric';if(text.includes('urgent'))return'urgent_care';return'emergency';})(),distance:formatDistance(item.distanceMeters),distanceMeters:item.distanceMeters,estimatedTime:'',emergencyAvailable:item.emergencyAvailability==='AVAILABLE',verified:item.verificationStatus==='VERIFIED',lastUpdated:relativeUpdated(item.updatedAt),latitude:item.latitude,longitude:item.longitude,address:[item.address,item.city,item.state,item.country].filter(Boolean).join(', '),phone:item.phone??'',openStatus:item.emergencyAvailability==='LIMITED'?'Emergency intake reported as limited':'Emergency intake reported as available',isOpen:item.accountStatus==='ACTIVE',isAvailable:item.emergencyAvailability!=='UNAVAILABLE',capabilities:[...item.services,...item.capabilities]});
+export const EmergencyPage=()=>{const navigate=useNavigate();const[searchParams]=useSearchParams();const{currentLocation,refreshLocation,permissionState,locationError}=useOutletContext<LayoutContext>();const valid=Number.isFinite(currentLocation.latitude)&&Number.isFinite(currentLocation.longitude)&&(currentLocation.latitude!==0||currentLocation.longitude!==0);const preselectedId=searchParams.get('facility');const[currentStep,setCurrentStep]=useState<EmergencyFlowStep>('situation');const[selectedSituationId,setSelectedSituationId]=useState<EmergencySituationId|null>(null);const[confirmedLocation,setConfirmedLocation]=useState<UserLocation|null>(null);const[recommendations,setRecommendations]=useState<FacilityRecommendationItem[]>([]);const[selectedFacility,setSelectedFacility]=useState<Facility|null>(null);const[emergencyRequestId,setEmergencyRequestId]=useState<string|null>(null);const[searchRadius,setSearchRadius]=useState(10000);const[isSearching,setIsSearching]=useState(false);const[searchError,setSearchError]=useState<string|null>(null);const[coordinationError,setCoordinationError]=useState<string|null>(null);const[isCreatingRequest,setIsCreatingRequest]=useState(false);
+useEffect(()=>{if(!valid&&permissionState==='prompt')refreshLocation();},[valid,permissionState,refreshLocation]);
+useEffect(()=>{if(preselectedId&&valid&&!selectedFacility){void mapsApi.nearbyFacilities(currentLocation.latitude,currentLocation.longitude,{radius:50000,limit:100}).then(data=>{const match=data.items.find(item=>item.id===preselectedId);if(match)setSelectedFacility(toFacility(match));}).catch(()=>undefined);}},[preselectedId,valid,currentLocation.latitude,currentLocation.longitude,selectedFacility]);
+const handleLocationConfirm=async(location:UserLocation)=>{if(!Number.isFinite(location.latitude)||!Number.isFinite(location.longitude)){setSearchError('A valid location is required.');return;}setConfirmedLocation(location);setCurrentStep('searching');setIsSearching(true);setSearchError(null);setRecommendations([]);try{const data=await mapsApi.nearbyFacilities(location.latitude,location.longitude,{radius:searchRadius,limit:50,emergencyAvailability:'AVAILABLE'});setRecommendations(getRecommendedFacilities(selectedSituationId??'other',data.items.map(toFacility)));setCurrentStep('recommendations');}catch(error){setSearchError(error instanceof Error?error.message:'Could not load live emergency facility data.');setCurrentStep('recommendations');}finally{setIsSearching(false);}};
+const handleSelectRecommendation=async(item:FacilityRecommendationItem)=>{setSelectedFacility(item.facility);setCurrentStep('coordination');setEmergencyRequestId(null);setCoordinationError(null);setIsCreatingRequest(true);let enriched=item.facility;const flowLocation=confirmedLocation??currentLocation;try{const result=await mapsApi.route({origin:{latitude:flowLocation.latitude,longitude:flowLocation.longitude},destination:{latitude:item.facility.latitude,longitude:item.facility.longitude},travelMode:'DRIVE',routingPreference:'TRAFFIC_AWARE'});const live=result.routes[0];if(live){enriched={...enriched,distance:live.distanceText,distanceMeters:live.distanceMeters,estimatedTime:live.durationText,routeSummary:{distance:live.distanceText,duration:live.durationText,viaRoute:live.summary,trafficCondition:live.trafficCondition==='HEAVY'?'Heavy traffic':live.trafficCondition==='MODERATE'?'Moderate traffic':'Light traffic'}};setSelectedFacility(enriched);}}catch{setSelectedFacility(enriched);}try{const request=await emergencyApi.create({hospitalId:item.facility.id,situationType:EMERGENCY_SITUATIONS.find(s=>s.id===selectedSituationId)?.label??'Other acute situation',location:flowLocation.label,latitude:flowLocation.latitude,longitude:flowLocation.longitude});setEmergencyRequestId(request.id);}catch(error){setCoordinationError(error instanceof Error?error.message:'Emergency request could not be created.');}finally{setIsCreatingRequest(false);}};
+const selectedSituation=useMemo(()=>EMERGENCY_SITUATIONS.find(s=>s.id===selectedSituationId),[selectedSituationId]);const locationUnavailable=permissionState==='denied'||permissionState==='unsupported'||(!valid&&Boolean(locationError));const meta=currentStep==='situation'?{step:1,label:'Situation'}:currentStep==='location'?{step:2,label:'Location'}:currentStep==='coordination'?{step:4,label:'Coordination'}:{step:3,label:'Care Options'};
+return <EmergencyMode stepNumber={meta.step} totalSteps={4} currentStepLabel={meta.label} onExit={()=>navigate('/')}>
+{currentStep==='situation'&&<SituationSelector selectedSituation={selectedSituationId} onSelectSituation={setSelectedSituationId} onContinue={()=>selectedSituationId&&setCurrentStep('location')}/>}
+{currentStep==='location'&&<LocationConfirmation currentLocation={confirmedLocation??currentLocation} onConfirmLocation={handleLocationConfirm} onBack={()=>setCurrentStep('situation')} isLocationUnavailable={locationUnavailable} onRetryLocation={refreshLocation}/>}
+{currentStep==='searching'&&isSearching&&<EmergencySearchState situationLabel={selectedSituation?.label}/>}
+{currentStep==='recommendations'&&!isSearching&&<div className="space-y-6 flex-1"><div className="space-y-4"><button type="button" onClick={()=>setCurrentStep('location')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-xs"><ArrowLeft className="w-3.5 h-3.5"/>Change Location</button><div><h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950">Verified emergency facilities</h2><p className="text-xs sm:text-sm text-slate-500">Ranked using live facility availability, documented capability, and real geospatial distance.</p></div>{searchError&&<div role="alert" className="p-5 bg-white border border-rose-200 rounded-xl text-center space-y-3"><AlertTriangle className="w-6 h-6 text-rose-700 mx-auto"/><h3 className="font-bold text-slate-900 text-sm">Live facility search failed</h3><p className="text-xs text-slate-500">{searchError}</p><Button variant="outline" size="sm" icon={<RefreshCw className="w-3.5 h-3.5"/>} onClick={()=>void handleLocationConfirm(confirmedLocation??currentLocation)}>Retry Search</Button></div>}{!searchError&&recommendations.length===0&&<div role="alert" className="p-6 bg-white border border-slate-200 rounded-xl text-center space-y-4"><Building2 className="w-6 h-6 text-slate-500 mx-auto"/><h3 className="font-bold text-slate-900 text-sm">No verified emergency facility found</h3><p className="text-xs text-slate-500">No qualifying facility with active emergency availability was found within {Math.round(searchRadius/1000)} km.</p><div className="flex justify-center gap-2"><Button variant="emergency" size="md" icon={<Phone className="w-4 h-4"/>} onClick={()=>{window.location.href='tel:112'}}>Call emergency services</Button>{searchRadius<50000&&<Button variant="outline" size="md" onClick={()=>{setSearchRadius(50000);void handleLocationConfirm(confirmedLocation??currentLocation)}}>Broaden to 50 km</Button>}</div></div>}{!searchError&&recommendations.length>0&&<div role="feed" aria-label="Recommended facilities" className="space-y-3">{recommendations.map((item,index)=><FacilityRecommendation key={item.facility.id} item={item} isPrimary={index===0} onSelect={handleSelectRecommendation} onViewDetails={(selected)=>navigate(`/facility/${selected.facility.id}?emergency=true`)}/>)}</div>}</div></div>}
+{currentStep==='coordination'&&selectedFacility&&<CoordinationStatus facility={selectedFacility} onExit={()=>navigate('/')} emergencyRequestId={emergencyRequestId} isCreatingRequest={isCreatingRequest} error={coordinationError}/>}
+</EmergencyMode>;
 };

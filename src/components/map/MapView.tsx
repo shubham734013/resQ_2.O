@@ -59,7 +59,7 @@ export const MapView = ({
         const googleMaps = await loadGoogleMaps();
         if (cancelled || !containerRef.current) return;
         const maps = await googleMaps.maps.importLibrary('maps') as unknown as MapLibrary;
-        const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim();
+        const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || 'DEMO_MAP_ID';
         mapRef.current = new maps.Map(containerRef.current, {
           center: toGoogle(fallbackCenter.latitude, fallbackCenter.longitude),
           zoom,
@@ -188,7 +188,7 @@ export const MapView = ({
   };
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google map">
+    <div className={`relative w-full h-full overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google Maps">
       <div ref={containerRef} className="absolute inset-0" />
       {status === 'loading' && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 z-10">

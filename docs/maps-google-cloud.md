@@ -1,34 +1,57 @@
 # ResQ Google Maps configuration
 
-## Frontend key
+ResQ now uses Google Maps Platform for browser maps and server-side route calculation.
 
-Set `VITE_GOOGLE_MAPS_API_KEY` in the deployed frontend environment.
+## Frontend browser key
 
-Restrict the browser key by HTTP referrer/application origin. Restrict APIs to the browser APIs actually used by ResQ:
+Set `VITE_GOOGLE_MAPS_API_KEY` in the frontend environment.
+
+For local development:
+
+```env
+VITE_GOOGLE_MAPS_API_KEY=YOUR_BROWSER_KEY
+VITE_GOOGLE_MAPS_MAP_ID=DEMO_MAP_ID
+```
+
+Restrict the browser key by HTTP referrer and restrict it to the Google Maps JavaScript API and other browser APIs actually used by the app.
+
+A Map ID is required for Advanced Markers. Google documents `DEMO_MAP_ID` as acceptable for testing; use a project-owned JavaScript Map ID for production.
+
+## Backend server key
+
+Set `GOOGLE_MAPS_SERVER_API_KEY` only in `server/.env`.
+
+```env
+GOOGLE_MAPS_SERVER_API_KEY=YOUR_SERVER_KEY
+```
+
+Restrict the server key to the APIs required for ResQ server-side requests, including Routes API.
+
+Never expose the server key through React/Vite, browser source, client responses, or logs.
+
+## Required Google Cloud APIs
+
+Enable at minimum:
 
 - Maps JavaScript API
-- Places API (New)
-
-If a separate browser Maps ID is used, set `VITE_GOOGLE_MAPS_MAP_ID`.
-
-## Server key
-
-Set `GOOGLE_MAPS_SERVER_API_KEY` only in the backend environment.
-
-Restrict the server key to the APIs used by server-side requests:
-
 - Routes API
-- Geocoding API
 
-Never expose this key through Vite, React source, client network responses, or logs.
+The frontend loads the Maps JavaScript API and the `marker` library for Advanced Markers.
 
-## Required services
+## Local environment
 
-Enable the Google Cloud APIs required by the implementation before manual verification. Do not commit either key to the repository.
+Frontend `.env`:
 
-## Security
+```env
+VITE_API_BASE_URL=http://localhost:5001/api/v1
+VITE_GOOGLE_MAPS_API_KEY=
+VITE_GOOGLE_MAPS_MAP_ID=DEMO_MAP_ID
+```
 
-- Use separate browser and server keys.
-- Apply application restrictions and API restrictions.
-- Rotate keys if they are ever exposed.
-- Keep production keys in deployment environment configuration only.
+Backend `server/.env`:
+
+```env
+GOOGLE_MAPS_SERVER_API_KEY=
+```
+
+Do not commit either secret to Git.

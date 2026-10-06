@@ -48,6 +48,12 @@ export const mapsApi = {
     ),
   route: (input: RouteRequest) =>
     request<RouteResult>('/maps/routes', { method: 'POST', body: JSON.stringify(input) }),
+
+  geocode: (address: string) =>
+    request<{ placeId: string; formattedAddress: string; latitude: number; longitude: number }>(
+      '/geocoding',
+      { method: 'POST', body: JSON.stringify({ address }) },
+    ),
   placeSearch: async (query: string): Promise<PlaceSearchResult[]> => {
     const { loadGoogleMaps } = await import('./googleMapsLoader');
     const googleMaps = await loadGoogleMaps();
