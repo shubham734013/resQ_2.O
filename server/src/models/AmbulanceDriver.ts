@@ -1,7 +1,7 @@
 import { Schema, model, Types } from 'mongoose';
 import { ACCOUNT_STATUSES, VERIFICATION_STATUSES, type AccountStatus, type VerificationStatus } from '../types/roles.js';
 import type { AuthProvider } from './User.js';
-export const DRIVER_AVAILABILITY_STATUSES = ['AVAILABLE','BUSY','OFFLINE'] as const;
+export const DRIVER_AVAILABILITY_STATUSES = ['ONLINE','OFFLINE','BUSY'] as const;
 export type DriverAvailabilityStatus = (typeof DRIVER_AVAILABILITY_STATUSES)[number];
 export type DriverProfileCompletionStatus = 'INCOMPLETE'|'COMPLETE';
 export interface AmbulanceDriverDocument {
