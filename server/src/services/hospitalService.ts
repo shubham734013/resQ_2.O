@@ -98,7 +98,7 @@ export const getServices = async (hospitalId: string) => {
 export const updateServices = async (hospitalId: string, input: ServicesInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { services: input.services } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { services: profileOut(hospital as unknown as Record<string, unknown>).services, updatedAt: hospital.updatedAt };
 };
 
@@ -110,7 +110,7 @@ export const getCapabilities = async (hospitalId: string) => {
 export const updateCapabilities = async (hospitalId: string, input: CapabilitiesInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { capabilities: input.capabilities } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { capabilities: profileOut(hospital as unknown as Record<string, unknown>).capabilities, updatedAt: hospital.updatedAt };
 };
 
@@ -122,7 +122,7 @@ export const getAvailability = async (hospitalId: string) => {
 export const updateAvailability = async (hospitalId: string, input: AvailabilityInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { emergencyAvailability: input.emergencyAvailability } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { emergencyAvailability: hospital.emergencyAvailability, updatedAt: hospital.updatedAt };
 };
 
@@ -134,7 +134,7 @@ export const getResources = async (hospitalId: string) => {
 export const updateResources = async (hospitalId: string, input: ResourcesInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { resourceSummary: input.resourceSummary } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { resourceSummary: profileOut(hospital as unknown as Record<string, unknown>).resourceSummary, updatedAt: hospital.updatedAt };
 };
 
@@ -186,10 +186,10 @@ const allowedEmergencyTransition: Record<HospitalEmergencyStatus, HospitalEmerge
 };
 
 export const updateEmergencyStatus = async (hospitalId: string, emergencyId: string, status: HospitalEmergencyStatus) => {
-  const hospital = assertHospitalId(hospitalId);
+  assertHospitalId(hospitalId);
   if (!Types.ObjectId.isValid(emergencyId)) throw new AppError('INVALID_ID', 'Invalid emergency id', 400);
   const emergency = await EmergencyRequestModel.findOne({ _id: emergencyId, ...hospitalOwnershipFilter(hospitalId) }).exec();
-  if (!emergency) notFound('Emergency request not found');
+  if (!emergency) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
   if (emergency.status !== status && !allowedEmergencyTransition[emergency.status].includes(status)) {
     throw new AppError('INVALID_STATUS_TRANSITION', 'Emergency status transition is not allowed', 409);
   }
@@ -211,7 +211,7 @@ const patientOut = (x: Record<string, unknown>): HospitalPatient => ({
 });
 
 export const listPatients = async (hospitalId: string, query: PatientQuery) => {
-  const id = assertHospitalId(hospitalId);
+  assertHospitalId(hospitalId);
   const filter: Record<string, unknown> = { ...hospitalOwnershipFilter(hospitalId) };
   if (query.status) filter.coordinationStatus = query.status;
   if (query.from || query.to) filter.receivedAt = { ...(query.from ? { $gte: query.from } : {}), ...(query.to ? { $lte: query.to } : {}) };
@@ -282,9 +282,9 @@ export const getAmbulance = async (hospitalId: string, ambulanceId: string) => {
   hospitalOwnershipFilter(hospitalId);
   if (!Types.ObjectId.isValid(ambulanceId)) throw new AppError('INVALID_ID', 'Invalid ambulance id', 400);
   const emergency = await EmergencyRequestModel.findOne({ ...hospitalOwnershipFilter(hospitalId), ambulanceId }).sort({ reportedAt: -1 }).lean().exec();
-  if (!emergency) notFound('Ambulance is not associated with this hospital');
+  if (!emergency) throw new AppError('NOT_FOUND', 'Ambulance is not associated with this hospital', 404);
   const ambulance = await AmbulanceModel.findById(ambulanceId).lean().exec();
-  if (!ambulance) notFound('Ambulance not found');
+  if (!ambulance) throw new AppError('NOT_FOUND', 'Ambulance not found', 404);
   const [provider, driver] = await Promise.all([
     AmbulanceProviderModel.findById(ambulance.providerId).select('name registrationNumber').lean().exec(),
     AmbulanceDriverModel.findOne({ assignedAmbulanceId: ambulance._id }).select('fullName licenseNumber').lean().exec(),
