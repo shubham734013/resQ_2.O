@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { facilityApi } from '../services/facilityApi';
-import type { Facility, FacilityCategory } from '../types/facility';
+import type { FacilityCategory } from '../types/facility';
 
 export interface UseFacilitiesFilter {
   searchQuery?: string;
