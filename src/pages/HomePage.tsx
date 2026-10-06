@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   List,
@@ -49,9 +49,9 @@ export const HomePage = () => {
     emergencyOnly,
   });
 
-  const handleSelectFacility = (facility: Facility) => {
+  const handleSelectFacility = useCallback((facility: Facility) => {
     setSelectedFacilityId(facility.id);
-  };
+  }, [setSelectedFacilityId]);
 
   const handleDismissSelection = () => {
     setSelectedFacilityId(null);
@@ -98,7 +98,7 @@ export const HomePage = () => {
         isEmergency: facility.emergencyAvailable,
         onClick: () => handleSelectFacility(facility),
       }));
-  }, [nearby.data?.items, facilities]);
+  }, [nearby.data?.items, facilities, handleSelectFacility]);
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-slate-100">
