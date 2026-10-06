@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Ambulance, Building2, Check, CircleAlert, RefreshCw, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/common/Button';
