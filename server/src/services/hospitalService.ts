@@ -3,7 +3,7 @@ import { HospitalModel } from '../models/Hospital.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
-import { EmergencyRequestModel, type HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
+import { EmergencyRequestModel, type EmergencyRequestDocument, type HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { AppError } from '../utils/AppError.js';
 import type { HospitalProfile, HospitalPagination, HospitalEmergency, HospitalPatient, HospitalAmbulance } from '../types/hospital.js';
