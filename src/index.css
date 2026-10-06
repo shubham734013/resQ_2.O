@@ -17,6 +17,38 @@
   }
 }
 
+.resq-leaflet-marker {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.resq-leaflet-marker__dot,
+.resq-leaflet-marker__you {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 28px;
+  padding: 0 8px;
+  border: 2px solid white;
+  border-radius: 999px;
+  background: white;
+  color: #0f172a;
+  font: 600 10px/1.1 system-ui, sans-serif;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 18%);
+  white-space: nowrap;
+}
+
+.resq-leaflet-marker__dot--emergency {
+  color: #b91c1c;
+}
+
+.resq-leaflet-marker__you {
+  min-width: 48px;
+  background: #2563eb;
+  color: white;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .resq-reduced-motion *,
