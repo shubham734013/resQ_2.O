@@ -1,6 +1,6 @@
 import { Schema, model, Types } from 'mongoose';
 import { ACCOUNT_STATUSES, VERIFICATION_STATUSES, type AccountStatus, type VerificationStatus } from '../types/roles.js';
-export const DRIVER_AVAILABILITY_STATUSES = ['AVAILABLE', 'BUSY', 'OFFLINE'] as const;
+export const DRIVER_AVAILABILITY_STATUSES = ['ONLINE', 'OFFLINE', 'BUSY'] as const;
 export type DriverAvailabilityStatus = (typeof DRIVER_AVAILABILITY_STATUSES)[number];
 export interface AmbulanceDriverDocument { fullName: string; email: string; phone: string; passwordHash: string; licenseNumber: string; licenseVerificationStatus: VerificationStatus; address?: string; city?: string; state?: string; country?: string; registeredLatitude?: number; registeredLongitude?: number; providerId: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus; accountStatus: AccountStatus; createdAt: Date; updatedAt: Date; }
 const schema = new Schema<AmbulanceDriverDocument>({
