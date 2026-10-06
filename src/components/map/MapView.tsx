@@ -81,6 +81,8 @@ export const MapView = ({
     };
     void initialize();
     return () => { cancelled = true; };
+  // Map construction is intentionally one-time; prop changes are applied by the following effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
