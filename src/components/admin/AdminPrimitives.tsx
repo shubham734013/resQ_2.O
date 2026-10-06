@@ -1,0 +1,16 @@
+import type { ReactNode } from 'react';
+import { Search, SlidersHorizontal } from 'lucide-react';
+import { Button } from '../common/Button';
+import type { AdminMetric } from '../../types/admin';
+
+export const AdminPage = ({ title, description, children, action }: { title: string; description?: string; children: ReactNode; action?: ReactNode }) => <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 xl:px-8 xl:py-8"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">ResQ Operations</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h2>{description && <p className="mt-1 max-w-2xl text-sm text-slate-500">{description}</p>}</div>{action}</div><div className="mt-6">{children}</div></div>;
+
+export const MetricGrid = ({ metrics }: { metrics: AdminMetric[] }) => <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 md:grid-cols-3 xl:grid-cols-6">{metrics.map((metric) => <div key={metric.label} className="bg-white p-4 sm:p-5"><p className="text-xs font-medium leading-5 text-slate-500">{metric.label}</p><div className="mt-2 flex items-end justify-between gap-2"><p className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">{metric.value}</p>{metric.trend && <span className="text-[11px] font-semibold text-emerald-700">{metric.trend}</span>}</div><p className="mt-1 text-[11px] text-slate-400">{metric.detail}</p></div>)}</div>;
+
+export const Panel = ({ title, description, children, className = '' }: { title: string; description?: string; children: ReactNode; className?: string }) => <section className={`border border-slate-200 bg-white ${className}`}><div className="border-b border-slate-200 px-4 py-3 sm:px-5"><h3 className="text-sm font-semibold text-slate-950">{title}</h3>{description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}</div><div>{children}</div></section>;
+
+export const FilterBar = ({ placeholder = 'Search', onSearch }: { placeholder?: string; onSearch?: (value: string) => void }) => <div className="flex flex-col gap-2 sm:flex-row"><div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input aria-label={placeholder} placeholder={placeholder} onChange={(event) => onSearch?.(event.target.value)} className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" /></div><Button type="button" variant="secondary" icon={<SlidersHorizontal className="h-4 w-4" />}>Filters</Button></div>;
+
+export const StatusDot = ({ label, tone = 'neutral' }: { label: string; tone?: 'good' | 'warning' | 'danger' | 'neutral' }) => { const styles = { good: 'bg-emerald-500', warning: 'bg-amber-500', danger: 'bg-rose-500', neutral: 'bg-slate-400' }; return <span className="inline-flex items-center gap-2 text-xs font-medium text-slate-700"><span className={`h-1.5 w-1.5 rounded-full ${styles[tone]}`} />{label}</span>; };
+
+export const EmptyState = ({ label }: { label: string }) => <div className="px-5 py-10 text-center text-sm text-slate-500">{label}</div>;
