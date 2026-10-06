@@ -51,6 +51,7 @@ export interface RouteOption {
   summary: string;
   trafficCondition?: 'LIGHT' | 'MODERATE' | 'HEAVY' | 'UNKNOWN';
   recommended: boolean;
+  instructions: Array<{ id: string; stepNumber: number; maneuver: 'straight' | 'turn-right' | 'turn-left' | 'slight-right' | 'slight-left' | 'u-turn' | 'arrive'; instruction: string; streetName: string; distanceToNext: string; remainingTime: string; remainingDistance: string }>;
 }
 
 export interface RouteResult {
