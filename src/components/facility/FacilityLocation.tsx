@@ -1,82 +1,14 @@
-import { Navigation, Clock, MapPin, Compass } from 'lucide-react';
+import { useGoogleRoute } from '../../hooks/useGoogleRoute';
+import { Navigation, Clock, MapPin, Compass, RefreshCw } from 'lucide-react';
 import type { Facility, UserLocation } from '../../types/facility';
-import { MapPlaceholder } from '../map/MapPlaceholder';
+import { MapView } from '../map/MapView';
 
-export interface FacilityLocationProps {
-  facility: Facility;
-  userLocation: UserLocation;
-  className?: string;
-}
-
-export const FacilityLocation = ({
-  facility,
-  userLocation,
-  className = '',
-}: FacilityLocationProps) => {
-  const route = facility.routeSummary ?? {
-    distance: facility.distance,
-    duration: facility.estimatedTime,
-    viaRoute: 'Direct arterial route',
-    trafficCondition: 'Moderate traffic',
-  };
-
-  return (
-    <div className={`space-y-3 ${className}`}>
-      {/* Route Summary Box */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Route & Navigation Summary
-          </span>
-          <span
-            className={`text-[11px] font-medium px-2 py-0.5 rounded ${
-              route.trafficCondition === 'Light traffic'
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border border-amber-200'
-            }`}
-          >
-            {route.trafficCondition}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-slate-900 font-semibold">
-            <Navigation className="w-3.5 h-3.5 text-slate-700" aria-hidden="true" />
-            <span>{route.distance}</span>
-            <span className="text-slate-300">•</span>
-            <Clock className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-            <span>{route.duration}</span>
-          </div>
-
-          <span className="text-slate-500 text-[11px] truncate max-w-[200px]">
-            {route.viaRoute}
-          </span>
-        </div>
-      </div>
-
-      {/* Map Canvas Frame */}
-      <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-xs h-[300px] lg:h-[380px] relative">
-        <MapPlaceholder
-          facilities={[facility]}
-          selectedFacility={facility}
-          userLocation={userLocation}
-          onSelectFacility={() => {}}
-        />
-
-        {/* Destination Callout Overlay */}
-        <div className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-xs border border-slate-200/90 rounded-lg p-2.5 shadow-sm max-w-xs text-xs pointer-events-none">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 truncate">
-            <MapPin className="w-3.5 h-3.5 text-rose-600 shrink-0" aria-hidden="true" />
-            <span className="truncate">{facility.name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono mt-1">
-            <Compass className="w-3 h-3 text-slate-400" aria-hidden="true" />
-            <span>
-              {facility.latitude.toFixed(4)}, {facility.longitude.toFixed(4)}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+export interface FacilityLocationProps { facility: Facility; userLocation: UserLocation; className?: string; }
+export const FacilityLocation=({facility,userLocation,className=''}:FacilityLocationProps)=>{
+ const {routes,isLoading,isError,refetch}=useGoogleRoute(facility,userLocation);const liveRoute=routes[0]??null;
+ const trafficLabel=liveRoute?.trafficCondition==='heavy'?'Heavy traffic':liveRoute?.trafficCondition==='moderate'?'Moderate traffic':liveRoute?'Light traffic':'Live route unavailable';
+ return <div className={`space-y-3 ${className}`}>
+  <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs space-y-2.5"><div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Live route & navigation</span><span className={`text-[11px] font-medium px-2 py-0.5 rounded border ${liveRoute?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>{trafficLabel}</span></div><div className="flex items-center justify-between text-xs gap-3">{liveRoute?<div className="flex items-center gap-2 text-slate-900 font-semibold"><Navigation className="w-3.5 h-3.5"/><span>{liveRoute.distance}</span><span className="text-slate-300">•</span><Clock className="w-3.5 h-3.5 text-slate-400"/><span>{liveRoute.duration}</span></div>:<div className="text-slate-500">{isLoading?'Calculating live driving route…':isError?'Live route could not be calculated.':'Allow location access for a live route.'}</div>}{isError&&<button type="button" onClick={()=>void refetch()} className="inline-flex items-center gap-1 font-semibold text-slate-700"><RefreshCw className="w-3 h-3"/>Retry</button>}</div></div>
+  <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-xs h-[300px] lg:h-[380px] relative"><MapView center={{latitude:facility.latitude,longitude:facility.longitude}} userLocation={Number.isFinite(userLocation.latitude)&&Number.isFinite(userLocation.longitude)?userLocation:undefined} destination={{latitude:facility.latitude,longitude:facility.longitude,name:facility.name,address:facility.address,isEmergency:facility.emergencyAvailable}} activeRoute={liveRoute} interactive className="h-full w-full"/><div className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-xs border border-slate-200/90 rounded-lg p-2.5 shadow-sm max-w-xs pointer-events-none"><div className="flex items-center gap-1.5 font-semibold text-slate-900 truncate"><MapPin className="w-3.5 h-3.5 text-rose-600 shrink-0"/><span className="truncate">{facility.name}</span></div><div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono mt-1"><Compass className="w-3 h-3 text-slate-400"/><span>{facility.latitude.toFixed(4)}, {facility.longitude.toFixed(4)}</span></div></div></div>
+ </div>;
 };
