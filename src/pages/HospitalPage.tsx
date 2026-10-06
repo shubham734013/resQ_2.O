@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Ambulance, BedDouble, Building2, Check, CircleAlert, RefreshCw, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -18,7 +18,7 @@ const Freshness = ({ value }: { value?: string }) => <p className="text-xs text-
 const PageShell = ({ children }: { children: React.ReactNode }) => <div className={wrap}>{children}</div>;
 
 const availabilityLabel: Record<string, string> = { AVAILABLE: 'Available', LIMITED: 'Limited', UNAVAILABLE: 'Unavailable', UNKNOWN: 'Unknown' };
-const statusVariant = (value: string) => value === 'AVAILABLE' || value === 'VERIFIED' || value === 'RESOLVED' ? 'verified' : value === 'UNAVAILABLE' || value === 'CANCELLED' ? 'critical' : 'waitTime';
+const statusVariant = (value: string): 'verified' | 'waitTime' | 'neutral' => value === 'AVAILABLE' || value === 'VERIFIED' || value === 'RESOLVED' ? 'verified' : value === 'UNAVAILABLE' || value === 'CANCELLED' ? 'neutral' : 'waitTime';
 
 export const HospitalPage = () => {
   const path = window.location.pathname;
@@ -61,7 +61,6 @@ const HospitalEmergenciesPage = () => {
   const q = useHospitalEmergencies({ page, limit: 10, status: status || undefined });
   const mutation = useHospitalEmergencyStatusMutation();
   const [selected, setSelected] = useState<string | null>(null);
-  const detail = useHospitalEmergencies({ page: 1, limit: 1 });
   const items = q.data?.items ?? [];
   return <PageShell><section className={box}><header className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold">Emergency Requests</h2><p className="mt-1 text-sm text-slate-500">Operational coordination records belonging to this hospital.</p></div><select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="">All statuses</option><option value="RECEIVED">Received</option><option value="REVIEWING">Reviewing</option><option value="PREPARING">Preparing</option><option value="AMBULANCE_COORDINATION">Ambulance coordination</option><option value="RESOLVED">Resolved</option><option value="CANCELLED">Cancelled</option></select></header>{q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={() => void q.refetch()} /> : items.length ? <>{items.map((e) => <EmergencyRow key={e.id} emergency={e} selected={selected === e.id} onSelect={() => setSelected(e.id)} onStatus={(next) => mutation.mutate({ id: e.id, status: next })} busy={mutation.isPending && mutation.variables?.id === e.id} />)}<Pagination page={q.data?.pagination.page ?? 1} totalPages={q.data?.pagination.totalPages ?? 0} onPage={setPage} /></> : <p className="p-8 text-center text-sm text-slate-500">No emergency requests match the selected filter.</p>}</section></PageShell>;
 };
