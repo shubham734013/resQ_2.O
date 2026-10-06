@@ -11,6 +11,10 @@ export const nearbyQuerySchema = z.object({
   radius: z.coerce.number().finite().min(100).max(100000).default(10000),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  emergencyAvailability: z.enum(['AVAILABLE', 'LIMITED', 'UNAVAILABLE', 'UNKNOWN']).optional(),
+  hospitalType: z.string().trim().max(100).optional(),
+  service: z.string().trim().max(100).optional(),
+  capability: z.string().trim().max(100).optional(),
 }).strict();
 
 export const routeRequestSchema = z.object({
