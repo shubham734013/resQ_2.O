@@ -13,7 +13,10 @@ const envSchema = z.object({
   MICROSOFT_TENANT_ID: z.string().min(1).optional(),
   MICROSOFT_AUTHORITY: z.string().url().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
-  GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
+  OPENROUTESERVICE_API_KEY: z.string().trim().optional(),
+  OPENROUTESERVICE_BASE_URL: z.string().url().default('https://api.heigit.org/openrouteservice'),
+  NOMINATIM_BASE_URL: z.string().url().default('https://nominatim.openstreetmap.org'),
+  NOMINATIM_USER_AGENT: z.string().trim().min(3).default('ResQ/1.0 (Healthcare Navigation & Emergency Coordination Platform)'),
 });
 
 const parsed = envSchema.safeParse(process.env);
