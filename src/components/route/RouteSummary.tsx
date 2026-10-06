@@ -100,7 +100,7 @@ export const RouteSummary = ({
 
       <div className="text-[10px] text-slate-600 flex items-center gap-1.5 pt-1">
         <Info className="w-3 h-3 text-slate-500 shrink-0" />
-        <span>Route distance and time come from the OpenStreetMap road network. Live traffic is not included.</span>
+        <span>Route distance, ETA, and traffic-aware routing are provided by Google Maps Platform.</span>
       </div>
     </div>
 
