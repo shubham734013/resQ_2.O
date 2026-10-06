@@ -59,7 +59,6 @@ const HospitalOverviewPage = () => {
   </PageShell>;
 };
 
-const activeEmergencyStatuses: HospitalEmergencyStatus[] = ['RECEIVED', 'REVIEWING', 'PREPARING', 'AMBULANCE_COORDINATION'];
 
 const formatElapsed = (value: string): string => {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
