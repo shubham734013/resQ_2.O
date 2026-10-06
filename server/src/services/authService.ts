@@ -88,7 +88,8 @@ const findByIdentity = async (identity: AuthenticatedIdentity): Promise<AccountW
 export const assertLoginAllowed = (status: AccountStatus) => {
   if (status === 'SUSPENDED') throw new AppError('ACCOUNT_SUSPENDED','This account is suspended',403);
   if (status === 'REJECTED') throw new AppError('ACCOUNT_REJECTED','This account has been rejected',403);
-  if (status !== 'PENDING' && status !== 'ACTIVE') throw new AppError('UNAUTHORIZED','Account is not active',401);
+  if (status === 'PENDING') throw new AppError('ACCOUNT_PENDING','This account is awaiting approval',403);
+  if (status !== 'ACTIVE') throw new AppError('UNAUTHORIZED','Account is not active',401);
 };
 
 const signAccessToken = (identity: AuthenticatedIdentity) => jwt.sign({
