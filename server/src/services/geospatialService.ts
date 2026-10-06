@@ -5,11 +5,21 @@ import type { nearbyQuerySchema } from '../schemas/maps.js';
 
 type NearbyQuery = z.infer<typeof nearbyQuerySchema>;
 
-const point = (latitude: number, longitude: number) => ({ type: 'Point' as const, coordinates: [longitude, latitude] as [number, number] });
+const point = (latitude: number, longitude: number) => ({
+  type: 'Point' as const,
+  coordinates: [longitude, latitude] as [number, number],
+});
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^()|[\\]\\]/g, '\\$&');
 
 const pagination = <T>(items: T[], total: number, query: NearbyQuery) => ({
   items,
-  pagination: { page: query.page, limit: query.limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / query.limit) },
+  pagination: {
+    page: query.page,
+    limit: query.limit,
+    total,
+    totalPages: total === 0 ? 0 : Math.ceil(total / query.limit),
+  },
 });
 
 export const listNearbyFacilities = async (query: NearbyQuery) => {
@@ -19,22 +29,20 @@ export const listNearbyFacilities = async (query: NearbyQuery) => {
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
   };
+
   if (query.emergencyAvailability) filter.emergencyAvailability = query.emergencyAvailability;
-  if (query.hospitalType) filter.hospitalType = new RegExp(query.hospitalType.replace(/[.*+?^()|[\\]\\\\]/g, '\\\\  const filter = {
-    location: { $near: { $geometry: center, $maxDistance: query.radius } },
-    accountStatus: 'ACTIVE',
-    verificationStatus: 'VERIFIED',
-  };'), 'i');
-  if (query.service) filter.services = new RegExp(query.service.replace(/[.*+?^()|[\\]\\\\]/g, '\\\\  const filter = {
-    location: { $near: { $geometry: center, $maxDistance: query.radius } },
-    accountStatus: 'ACTIVE',
-    verificationStatus: 'VERIFIED',
-  };'), 'i');
-  if (query.capability) filter.capabilities = new RegExp(query.capability.replace(/[.*+?^()|[\\]\\\\]/g, '\\\\  const filter = {
-    location: { $near: { $geometry: center, $maxDistance: query.radius } },
-    accountStatus: 'ACTIVE',
-    verificationStatus: 'VERIFIED',
-  };'), 'i');
+  if (query.hospitalType) filter.hospitalType = new RegExp(escapeRegex(query.hospitalType), 'i');
+  if (query.service) filter.services = new RegExp(escapeRegex(query.service), 'i');
+  if (query.capability) filter.capabilities = new RegExp(escapeRegex(query.capability), 'i');
+
+  const countFilter = {
+    ...filter,
+    location: {
+      $geoWithin: {
+        $centerSphere: [[query.longitude, query.latitude], query.radius / 6378137],
+      },
+    },
+  };
 
   const [items, total] = await Promise.all([
     HospitalModel.find(filter)
@@ -43,22 +51,23 @@ export const listNearbyFacilities = async (query: NearbyQuery) => {
       .limit(query.limit)
       .lean()
       .exec(),
-    HospitalModel.countDocuments({
-      ...filter,
-      location: { $geoWithin: { $centerSphere: [[query.longitude, query.latitude], query.radius / 6378137] } },
-    }).exec(),
+    HospitalModel.countDocuments(countFilter).exec(),
   ]);
 
-  return pagination(items.map((hospital) => ({
-    id: String(hospital._id),
-    name: hospital.name,
-    latitude: hospital.location?.coordinates[1] ?? 0,
-    longitude: hospital.location?.coordinates[0] ?? 0,
-    verificationStatus: hospital.verificationStatus,
-    emergencyAvailability: hospital.emergencyAvailability,
-    capabilities: hospital.capabilities,
-    updatedAt: hospital.updatedAt.toISOString(),
-  })), total, query);
+  return pagination(
+    items.map((hospital) => ({
+      id: String(hospital._id),
+      name: hospital.name,
+      latitude: hospital.location?.coordinates[1] ?? 0,
+      longitude: hospital.location?.coordinates[0] ?? 0,
+      verificationStatus: hospital.verificationStatus,
+      emergencyAvailability: hospital.emergencyAvailability,
+      capabilities: hospital.capabilities,
+      updatedAt: hospital.updatedAt.toISOString(),
+    })),
+    total,
+    query,
+  );
 };
 
 export const listNearbyAmbulances = async (query: NearbyQuery) => {
