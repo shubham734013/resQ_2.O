@@ -9,6 +9,7 @@ export const hospitalKeys = {
   capabilities: () => [...hospitalKeys.all, 'capabilities'] as const,
   availability: () => [...hospitalKeys.all, 'availability'] as const,
   resources: () => [...hospitalKeys.all, 'resources'] as const,
+  emergencySummary: () => [...hospitalKeys.all, 'emergency-summary'] as const,
   emergencies: (params: HospitalListParams) => [...hospitalKeys.all, 'emergencies', params] as const,
   emergency: (id: string) => [...hospitalKeys.all, 'emergency', id] as const,
   patients: (params: HospitalListParams) => [...hospitalKeys.all, 'patients', params] as const,
@@ -22,7 +23,17 @@ export const useHospitalServices = () => useQuery({ queryKey: hospitalKeys.servi
 export const useHospitalCapabilities = () => useQuery({ queryKey: hospitalKeys.capabilities(), queryFn: hospitalApi.getCapabilities });
 export const useHospitalAvailability = () => useQuery({ queryKey: hospitalKeys.availability(), queryFn: hospitalApi.getAvailability });
 export const useHospitalResources = () => useQuery({ queryKey: hospitalKeys.resources(), queryFn: hospitalApi.getResources });
-export const useHospitalEmergencies = (params: HospitalListParams = {}) => useQuery({ queryKey: hospitalKeys.emergencies(params), queryFn: () => hospitalApi.getEmergencies(params) });
+export const useHospitalEmergencySummary = () => useQuery({ queryKey: hospitalKeys.emergencySummary(), queryFn: hospitalApi.getEmergencySummary, refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true });
+export const useHospitalEmergencies = (params: HospitalListParams = {}) => useQuery({
+  queryKey: hospitalKeys.emergencies(params),
+  queryFn: () => hospitalApi.getEmergencies(params),
+  refetchInterval: (query) => {
+    const active = query.state.data?.items.some((item) => ['RECEIVED', 'REVIEWING', 'PREPARING', 'AMBULANCE_COORDINATION'].includes(item.status));
+    return active ? 15000 : false;
+  },
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: true,
+});
 export const useHospitalEmergency = (id: string) => useQuery({ queryKey: hospitalKeys.emergency(id), queryFn: () => hospitalApi.getEmergency(id), enabled: Boolean(id) });
 export const useHospitalPatients = (params: HospitalListParams = {}) => useQuery({ queryKey: hospitalKeys.patients(params), queryFn: () => hospitalApi.getPatients(params) });
 export const useHospitalPatient = (id: string) => useQuery({ queryKey: hospitalKeys.patient(id), queryFn: () => hospitalApi.getPatient(id), enabled: Boolean(id) });
