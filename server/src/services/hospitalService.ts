@@ -154,7 +154,7 @@ const emergencyOut = (x: Record<string, unknown>): HospitalEmergency => ({
 });
 
 export const listEmergencies = async (hospitalId: string, query: EmergencyQuery) => {
-  const id = assertHospitalId(hospitalId);
+  hospitalOwnershipFilter(hospitalId);
   const filter: Record<string, unknown> = { ...hospitalOwnershipFilter(hospitalId) };
   if (query.status) filter.status = query.status;
   if (query.situationType) filter.situationType = new RegExp(escapeRegex(query.situationType), 'i');
@@ -169,7 +169,7 @@ export const listEmergencies = async (hospitalId: string, query: EmergencyQuery)
 };
 
 export const getEmergency = async (hospitalId: string, emergencyId: string) => {
-  const hospital = assertHospitalId(hospitalId);
+  hospitalOwnershipFilter(hospitalId);
   if (!Types.ObjectId.isValid(emergencyId)) throw new AppError('INVALID_ID', 'Invalid emergency id', 400);
   const emergency = await EmergencyRequestModel.findOne({ _id: emergencyId, ...hospitalOwnershipFilter(hospitalId) }).lean().exec();
   if (!emergency) notFound('Emergency request not found');
@@ -212,7 +212,7 @@ const patientOut = (x: Record<string, unknown>): HospitalPatient => ({
 
 export const listPatients = async (hospitalId: string, query: PatientQuery) => {
   const id = assertHospitalId(hospitalId);
-  const filter: Record<string, unknown> = { hospitalId: id };
+  const filter: Record<string, unknown> = { ...hospitalOwnershipFilter(hospitalId) };
   if (query.status) filter.coordinationStatus = query.status;
   if (query.from || query.to) filter.receivedAt = { ...(query.from ? { $gte: query.from } : {}), ...(query.to ? { $lte: query.to } : {}) };
 
@@ -224,7 +224,7 @@ export const listPatients = async (hospitalId: string, query: PatientQuery) => {
 };
 
 export const getPatient = async (hospitalId: string, patientId: string) => {
-  const hospital = assertHospitalId(hospitalId);
+  hospitalOwnershipFilter(hospitalId);
   if (!Types.ObjectId.isValid(patientId)) throw new AppError('INVALID_ID', 'Invalid patient id', 400);
   const patient = await HospitalPatientModel.findOne({ _id: patientId, ...hospitalOwnershipFilter(hospitalId) }).lean().exec();
   if (!patient) notFound('Patient coordination record not found');
@@ -249,7 +249,7 @@ const ambulanceOut = (x: Record<string, unknown>, provider: Record<string, unkno
 });
 
 export const listAmbulances = async (hospitalId: string, query: AmbulanceQuery) => {
-  const hospital = assertHospitalId(hospitalId);
+  hospitalOwnershipFilter(hospitalId);
   const emergencies = await EmergencyRequestModel.find({ ...hospitalOwnershipFilter(hospitalId), ambulanceId: { $exists: true } }).select('ambulanceId etaMinutes _id').lean().exec();
   const ambulanceIds = emergencies.map((x) => x.ambulanceId).filter((x): x is Types.ObjectId => x instanceof Types.ObjectId);
   if (!ambulanceIds.length) return pagination([], 0, query.page, query.limit);
@@ -279,7 +279,7 @@ export const listAmbulances = async (hospitalId: string, query: AmbulanceQuery) 
 };
 
 export const getAmbulance = async (hospitalId: string, ambulanceId: string) => {
-  const hospital = assertHospitalId(hospitalId);
+  hospitalOwnershipFilter(hospitalId);
   if (!Types.ObjectId.isValid(ambulanceId)) throw new AppError('INVALID_ID', 'Invalid ambulance id', 400);
   const emergency = await EmergencyRequestModel.findOne({ ...hospitalOwnershipFilter(hospitalId), ambulanceId }).sort({ reportedAt: -1 }).lean().exec();
   if (!emergency) notFound('Ambulance is not associated with this hospital');
