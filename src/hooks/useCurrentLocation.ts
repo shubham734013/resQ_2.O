@@ -19,7 +19,7 @@ const readPermission = async (): Promise<LocationPermissionState> => {
   }
 };
 
-export function useCurrentLocation(autoRequest = false): LocationState {
+export function useCurrentLocation(): LocationState {
   const [location, setLocation] = useState<GeoPoint | null>(null);
   const [loading, setLoading] = useState(false);
   const [permissionState, setPermissionState] = useState<LocationPermissionState>('unknown');
@@ -58,10 +58,6 @@ export function useCurrentLocation(autoRequest = false): LocationState {
     void readPermission().then((state) => { if (active) setPermissionState(state); });
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (autoRequest && permissionState === 'prompt') refreshLocation();
-  }, [autoRequest, permissionState, refreshLocation]);
 
   return { location, loading, permissionState, error, refreshLocation };
 }
