@@ -4,7 +4,7 @@ import { BottomNavigation } from '../components/navigation/BottomNavigation';
 import { useLocationState } from '../hooks/useLocationState';
 
 export const AppLayout = () => {
-  const { currentLocation, isUpdating, refreshLocation } = useLocationState();
+  const { currentLocation, location, isUpdating, permissionState, locationError, refreshLocation } = useLocationState();
   const location = useLocation();
 
   const isEmergencyRoute = location.pathname.startsWith('/sos');
