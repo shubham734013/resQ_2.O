@@ -6,7 +6,6 @@ import { FacilityFilterChips } from '../components/facility/FacilityFilterChips'
 import { FacilityList } from '../components/facility/FacilityList';
 import { FacilityPreview } from '../components/facility/FacilityPreview';
 import { useFacilities } from '../hooks/useFacilities';
-import { useLocationState } from '../hooks/useLocationState';
 import { MapView } from '../components/map/MapView';
 import type { Facility, FacilityCategory, UserLocation } from '../types/facility';
 
