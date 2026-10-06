@@ -56,8 +56,8 @@ const profileOut = (document: Record<string, unknown>): HospitalProfile => ({
   city: typeof document.city === 'string' ? document.city : undefined,
   state: typeof document.state === 'string' ? document.state : undefined,
   country: typeof document.country === 'string' ? document.country : undefined,
-  latitude: typeof document.latitude === 'number' ? document.latitude : undefined,
-  longitude: typeof document.longitude === 'number' ? document.longitude : undefined,
+  latitude: Array.isArray((document.location as { coordinates?: unknown } | undefined)?.coordinates) ? Number((document.location as { coordinates: [number, number] }).coordinates[1]) : (typeof document.latitude === 'number' ? document.latitude : undefined),
+  longitude: Array.isArray((document.location as { coordinates?: unknown } | undefined)?.coordinates) ? Number((document.location as { coordinates: [number, number] }).coordinates[0]) : (typeof document.longitude === 'number' ? document.longitude : undefined),
   hospitalType: String(document.hospitalType),
   services: Array.isArray(document.services) ? document.services.filter((v): v is string => typeof v === 'string') : [],
   capabilities: Array.isArray(document.capabilities) ? document.capabilities.filter((v): v is string => typeof v === 'string') : [],
@@ -85,7 +85,13 @@ export const getProfile = async (hospitalId: string): Promise<HospitalProfile> =
 
 export const updateProfile = async (hospitalId: string, input: ProfileInput): Promise<HospitalProfile> => {
   const id = assertHospitalId(hospitalId);
-  const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: input }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
+  const update: Record<string, unknown> = { ...input };
+  if (typeof input.latitude === 'number' && typeof input.longitude === 'number') {
+    update.location = { type: 'Point', coordinates: [input.longitude, input.latitude] };
+    delete update.latitude;
+    delete update.longitude;
+  }
+  const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
   if (!hospital) notFound('Hospital profile not found');
   return profileOut(hospital as unknown as Record<string, unknown>);
 };

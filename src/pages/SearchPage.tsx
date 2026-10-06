@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePlaceSearch } from '../hooks/usePlaceSearch';
 import { useNavigate } from 'react-router-dom';
 import { SearchBar } from '../components/search/SearchBar';
 import { FacilityFilterChips } from '../components/facility/FacilityFilterChips';
@@ -14,6 +15,7 @@ export const SearchPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<FacilityCategory>('all');
   const [emergencyOnly, setEmergencyOnly] = useState(false);
+  const placeSearch = usePlaceSearch(searchQuery);
 
   const {
     facilities,
@@ -55,6 +57,31 @@ export const SearchPage = () => {
           autoFocus
           placeholder="Search by hospital name, condition, or service (e.g. stroke, ICU, pediatric)..."
         />
+
+        <SearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          onClear={() => setSearchQuery('')}
+          autoFocus
+          placeholder="Search by hospital name, condition, or service (e.g. stroke, ICU, pediatric)..."
+        />
+
+        {placeSearch.data && placeSearch.data.length > 0 && searchQuery.trim().length >= 3 && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 space-y-1" aria-label="Google Places suggestions">
+            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Google Places</p>
+            {placeSearch.data.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                onClick={() => setSearchQuery(place.displayName)}
+                className="block w-full rounded-md px-2 py-2 text-left hover:bg-white"
+              >
+                <span className="block text-xs font-semibold text-slate-800">{place.displayName}</span>
+                {place.formattedAddress && <span className="block text-[11px] text-slate-500">{place.formattedAddress}</span>}
+              </button>
+            ))}
+          </div>
+        )}
 
         <FacilityFilterChips
           activeCategory={category}
