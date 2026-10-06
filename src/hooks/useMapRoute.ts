@@ -17,7 +17,7 @@ const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][
         ? 'unknown'
         : 'light',
   summary: route.summary,
-  viaRoute: 'OpenStreetMap route',
+  viaRoute: 'Google route',
   isRecommended: route.recommended,
   polylinePoints: route.polyline.map((point) => ({ x: 0, y: 0, latitude: point.latitude, longitude: point.longitude })),
   googlePath: route.polyline,
@@ -33,12 +33,12 @@ export function useMapRoute(facility: Facility | null, location: UserLocation | 
     : null;
 
   const query = useQuery({
-    queryKey: ['osm-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
+    queryKey: ['google-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
     queryFn: () => mapsApi.route({
       origin: origin as { latitude: number; longitude: number },
       destination: destination as { latitude: number; longitude: number },
       travelMode: 'DRIVE',
-      routingPreference: 'TRAFFIC_UNAWARE',
+      routingPreference: 'TRAFFIC_AWARE',
     }),
     enabled: Boolean(origin && destination),
     staleTime: 30_000,
