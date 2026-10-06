@@ -23,7 +23,17 @@ export const useHospitalServices = () => useQuery({ queryKey: hospitalKeys.servi
 export const useHospitalCapabilities = () => useQuery({ queryKey: hospitalKeys.capabilities(), queryFn: hospitalApi.getCapabilities });
 export const useHospitalAvailability = () => useQuery({ queryKey: hospitalKeys.availability(), queryFn: hospitalApi.getAvailability });
 export const useHospitalResources = () => useQuery({ queryKey: hospitalKeys.resources(), queryFn: hospitalApi.getResources });
-export const useHospitalEmergencySummary = () => useQuery({ queryKey: hospitalKeys.emergencySummary(), queryFn: hospitalApi.getEmergencySummary, refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true });
+export const useHospitalEmergencySummary = () => useQuery({
+  queryKey: hospitalKeys.emergencySummary(),
+  queryFn: hospitalApi.getEmergencySummary,
+  refetchInterval: (query) => {
+    const data = query.state.data;
+    if (!data) return 15000;
+    return data.RECEIVED + data.REVIEWING + data.PREPARING + data.AMBULANCE_COORDINATION > 0 ? 15000 : false;
+  },
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: true,
+});
 export const useHospitalEmergencies = (params: HospitalListParams = {}) => useQuery({
   queryKey: hospitalKeys.emergencies(params),
   queryFn: () => hospitalApi.getEmergencies(params),
