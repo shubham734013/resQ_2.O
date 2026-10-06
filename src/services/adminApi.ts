@@ -3,7 +3,15 @@ import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmb
 const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
 
 export class AdminApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string, message: string) { super(message); this.name = 'AdminApiError'; }
+  public readonly status: number;
+  public readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.name = 'AdminApiError';
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
