@@ -241,5 +241,5 @@ export const refreshAuthentication=async(refreshToken:string)=>{
   const account=await findByIdentity({id:c.sub,email:c.email,name:c.name??c.email,role:c.role,accountStatus:c.accountStatus}); if(!account) throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);
   assertLoginAllowed(account.accountStatus); await AuthSessionModel.deleteOne({_id:s._id}).exec(); return createAuthResult(account);
 };
-export const logout=async(refreshToken:string|undefined)=>{if(!refreshToken)return;try{const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh');if(c.jti)await AuthSessionModel.deleteOne({tokenId:c.jti}).exec();}catch{}};
+export const logout=async(refreshToken:string|undefined)=>{if(!refreshToken)return;try{const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh');if(c.jti)await AuthSessionModel.deleteOne({tokenId:c.jti}).exec();}catch(error: unknown) { void error; }};
 export const getCurrentUser=async(identity:AuthenticatedIdentity)=>{const a=await findByIdentity(identity);if(!a)throw new AppError('UNAUTHORIZED','Authenticated account was not found',401);return publicIdentity(a);};
