@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Ambulance, BedDouble, Building2, Check, CircleAlert, RefreshCw, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/common/Button';
+import type { HospitalProfileUpdate } from '../services/hospitalApi';
 import { StatusBadge } from '../components/common/StatusBadge';
 import {
   useHospitalAmbulances, useHospitalAvailability, useHospitalAvailabilityMutation,
@@ -101,12 +102,12 @@ const HospitalResourcesPage = () => {
 const HospitalProfilePage = () => {
   const q = useHospitalProfile();
   const mutation = useHospitalProfileMutation();
-  const [form, setForm] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<HospitalProfileUpdate>({});
   useEffect(() => { if (q.data) setForm({ name: q.data.name, phone: q.data.phone, address: q.data.address ?? '', city: q.data.city ?? '', state: q.data.state ?? '', country: q.data.country ?? '', hospitalType: q.data.hospitalType, publicContactInformation: q.data.publicContactInformation ?? '', operationalDescription: q.data.operationalDescription ?? '' }); }, [q.data]);
   if (q.isLoading) return <PageShell><Loading /></PageShell>;
   if (q.isError || !q.data) return <PageShell><ErrorState retry={() => void q.refetch()} /></PageShell>;
   const p = q.data;
-  const field = (label: string, key: string) => <label className="space-y-1 text-sm"><span className="font-medium text-slate-700">{label}</span><input value={form[key] ?? ''} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="w-full rounded-md border border-slate-200 px-3 py-2 outline-none focus:border-slate-400" /></label>;
+  const field = (label: string, key: string) => <label className="space-y-1 text-sm"><span className="font-medium text-slate-700">{label}</span><input value={String(form[key as keyof HospitalProfileUpdate] ?? '')} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="w-full rounded-md border border-slate-200 px-3 py-2 outline-none focus:border-slate-400" /></label>;
   return <PageShell><div className="grid gap-6 lg:grid-cols-2"><section className={`${box} p-5`}><div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100"><Building2 className="h-6 w-6" /></div><div><h2 className="text-xl font-semibold">{p.name}</h2><p className="text-sm text-slate-500">{p.registrationNumber}</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2">{field('Name', 'name')}{field('Phone', 'phone')}{field('Address', 'address')}{field('City', 'city')}{field('State', 'state')}{field('Country', 'country')}{field('Hospital type', 'hospitalType')}{field('Public contact', 'publicContactInformation')}</div><label className="mt-4 block space-y-1 text-sm"><span className="font-medium text-slate-700">Operational description</span><textarea value={form.operationalDescription ?? ''} onChange={(e) => setForm((current) => ({ ...current, operationalDescription: e.target.value }))} rows={4} className="w-full rounded-md border border-slate-200 px-3 py-2" /></label><div className="mt-5 flex items-center justify-between"><div><StatusBadge variant={statusVariant(p.verificationStatus)} label={`Verification: ${p.verificationStatus}`} /><p className="mt-2 text-xs text-slate-500">Account status: {p.accountStatus}. Admin controls verification and account status.</p></div><Button disabled={mutation.isPending} onClick={() => mutation.mutate(form)} icon={<Save className="h-4 w-4" />}>{mutation.isPending ? 'Saving…' : 'Save profile'}</Button></div></section><OperationsSettings profile={p} /></div></PageShell>;
 };
 
