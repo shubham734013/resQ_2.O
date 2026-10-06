@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { AMBULANCE_STATUSES, DRIVER_AVAILABILITY_STATUSES, TRIP_STATUSES } from '../types/ambulance.js';
+import { HOSPITAL_EMERGENCY_STATUSES } from '../models/EmergencyRequest.js';
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 const lat = z.number().min(-90).max(90);
@@ -17,9 +19,9 @@ export const assignmentSchema = z.object({ driverId:objectId }).strict();
 export const driverStatusSchema = z.object({ status:z.enum(['ONLINE','OFFLINE','BUSY']) }).strict();
 export const requestAssignSchema = z.object({ ambulanceId:objectId }).strict();
 const commonQuery = z.object({ page, limit, search:z.string().trim().max(100).optional(), status:z.string().trim().max(50).optional(), ambulance:z.string().regex(/^[0-9a-fA-F]{24}$/).optional(), driver:z.string().regex(/^[0-9a-fA-F]{24}$/).optional(), from:date.optional(), to:date.optional(), sortOrder:z.enum(['asc','desc']).default('desc') }).strict();
-export const providerAmbulanceQuerySchema = commonQuery;
-export const providerDriverQuerySchema = commonQuery;
-export const providerRequestQuerySchema = commonQuery;
-export const providerTripQuerySchema = commonQuery;
-export const driverRequestQuerySchema = commonQuery;
-export const driverTripQuerySchema = commonQuery;
+export const providerAmbulanceQuerySchema = commonQuery.extend({status:z.enum(AMBULANCE_STATUSES).optional()});
+export const providerDriverQuerySchema = commonQuery.extend({status:z.enum(DRIVER_AVAILABILITY_STATUSES).optional()});
+export const providerRequestQuerySchema = commonQuery.extend({status:z.enum(HOSPITAL_EMERGENCY_STATUSES).optional()});
+export const providerTripQuerySchema = commonQuery.extend({status:z.enum(TRIP_STATUSES).optional()});
+export const driverRequestQuerySchema = commonQuery.extend({status:z.enum(HOSPITAL_EMERGENCY_STATUSES).optional()});
+export const driverTripQuerySchema = commonQuery.extend({status:z.enum(TRIP_STATUSES).optional()});
