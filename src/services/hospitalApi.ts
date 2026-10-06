@@ -41,7 +41,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (payload as { data: T }).data;
 }
 
-const query = (params: Record<string, string | number | undefined>): string => {
+const query = (params: HospitalListParams): string => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== '') search.set(key, String(value));
