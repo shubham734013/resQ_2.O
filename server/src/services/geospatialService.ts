@@ -14,11 +14,27 @@ const pagination = <T>(items: T[], total: number, query: NearbyQuery) => ({
 
 export const listNearbyFacilities = async (query: NearbyQuery) => {
   const center = point(query.latitude, query.longitude);
-  const filter = {
+  const filter: Record<string, unknown> = {
     location: { $near: { $geometry: center, $maxDistance: query.radius } },
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
   };
+  if (query.emergencyAvailability) filter.emergencyAvailability = query.emergencyAvailability;
+  if (query.hospitalType) filter.hospitalType = new RegExp(query.hospitalType.replace(/[.*+?^()|[\\]\\\\]/g, '\\\\  const filter = {
+    location: { $near: { $geometry: center, $maxDistance: query.radius } },
+    accountStatus: 'ACTIVE',
+    verificationStatus: 'VERIFIED',
+  };'), 'i');
+  if (query.service) filter.services = new RegExp(query.service.replace(/[.*+?^()|[\\]\\\\]/g, '\\\\  const filter = {
+    location: { $near: { $geometry: center, $maxDistance: query.radius } },
+    accountStatus: 'ACTIVE',
+    verificationStatus: 'VERIFIED',
+  };'), 'i');
+  if (query.capability) filter.capabilities = new RegExp(query.capability.replace(/[.*+?^()|[\\]\\\\]/g, '\\\\  const filter = {
+    location: { $near: { $geometry: center, $maxDistance: query.radius } },
+    accountStatus: 'ACTIVE',
+    verificationStatus: 'VERIFIED',
+  };'), 'i');
 
   const [items, total] = await Promise.all([
     HospitalModel.find(filter)
@@ -28,9 +44,8 @@ export const listNearbyFacilities = async (query: NearbyQuery) => {
       .lean()
       .exec(),
     HospitalModel.countDocuments({
+      ...filter,
       location: { $geoWithin: { $centerSphere: [[query.longitude, query.latitude], query.radius / 6378137] } },
-      accountStatus: 'ACTIVE',
-      verificationStatus: 'VERIFIED',
     }).exec(),
   ]);
 
