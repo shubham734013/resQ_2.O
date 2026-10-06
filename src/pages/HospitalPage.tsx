@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Ambulance, BedDouble, Building2, Check, CircleAlert, RefreshCw, Save, UserRound } from 'lucide-react';
+import { Ambulance, Building2, Check, CircleAlert, RefreshCw, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import type { HospitalProfileUpdate } from '../services/hospitalApi';
 import { StatusBadge } from '../components/common/StatusBadge';
 import {
   useHospitalAmbulances, useHospitalAvailability, useHospitalAvailabilityMutation,
   useHospitalCapabilities, useHospitalCapabilitiesMutation, useHospitalEmergencyStatusMutation,
-  useHospitalEmergencies, useHospitalPatients, useHospitalProfile, useHospitalProfileMutation,
-  useHospitalResources, useHospitalResourcesMutation, useHospitalServices, useHospitalServicesMutation,
+  useHospitalEmergencies, useHospitalEmergency, useHospitalPatients, useHospitalPatient, useHospitalProfile, useHospitalProfileMutation,
+  useHospitalResources, useHospitalResourcesMutation, useHospitalServices, useHospitalServicesMutation, useHospitalAmbulance,
 } from '../hooks/useHospitalManagement';
 import type { HospitalEmergencyStatus } from '../types/hospitalManagement';
 
@@ -40,6 +40,7 @@ const HospitalOverviewPage = () => {
   if (profile.isLoading || emergencies.isLoading) return <PageShell><Loading /></PageShell>;
   if (profile.isError) return <PageShell><ErrorState retry={() => void profile.refetch()} /></PageShell>;
   const p = profile.data;
+  if (!p) return <PageShell><ErrorState retry={() => void profile.refetch()} /></PageShell>;
   const metrics = [
     ['Emergency availability', availabilityLabel[p.emergencyAvailability] ?? p.emergencyAvailability, CircleAlert],
     ['Incoming requests', emergencies.data?.pagination.total ?? 0, CircleAlert],
