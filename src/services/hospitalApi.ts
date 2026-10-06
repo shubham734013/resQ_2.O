@@ -50,6 +50,8 @@ const query = (params: Record<string, string | number | undefined>): string => {
   return encoded ? `?${encoded}` : '';
 };
 
+export type HospitalProfileUpdate = Partial<Pick<HospitalProfile, 'name' | 'phone' | 'address' | 'city' | 'state' | 'country' | 'latitude' | 'longitude' | 'hospitalType' | 'publicContactInformation' | 'emergencyAvailability' | 'operationalDescription'>>;
+
 export interface HospitalListParams {
   page?: number;
   limit?: number;
@@ -63,7 +65,7 @@ export interface HospitalListParams {
 
 export const hospitalApi = {
   getProfile: () => request<HospitalProfile>('/hospital/profile'),
-  updateProfile: (input: Partial<Pick<HospitalProfile, 'name' | 'phone' | 'address' | 'city' | 'state' | 'country' | 'latitude' | 'longitude' | 'hospitalType' | 'publicContactInformation' | 'emergencyAvailability' | 'operationalDescription'>>) =>
+  updateProfile: (input: HospitalProfileUpdate) =>
     request<HospitalProfile>('/hospital/profile', { method: 'PATCH', body: JSON.stringify(input) }),
 
   getServices: () => request<{ services: string[]; updatedAt: string }>('/hospital/services'),
