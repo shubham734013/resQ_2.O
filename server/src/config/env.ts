@@ -13,6 +13,7 @@ const envSchema = z.object({
   MICROSOFT_TENANT_ID: z.string().min(1).optional(),
   MICROSOFT_AUTHORITY: z.string().url().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+  GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
