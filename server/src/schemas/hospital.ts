@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HOSPITAL_EMERGENCY_STATUSES, HOSPITAL_PATIENT_STATUSES } from '../models/EmergencyRequest.js';
+import { HOSPITAL_EMERGENCY_STATUSES } from '../models/EmergencyRequest.js';
 import { HOSPITAL_PATIENT_STATUSES as PATIENT_STATUSES } from '../models/HospitalPatient.js';
 
 const coordinate = z.number().finite().min(-180).max(180);
