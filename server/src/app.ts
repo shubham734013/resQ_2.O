@@ -8,6 +8,7 @@ import { mapsRouter } from './routes/mapsRoutes.js';
 import { geospatialRouter } from './routes/geospatialRoutes.js';
 import { facilityRouter } from './routes/facilityRoutes.js';
 import { geocodingRouter } from './routes/geocodingRoutes.js';
+import { ambulanceProviderRouter, ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 export const app = express();
@@ -24,6 +25,8 @@ app.use('/api/v1', geospatialRouter);
 app.use('/api/v1/facilities', facilityRouter);
 app.use('/api/v1/maps', mapsRouter);
 app.use('/api/v1/geocoding', geocodingRouter);
+app.use('/api/v1/ambulance-provider', ambulanceProviderRouter);
+app.use('/api/v1/ambulance-driver', ambulanceDriverRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
