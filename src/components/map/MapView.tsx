@@ -1,408 +1,221 @@
-import { useState, useMemo } from 'react';
-import {
-  Plus,
-  Minus,
-  LocateFixed,
-  Layers,
-  Flame,
-  Building2,
-  Navigation,
-  Compass,
-} from 'lucide-react';
-import type { UserLocation } from '../../types/facility';
-import type { MapViewProps, RouteCoordinate } from '../../types/route';
-import { IconButton } from '../common/IconButton';
+import { useEffect, useRef, useState } from 'react';
+import { LocateFixed, Minus, Plus, RefreshCw } from 'lucide-react';
+import type { MapViewProps } from '../../types/route';
+import type { GoogleAdvancedMarker, GoogleMapInstance, GoogleMapsApi, GooglePolyline } from '../../types/googleMaps';
+import { loadGoogleMaps } from '../../services/googleMapsLoader';
 
-const DEFAULT_CENTER = { latitude: 37.7749, longitude: -122.4194 };
-const DEFAULT_USER_LOCATION: UserLocation = {
-  latitude: 37.7749,
-  longitude: -122.4194,
-  accuracy: 'high',
-  label: 'Downtown Financial District, San Francisco',
-};
-
-/**
- * Converts an array of RouteCoordinate ({ x, y }) into an SVG path 'd' attribute string.
- */
-function coordinatesToSvgPath(points: RouteCoordinate[]): string {
-  if (!points || points.length === 0) return '';
-  return points.reduce((acc, pt, index) => {
-    return index === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
-  }, '');
+interface AdvancedMarkerConstructor {
+  new (options: { map: GoogleMapInstance; position: { lat: number; lng: number }; title?: string; content?: HTMLElement; gmpClickable?: boolean }): GoogleAdvancedMarker;
 }
 
-/**
- * ResQ MapView Abstraction
- *
- * Architectural Guarantee:
- * Decouples the frontend application and navigation state from the underlying map provider.
- * When integrating Google Maps API in the future, only the internal JSX rendering of this
- * component will be replaced with GoogleMap, Polyline, and Marker primitives.
- * The external interface (props, callbacks, state) remains 100% identical.
- */
+interface MapLibrary {
+  Map: new (element: HTMLElement, options: { center: { lat: number; lng: number }; zoom: number; mapId?: string; streetViewControl?: boolean; mapTypeControl?: boolean; fullscreenControl?: boolean; clickableIcons?: boolean }) => GoogleMapInstance;
+  LatLngBounds: new () => { extend(point: { lat: number; lng: number }): void };
+  Polyline: new (options: { map?: GoogleMapInstance; path: { lat: number; lng: number }[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number }) => GooglePolyline;
+}
+
+const toGoogle = (latitude: number, longitude: number) => ({ lat: latitude, lng: longitude });
+
+const markerElement = (label: string, emergency = false): HTMLElement => {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.setAttribute('aria-label', label);
+  element.title = label;
+  element.className = 'rounded-full border-2 border-white px-2 py-1 text-[10px] font-semibold shadow-md bg-white text-slate-800';
+  if (emergency) element.className += ' text-rose-700';
+  element.textContent = label;
+  return element;
+};
+
 export const MapView = ({
-  center = DEFAULT_CENTER,
+  center,
   zoom = 14,
-  userLocation = DEFAULT_USER_LOCATION,
+  userLocation,
   destination,
   markers = [],
   activeRoute = null,
   alternativeRoutes = [],
   onSelectRoute,
   interactive = true,
-  isNavigating = false,
-  currentStepIndex = 0,
   onRecenter,
   className = '',
 }: MapViewProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<GoogleMapInstance | null>(null);
+  const markersRef = useRef<GoogleAdvancedMarker[]>([]);
+  const polylinesRef = useRef<GooglePolyline[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(zoom);
-  const [mapStyle, setMapStyle] = useState<'standard' | 'contrast'>('standard');
 
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(z + 1, 18));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 1, 10));
-  const toggleMapStyle = () =>
-    setMapStyle((s) => (s === 'standard' ? 'contrast' : 'standard'));
+  const fallbackCenter = center ?? (userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : destination ?? { latitude: 0, longitude: 0 });
 
-  // Calculate destination percentage position on SVG canvas (viewBox 0 0 100 100)
-  const destPos = useMemo(() => {
-    if (!destination) return null;
-    const deltaLat = destination.latitude - center.latitude;
-    const deltaLng = destination.longitude - center.longitude;
+  useEffect(() => {
+    let cancelled = false;
+    const initialize = async () => {
+      if (!containerRef.current) return;
+      try {
+        setStatus('loading');
+        const googleMaps = await loadGoogleMaps();
+        if (cancelled || !containerRef.current) return;
+        const maps = await googleMaps.maps.importLibrary('maps') as unknown as MapLibrary;
+        const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim();
+        mapRef.current = new maps.Map(containerRef.current, {
+          center: toGoogle(fallbackCenter.latitude, fallbackCenter.longitude),
+          zoom,
+          ...(mapId ? { mapId } : {}),
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+        });
+        setZoomLevel(zoom);
+        setStatus('ready');
+        setError(null);
+      } catch (reason) {
+        if (!cancelled) {
+          setStatus('error');
+          setError(reason instanceof Error ? reason.message : 'MAPS_API_LOAD_FAILED');
+        }
+      }
+    };
+    void initialize();
+    return () => { cancelled = true; };
+  }, []);
 
-    const x = Math.max(12, Math.min(88, 50 + deltaLng * 550));
-    const y = Math.max(16, Math.min(84, 50 - deltaLat * 800));
+  useEffect(() => {
+    if (!mapRef.current || status !== 'ready') return;
+    mapRef.current.setCenter(toGoogle(fallbackCenter.latitude, fallbackCenter.longitude));
+  }, [fallbackCenter.latitude, fallbackCenter.longitude, status]);
 
-    return { x, y };
-  }, [destination, center]);
+  useEffect(() => {
+    let cancelled = false;
+    const renderOverlays = async () => {
+      if (!mapRef.current || status !== 'ready') return;
+      const googleMaps = await loadGoogleMaps();
+      const markerLibrary = await googleMaps.maps.importLibrary('marker');
+      if (cancelled) return;
+      const AdvancedMarkerElement = (markerLibrary as unknown as { AdvancedMarkerElement: AdvancedMarkerConstructor }).AdvancedMarkerElement;
+      markersRef.current.forEach((marker) => { marker.map = null; });
+      markersRef.current = [];
+      polylinesRef.current.forEach((line) => line.setMap(null));
+      polylinesRef.current = [];
 
-  // Determine user navigation position along the active route when in navigation mode, or relative to center in preview
-  const currentNavUserPos = useMemo(() => {
-    if (isNavigating && activeRoute && activeRoute.polylinePoints.length) {
-      const points = activeRoute.polylinePoints;
-      // Map currentStepIndex smoothly to polyline segment
-      const targetIdx = Math.min(currentStepIndex, points.length - 1);
-      return points[targetIdx] || { x: 50, y: 50 };
+      const allPoints: Array<{ lat: number; lng: number }> = [];
+      if (userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)) {
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: toGoogle(userLocation.latitude, userLocation.longitude),
+          title: 'Your current location',
+          content: markerElement('You'),
+        });
+        markersRef.current.push(marker);
+        allPoints.push(toGoogle(userLocation.latitude, userLocation.longitude));
+      }
+
+      for (const item of markers) {
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: toGoogle(item.latitude, item.longitude),
+          title: item.title,
+          content: markerElement(item.title, item.isEmergency),
+          gmpClickable: Boolean(item.onClick),
+        });
+        if (item.onClick) marker.addListener('click', item.onClick);
+        markersRef.current.push(marker);
+        allPoints.push(toGoogle(item.latitude, item.longitude));
+      }
+
+      if (destination) {
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: toGoogle(destination.latitude, destination.longitude),
+          title: destination.name,
+          content: markerElement(destination.name, destination.isEmergency),
+        });
+        markersRef.current.push(marker);
+        allPoints.push(toGoogle(destination.latitude, destination.longitude));
+      }
+
+      if (activeRoute?.googlePath?.length) {
+        polylinesRef.current.push(new googleMaps.maps.Polyline({
+          map: mapRef.current,
+          path: activeRoute.googlePath.map((point) => toGoogle(point.latitude, point.longitude)),
+          strokeColor: '#2563eb',
+          strokeOpacity: 0.95,
+          strokeWeight: 6,
+        }));
+      }
+
+      for (const route of alternativeRoutes) {
+        if (!route.googlePath?.length) continue;
+        polylinesRef.current.push(new googleMaps.maps.Polyline({
+          map: mapRef.current,
+          path: route.googlePath.map((point) => toGoogle(point.latitude, point.longitude)),
+          strokeColor: '#64748b',
+          strokeOpacity: 0.55,
+          strokeWeight: 4,
+        }));
+      }
+
+      if (allPoints.length > 1 && !activeRoute?.googlePath?.length) {
+        const bounds = new googleMaps.maps.LatLngBounds();
+        allPoints.forEach((point) => bounds.extend(point));
+        mapRef.current.fitBounds(bounds);
+      }
+    };
+    void renderOverlays();
+    return () => { cancelled = true; };
+  }, [activeRoute, alternativeRoutes, destination, markers, status, userLocation]);
+
+  const changeZoom = (delta: number) => {
+    const next = Math.min(20, Math.max(2, zoomLevel + delta));
+    setZoomLevel(next);
+    mapRef.current?.setZoom(next);
+  };
+
+  const recenter = () => {
+    if (!userLocation) {
+      onRecenter?.();
+      return;
     }
-
-    const deltaLat = userLocation.latitude - center.latitude;
-    const deltaLng = userLocation.longitude - center.longitude;
-    const x = Math.max(8, Math.min(92, 50 + deltaLng * 550));
-    const y = Math.max(12, Math.min(88, 50 - deltaLat * 800));
-    return { x, y };
-  }, [isNavigating, activeRoute, currentStepIndex, userLocation, center]);
-
-  // Compute SVG path string for active route
-  const activeRouteSvgPath = useMemo(() => {
-    if (!activeRoute) return '';
-    return coordinatesToSvgPath(activeRoute.polylinePoints);
-  }, [activeRoute]);
+    mapRef.current?.setCenter(toGoogle(userLocation.latitude, userLocation.longitude));
+    mapRef.current?.setZoom(16);
+    setZoomLevel(16);
+    onRecenter?.();
+  };
 
   return (
-    <div
-      role="region"
-      aria-label="Interactive route navigation map"
-      className={`relative w-full h-full overflow-hidden select-none bg-slate-100 ${
-        mapStyle === 'contrast' ? 'bg-slate-200' : 'bg-slate-100'
-      } ${className}`}
-    >
-      {/* Background Vector Map Canvas (Roads, Grids, and Corridors) */}
-      <svg
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <pattern
-            id="nav-map-grid"
-            width="8"
-            height="8"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M 8 0 L 0 0 0 8"
-              fill="none"
-              stroke="#cbd5e1"
-              strokeWidth="0.1"
-            />
-            <path
-              d="M 4 0 L 4 8 M 0 4 L 8 4"
-              fill="none"
-              stroke="#e2e8f0"
-              strokeWidth="0.06"
-              strokeDasharray="0.3 0.3"
-            />
-          </pattern>
-        </defs>
-
-        {/* Base Grid */}
-        <rect width="100%" height="100%" fill="url(#nav-map-grid)" />
-
-        {/* Secondary Arterial Network Roads */}
-        <path
-          d="M -10 20 Q 30 25, 60 18 T 110 32"
-          fill="none"
-          stroke="#cbd5e1"
-          strokeWidth="0.6"
-          opacity="0.6"
-        />
-        <path
-          d="M 25 -10 L 28 110"
-          fill="none"
-          stroke="#cbd5e1"
-          strokeWidth="0.7"
-          opacity="0.6"
-        />
-        <path
-          d="M 72 -10 L 68 110"
-          fill="none"
-          stroke="#cbd5e1"
-          strokeWidth="0.6"
-          opacity="0.5"
-        />
-        <path
-          d="M -10 65 Q 35 60, 75 68 T 115 62"
-          fill="none"
-          stroke="#cbd5e1"
-          strokeWidth="0.6"
-          opacity="0.6"
-        />
-
-        {/* Major Transit Corridor */}
-        <path
-          d="M -5 45 Q 40 40, 80 50 T 105 45"
-          fill="none"
-          stroke="#94a3b8"
-          strokeWidth="1.2"
-          opacity="0.45"
-        />
-      </svg>
-
-      {/* SVG Polylines Layer for Routes */}
-      {(activeRoute || alternativeRoutes.length > 0) && (
-        <svg
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          className="absolute inset-0 w-full h-full"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Alternative Routes (selectable, dashed, muted slate) */}
-          {alternativeRoutes.map((alt) => {
-            const altPath = coordinatesToSvgPath(alt.polylinePoints);
-            return (
-              <g
-                key={alt.id}
-                className="cursor-pointer group"
-                onClick={() => onSelectRoute?.(alt.id)}
-              >
-                {/* Fat transparent hit target for easy clicking / tapping */}
-                <path
-                  d={altPath}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth="6"
-                  className="pointer-events-auto"
-                />
-                {/* Visible dashed alternative route line */}
-                <path
-                  d={altPath}
-                  fill="none"
-                  stroke="#94a3b8"
-                  strokeWidth="1.4"
-                  strokeDasharray="2 1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="transition-all group-hover:stroke-slate-600 group-hover:stroke-[1.8]"
-                />
-              </g>
-            );
-          })}
-
-          {/* Active Route Outer High-Contrast Glow / Casing */}
-          {activeRouteSvgPath && (
-            <>
-              <path
-                d={activeRouteSvgPath}
-                fill="none"
-                stroke="#bfdbfe"
-                strokeWidth="2.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.9"
-              />
-              {/* Active Route Main Polyline */}
-              <path
-                d={activeRouteSvgPath}
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="transition-all duration-300"
-              />
-            </>
-          )}
-        </svg>
-      )}
-
-      {/* User Location Radar Marker */}
-      <div
-        style={{
-          left: `${currentNavUserPos.x}%`,
-          top: `${currentNavUserPos.y}%`,
-        }}
-        className="absolute -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center transition-all duration-500 ease-out"
-      >
-        {isNavigating ? (
-          // In Navigation Mode: Directional Heading Puck
-          <div className="relative flex items-center justify-center">
-            <span className="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-blue-400 opacity-40" />
-            <div className="w-8 h-8 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white">
-              <Navigation className="w-4 h-4 fill-white text-white -rotate-45" />
-            </div>
-            <span className="absolute -bottom-5 text-[9px] font-bold tracking-wide bg-slate-950/90 text-white px-1.5 py-0.5 rounded shadow-xs whitespace-nowrap">
-              Navigating
-            </span>
-          </div>
-        ) : (
-          // In Preview Mode: Pulsing Radar Beacon
-          <div className="flex flex-col items-center">
-            <span className="relative flex h-8 w-8 items-center justify-center">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-60" />
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-sky-600 border-2 border-white shadow-md" />
-            </span>
-            <span className="text-[10px] font-semibold tracking-wide bg-slate-900/90 text-white px-1.5 py-0.5 rounded shadow-xs -mt-1 backdrop-blur-xs whitespace-nowrap">
-              You
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Destination Pin */}
-      {destination && destPos && (
-        <div
-          style={{
-            left: `${destPos.x}%`,
-            top: `${destPos.y}%`,
-          }}
-          className="absolute -translate-x-1/2 -translate-y-full z-30 flex flex-col items-center pointer-events-auto"
-        >
-          {/* Destination Tooltip Badge */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold shadow-md border ${
-              destination.isEmergency
-                ? 'bg-rose-900 text-white border-rose-950 ring-2 ring-rose-500/20'
-                : 'bg-slate-900 text-white border-slate-950 ring-2 ring-slate-900/20'
-            }`}
-          >
-            {destination.isEmergency ? (
-              <Flame className="w-3.5 h-3.5 text-rose-300" aria-hidden="true" />
-            ) : (
-              <Building2 className="w-3.5 h-3.5 text-slate-300" aria-hidden="true" />
-            )}
-            <span className="max-w-[140px] truncate">{destination.name}</span>
-            {activeRoute && (
-              <span className="text-[10px] opacity-80 border-l border-white/20 pl-1.5 font-mono">
-                {activeRoute.duration}
-              </span>
-            )}
-          </div>
-          {/* Stem pointer */}
-          <div
-            className={`w-2.5 h-2.5 rotate-45 -mt-1 border-r border-b ${
-              destination.isEmergency
-                ? 'bg-rose-900 border-rose-950'
-                : 'bg-slate-900 border-slate-950'
-            }`}
-            aria-hidden="true"
-          />
+    <div className={`relative w-full h-full overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google map">
+      <div ref={containerRef} className="absolute inset-0" />
+      {status === 'loading' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 z-10">
+          <p className="text-sm font-medium text-slate-600">Loading Google Maps…</p>
         </div>
       )}
-
-      {/* Additional Markers (e.g. nearby facilities if present) */}
-      {markers.map((marker) => {
-        const deltaLat = marker.latitude - center.latitude;
-        const deltaLng = marker.longitude - center.longitude;
-        const x = Math.max(8, Math.min(92, 50 + deltaLng * 550));
-        const y = Math.max(12, Math.min(88, 50 - deltaLat * 800));
-
-        return (
-          <button
-            key={marker.id}
-            type="button"
-            style={{ left: `${x}%`, top: `${y}%` }}
-            onClick={marker.onClick}
-            aria-label={`${marker.title} marker`}
-            className="absolute -translate-x-1/2 -translate-y-full z-20 group cursor-pointer focus-visible:outline-none"
-          >
-            <div className="flex flex-col items-center">
-              <div className="bg-white/95 border border-slate-200 text-slate-800 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-xs group-hover:border-slate-400">
-                {marker.title}
-              </div>
-              <div className="w-2 h-2 bg-white rotate-45 -mt-1 border-r border-b border-slate-200" />
-            </div>
-          </button>
-        );
-      })}
-
-      {/* Map Control Buttons: Top Right (Layers & Recenter) */}
-      {interactive && (
-        <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
-          <IconButton
-            icon={<Layers className="w-4 h-4" />}
-            size="md"
-            variant="default"
-            aria-label={`Toggle map layer (${mapStyle === 'standard' ? 'standard' : 'contrast'})`}
-            onClick={toggleMapStyle}
-          />
-          {isNavigating && (
-            <div className="p-2 bg-white/90 backdrop-blur-xs rounded-lg border border-slate-200 text-slate-700 shadow-xs flex items-center justify-center">
-              <Compass className="w-4 h-4 text-slate-500 animate-pulse" />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Map Control Buttons: Bottom Right (Recenter, Zoom In/Out) */}
-      {interactive && (
-        <div className="absolute bottom-5 right-4 z-20 flex flex-col gap-1.5">
-          <IconButton
-            icon={<LocateFixed className="w-4 h-4" />}
-            size="md"
-            variant="default"
-            aria-label="Recenter map to user location"
-            onClick={onRecenter}
-          />
-          <div className="flex flex-col bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
-            <button
-              type="button"
-              onClick={handleZoomIn}
-              aria-label="Zoom in"
-              className="p-2 text-slate-700 hover:bg-slate-50 active:bg-slate-100 border-b border-slate-100 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              aria-label="Zoom out"
-              className="p-2 text-slate-700 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 cursor-pointer"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
+      {status === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center p-6 bg-slate-100 z-10">
+          <div className="max-w-sm rounded-xl border border-rose-200 bg-white p-5 shadow-sm text-center">
+            <p className="font-semibold text-slate-900">Map unavailable</p>
+            <p className="mt-1 text-xs text-slate-500">{error === 'MAPS_API_KEY_MISSING' ? 'Google Maps is not configured. Add VITE_GOOGLE_MAPS_API_KEY to the frontend environment.' : 'Google Maps could not be loaded.'}</p>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"><RefreshCw className="h-3.5 w-3.5" /> Retry</button>
           </div>
         </div>
       )}
-
-      {/* Map Telemetry Scale & Attribution */}
-      <div className="absolute bottom-2 left-4 z-20 flex items-center gap-2.5 text-[10px] text-slate-500 font-mono pointer-events-none">
-        <div className="bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded border border-slate-200/80 shadow-xs flex items-center gap-1.5">
-          <Navigation className="w-2.5 h-2.5 text-slate-400 rotate-45" />
-          <span>Zoom: {zoomLevel}x</span>
-          <span className="text-slate-300">•</span>
-          <span>ResQ Navigation Abstraction</span>
+      {status === 'ready' && interactive && (
+        <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
+          <button type="button" aria-label="Zoom in" onClick={() => changeZoom(1)} className="rounded-lg bg-white p-2 shadow-md"><Plus className="h-4 w-4" /></button>
+          <button type="button" aria-label="Zoom out" onClick={() => changeZoom(-1)} className="rounded-lg bg-white p-2 shadow-md"><Minus className="h-4 w-4" /></button>
+          <button type="button" aria-label="Center on me" onClick={recenter} disabled={!userLocation} className="rounded-lg bg-white p-2 shadow-md disabled:opacity-50"><LocateFixed className="h-4 w-4" /></button>
         </div>
-      </div>
+      )}
+      {status === 'ready' && alternativeRoutes.length > 0 && (
+        <div className="absolute bottom-3 right-3 z-20 rounded-lg bg-white/95 px-3 py-2 shadow-md text-[11px] text-slate-600">
+          {alternativeRoutes.map((route) => (
+            <button key={route.id} type="button" onClick={() => onSelectRoute?.(route.id)} className="mr-2 font-semibold text-slate-800 last:mr-0">{route.name}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
