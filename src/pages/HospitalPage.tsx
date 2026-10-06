@@ -164,6 +164,7 @@ const HospitalEmergenciesPage = () => {
           </div>
         </header>
 
+        {mutation.isError && <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Status update could not be applied. The request was refreshed; please retry only if the current status still permits the action.</div>}
         {q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={() => void q.refetch()} /> : items.length ? <>
           <div className="divide-y divide-slate-100">
             {items.map((e) => <EmergencyRow key={e.id} emergency={e} selected={selected === e.id} onSelect={() => setSelected(e.id)} onStatus={(next) => mutation.mutate({ id: e.id, status: next })} busy={mutation.isPending && mutation.variables?.id === e.id} />)}
