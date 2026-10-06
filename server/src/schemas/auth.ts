@@ -49,6 +49,19 @@ export const loginSchema = z.object({
 });
 export const socialAuthSchema = z.object({
   credential: z.string().min(20).max(10000),
+  roleHint: z.enum(['USER', 'AMBULANCE_PROVIDER']).default('USER'),
+});
+export const providerProfileSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  phone: z.string().trim().min(7).max(20),
+  registrationNumber: z.string().trim().min(2).max(80),
+  serviceType: z.string().trim().min(2).max(80),
+  address: z.string().trim().min(2).max(250),
+  city: z.string().trim().min(2).max(100),
+  state: z.string().trim().min(2).max(100),
+  country: z.string().trim().min(2).max(100),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
 });
 export const driverProfileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
@@ -70,3 +83,4 @@ export type AmbulanceDriverRegistrationInput = z.infer<typeof ambulanceDriverReg
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SocialAuthInput = z.infer<typeof socialAuthSchema>;
 export type DriverProfileInput = z.infer<typeof driverProfileSchema>;
+export type ProviderProfileInput = z.infer<typeof providerProfileSchema>;
