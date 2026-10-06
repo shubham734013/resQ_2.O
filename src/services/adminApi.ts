@@ -17,7 +17,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (payload as { data: T }).data;
 }
 
-\nfunction userFacingMessage(status: number): string {\n  if (status === 401) return 'Your admin session has expired. Please sign in again.';\n  if (status === 403) return 'You do not have permission to perform this operation.';\n  if (status === 404) return 'The requested admin record was not found.';\n  if (status === 409) return 'The operation conflicts with the current record state.';\n  if (status === 422) return 'Some submitted values are invalid.';\n  if (status >= 500) return 'The server could not complete the request. Please try again.';\n  return 'The request could not be completed.';\n}\n\nfunction query(params: AdminListParams): string {
+
+function userFacingMessage(status: number): string {
+  if (status === 401) return 'Your admin session has expired. Please sign in again.';
+  if (status === 403) return 'You do not have permission to perform this operation.';
+  if (status === 404) return 'The requested admin record was not found.';
+  if (status === 409) return 'The operation conflicts with the current record state.';
+  if (status === 422) return 'Some submitted values are invalid.';
+  if (status >= 500) return 'The server could not complete the request. Please try again.';
+  return 'The request could not be completed.';
+}
+
+function query(params: AdminListParams): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); });
   const encoded = search.toString();
