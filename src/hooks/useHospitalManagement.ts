@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { hospitalApi, type HospitalListParams } from '../services/hospitalApi';
+import type { HospitalEmergencyStatus } from '../types/hospitalManagement';
 
 export const hospitalKeys = {
   all: ['hospital'] as const,
