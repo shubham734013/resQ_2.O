@@ -71,6 +71,35 @@ export const HomePage = () => {
     setSearchQuery(suggestion);
   };
 
+  const mapMarkers = useMemo(() => {
+    const source = nearby.data?.items ?? [];
+    if (source.length > 0) {
+      return source.map((item) => ({
+        id: item.id,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        title: item.name,
+        subtitle: item.emergencyAvailability,
+        isEmergency: item.emergencyAvailability === 'AVAILABLE',
+        onClick: () => {
+          const facility = facilities.find((candidate) => candidate.id === item.id);
+          if (facility) handleSelectFacility(facility);
+        },
+      }));
+    }
+    return facilities
+      .filter((facility) => Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude))
+      .map((facility) => ({
+        id: facility.id,
+        latitude: facility.latitude,
+        longitude: facility.longitude,
+        title: facility.name,
+        subtitle: facility.openStatus,
+        isEmergency: facility.emergencyAvailable,
+        onClick: () => handleSelectFacility(facility),
+      }));
+  }, [nearby.data?.items, facilities]);
+
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-slate-100">
       {/* ========================================================
@@ -231,11 +260,11 @@ export const HomePage = () => {
           <div className="relative w-full h-full flex flex-col">
             {/* Map Canvas */}
             <div className="flex-1 w-full h-full">
-              <MapPlaceholder
-                facilities={facilities}
-                selectedFacility={selectedFacility}
-                userLocation={currentLocation}
-                onSelectFacility={handleSelectFacility}
+              <MapView
+                center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (facilities[0] ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude } : undefined)}
+                userLocation={hasLocation ? currentLocation : undefined}
+                markers={mapMarkers}
+                interactive
                 onRecenter={refreshLocation}
               />
             </div>
