@@ -238,7 +238,7 @@ export const getEmergency = async (hospitalId: string, emergencyId: string) => {
   return emergencyOut(emergency as unknown as Record<string, unknown>);
 };
 
-const allowedEmergencyTransition: Record<HospitalEmergencyStatus, HospitalEmergencyStatus[]> = {
+export const allowedEmergencyTransition: Record<HospitalEmergencyStatus, HospitalEmergencyStatus[]> = {
   RECEIVED: ['REVIEWING', 'CANCELLED'],
   REVIEWING: ['PREPARING', 'CANCELLED'],
   PREPARING: ['AMBULANCE_COORDINATION', 'RESOLVED', 'CANCELLED'],
