@@ -24,7 +24,7 @@ const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][
   instructions: route.instructions,
 });
 
-export function useGoogleRoute(facility: Facility | null, location: UserLocation | null) {
+export function useMapRoute(facility: Facility | null, location: UserLocation | null) {
   const origin = location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
     ? { latitude: location.latitude, longitude: location.longitude }
     : null;
