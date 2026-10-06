@@ -12,6 +12,7 @@ export const geocodeAddress = async (address: string) => {
   if (payload?.status !== 'OK' || !payload.results?.length) throw new AppError('GEOCODING_FAILED', 'No location was found for that address', 404);
 
   const result = payload.results[0];
+  if (!result) throw new AppError('GEOCODING_FAILED', 'No location was found for that address', 404);
   const location = result.geometry?.location;
   if (typeof location?.lat !== 'number' || typeof location.lng !== 'number') throw new AppError('GEOCODING_FAILED', 'Google returned an invalid location', 502);
   return {
