@@ -1,0 +1,12 @@
+export const AMBULANCE_STATUSES = ['AVAILABLE', 'BUSY', 'OFFLINE', 'MAINTENANCE'] as const;
+export type AmbulanceStatus = (typeof AMBULANCE_STATUSES)[number];
+export const DRIVER_AVAILABILITY_STATUSES = ['ONLINE', 'OFFLINE', 'BUSY'] as const;
+export type DriverAvailabilityStatus = (typeof DRIVER_AVAILABILITY_STATUSES)[number];
+export const TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL', 'COMPLETED', 'CANCELLED'] as const;
+export type TripStatus = (typeof TRIP_STATUSES)[number];
+export interface Pagination { page:number; limit:number; total:number; totalPages:number; }
+export interface ProviderProfile { id:string; name:string; registrationNumber:string; email:string; phone:string; address?:string; city?:string; state?:string; country?:string; latitude?:number; longitude?:number; serviceType:string; verificationStatus:string; accountStatus:string; createdAt:Date; updatedAt:Date; }
+export interface AmbulanceView { id:string; registrationNumber:string; vehicleNumber:string; providerId:string; ambulanceType:string; capabilities:string[]; currentStatus:AmbulanceStatus; currentLatitude?:number; currentLongitude?:number; serviceArea?:string; verificationStatus:string; accountStatus:string; assignedDriver?:{id:string; fullName:string; phone:string; availabilityStatus:DriverAvailabilityStatus} | null; updatedAt:Date; }
+export interface DriverView { id:string; fullName:string; email:string; phone:string; licenseNumber:string; licenseVerificationStatus:string; address?:string; city?:string; state?:string; country?:string; registeredLatitude?:number; registeredLongitude?:number; providerId:string; assignedAmbulanceId?:string; availabilityStatus:DriverAvailabilityStatus; accountStatus:string; }
+export interface RequestView { id:string; requestCode:string; hospitalId:string; situationType:string; reportedAt:Date; location?:string; latitude?:number; longitude?:number; status:string; ambulanceId?:string; providerId?:string; driverId?:string; etaMinutes?:number; }
+export interface TripView { id:string; emergencyRequestId:string; providerId:string; ambulanceId:string; driverId:string; destinationHospitalId:string; status:TripStatus; acceptedAt?:Date; arrivedAtPickupAt?:Date; patientPickedUpAt?:Date; arrivedAtHospitalAt?:Date; completedAt?:Date; createdAt:Date; updatedAt:Date; }
