@@ -49,7 +49,7 @@ export const loginSchema = z.object({
 });
 export const socialAuthSchema = z.object({
   credential: z.string().min(20).max(10000),
-  roleHint: z.enum(['USER', 'AMBULANCE_PROVIDER']).default('USER'),
+  roleHint: z.enum(['USER', 'AMBULANCE_PROVIDER']).optional(),
 });
 export const providerProfileSchema = z.object({
   name: z.string().trim().min(2).max(100),
