@@ -1,24 +1,23 @@
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminList, AdminListParams, AdminOverview, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '');
+const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
 
 export class AdminApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); this.name = 'AdminApiError'; }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_BASE) throw new AdminApiError(0, 'API_CONFIGURATION_ERROR', 'VITE_API_BASE_URL is not configured.');
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload && typeof payload === 'object' && 'error' in payload ? (payload as { error?: { code?: string; message?: string } }).error : undefined;
-    throw new AdminApiError(response.status, error?.code ?? 'REQUEST_FAILED', error?.message ?? 'The request could not be completed.');
+    throw new AdminApiError(response.status, error?.code ?? 'REQUEST_FAILED', error?.message ?? userFacingMessage(response.status));
   }
   if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new AdminApiError(response.status, 'INVALID_RESPONSE', 'The server returned an invalid response.');
   return (payload as { data: T }).data;
 }
 
-function query(params: AdminListParams): string {
+\nfunction userFacingMessage(status: number): string {\n  if (status === 401) return 'Your admin session has expired. Please sign in again.';\n  if (status === 403) return 'You do not have permission to perform this operation.';\n  if (status === 404) return 'The requested admin record was not found.';\n  if (status === 409) return 'The operation conflicts with the current record state.';\n  if (status === 422) return 'Some submitted values are invalid.';\n  if (status >= 500) return 'The server could not complete the request. Please try again.';\n  return 'The request could not be completed.';\n}\n\nfunction query(params: AdminListParams): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); });
   const encoded = search.toString();
