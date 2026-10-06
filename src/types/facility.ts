@@ -45,4 +45,6 @@ export interface UserLocation {
   longitude: number;
   label: string;
   accuracy: 'high' | 'approximate';
+  accuracyMeters?: number;
+  timestamp?: number;
 }
