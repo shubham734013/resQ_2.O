@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Ambulance, BedDouble, Building2, Check, CircleAlert, RefreshCw, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -15,7 +15,7 @@ const box = 'border border-slate-200 bg-white';
 const ErrorState = ({ retry }: { retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>Unable to load hospital data.</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Retry</Button></div>;
 const Loading = () => <div className="p-8 text-center text-sm text-slate-500">Loading hospital data…</div>;
 const Freshness = ({ value }: { value?: string }) => <p className="text-xs text-slate-400">{value ? `Updated ${new Date(value).toLocaleString()}` : 'Update time unavailable'}</p>;
-const PageShell = ({ children }: { children: React.ReactNode }) => <div className={wrap}>{children}</div>;
+const PageShell = ({ children }: { children: ReactNode }) => <div className={wrap}>{children}</div>;
 
 const availabilityLabel: Record<string, string> = { AVAILABLE: 'Available', LIMITED: 'Limited', UNAVAILABLE: 'Unavailable', UNKNOWN: 'Unknown' };
 const statusVariant = (value: string): 'verified' | 'waitTime' | 'neutral' => value === 'AVAILABLE' || value === 'VERIFIED' || value === 'RESOLVED' ? 'verified' : value === 'UNAVAILABLE' || value === 'CANCELLED' ? 'neutral' : 'waitTime';
