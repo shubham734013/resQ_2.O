@@ -3,8 +3,13 @@ import type { AmbulanceMapItem, FacilityMapItem, PlaceSearchResult, RouteRequest
 const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
 
 class MapsApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string, message: string) {
+  public readonly status: number;
+  public readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
     super(message);
+    this.status = status;
+    this.code = code;
     this.name = 'MapsApiError';
   }
 }
