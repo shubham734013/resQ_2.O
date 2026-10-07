@@ -247,7 +247,7 @@ export const allowedEmergencyTransition: Record<HospitalEmergencyStatus, Hospita
   CANCELLED: [],
 };
 
-export const updateEmergencyStatus = async (hospitalId: string, emergencyId: string, status: HospitalEmergencyStatus) => {
+export const updateEmergencyStatus = async (hospitalId: string, emergencyId: string, status: HospitalEmergencyStatus, changedBy?: string) => {
   const hospitalObjectId = assertHospitalId(hospitalId);
   if (!Types.ObjectId.isValid(emergencyId)) throw new AppError('INVALID_ID', 'Invalid emergency id', 400);
   const requestObjectId = new Types.ObjectId(emergencyId);
@@ -276,7 +276,8 @@ export const updateEmergencyStatus = async (hospitalId: string, emergencyId: str
         statusHistory: {
           status,
           changedAt: new Date(),
-          previousStatus: previousStatuses[0],
+          previousStatus: current.status,
+          ...(changedBy && Types.ObjectId.isValid(changedBy) ? { changedBy: new Types.ObjectId(changedBy) } : {}),
         },
       },
     },
