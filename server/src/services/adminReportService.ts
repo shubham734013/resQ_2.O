@@ -3,7 +3,6 @@ import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { EmergencyRequestModel, type HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 import { HospitalModel } from '../models/Hospital.js';
-import { Types } from 'mongoose';
 
 export interface ReportRange { from?: Date; to?: Date; }
 export const REPORT_STATUSES: HospitalEmergencyStatus[] = ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION','RESOLVED','CANCELLED'];
@@ -30,7 +29,7 @@ export const getReportOverview = async (range: ReportRange) => {
       AmbulanceModel.countDocuments({ currentStatus: 'BUSY' }),
       AmbulanceModel.countDocuments({ currentStatus: 'OFFLINE' }),
       AmbulanceModel.countDocuments({ currentStatus: 'MAINTENANCE' }),
-    AmbulanceModel.countDocuments({ assignedDriverId: { $exists: true, $ne: null } }),
+      AmbulanceDriverModel.countDocuments({ assignedAmbulanceId: { $exists: true, $ne: null } }),
     ]),
     Promise.all([
       AmbulanceDriverModel.countDocuments(),
