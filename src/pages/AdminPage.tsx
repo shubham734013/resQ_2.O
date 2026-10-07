@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { RefreshCw, Download } from 'lucide-react';
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
@@ -12,14 +12,14 @@ import {
 import type { ReportOverview } from '../types/adminReports';
 import { adminApi } from '../services/adminApi';
 
-const Section = ({ children }: { children: React.ReactNode }) => <AdminLayout>{children}</AdminLayout>;
+const Section = ({ children }: { children: ReactNode }) => <AdminLayout>{children}</AdminLayout>;
 const Loading = () => <div className="flex items-center justify-center p-12 text-sm text-slate-500" role="status">Loading live admin data…</div>;
 const ErrorBox = ({ message, retry }: { message: string; retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert"><span>{message}</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Retry</Button></div>;
 const Empty = ({ label }: { label: string }) => <div className="p-10 text-center text-sm text-slate-500">{label}</div>;
 const Status = ({ value }: { value: string }) => <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">{value}</span>;
 const Pager = ({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (page: number) => void }) => <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"><span>Page {page} of {Math.max(totalPages,1)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={page<=1} onClick={()=>onPage(page-1)}>Previous</Button><Button size="sm" variant="secondary" disabled={page>=totalPages} onClick={()=>onPage(page+1)}>Next</Button></div></div>;
 const Search = ({ value, onChange, placeholder='Search…' }: { value:string; onChange:(v:string)=>void; placeholder?:string }) => <input aria-label={placeholder} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />;
-const Select = ({ value, onChange, children }: { value:string; onChange:(v:string)=>void; children:React.ReactNode }) => <select aria-label="Filter" value={value} onChange={e=>onChange(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none">{children}</select>;
+const Select = ({ value, onChange, children }: { value:string; onChange:(v:string)=>void; children:ReactNode }) => <select aria-label="Filter" value={value} onChange={e=>onChange(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none">{children}</select>;
 const ConfirmAction = ({ label,onConfirm,disabled=false }: { label:string; onConfirm:()=>void; disabled?:boolean }) => <Button size="sm" variant="secondary" disabled={disabled} onClick={()=>{if(window.confirm(`Confirm: ${label}?`))onConfirm();}}>{label}</Button>;
 const message = (error: unknown): string => error instanceof Error ? error.message : 'The operation failed.';
 
