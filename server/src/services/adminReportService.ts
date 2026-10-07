@@ -82,43 +82,43 @@ export const getEmergencyReports = async (range: ReportRange) => {
 
 export const getOperationalAnalytics = async (range: ReportRange) => {
   const match = emergencyMatch(range);
-  const scopedAmbulanceMatch = range.from || range.to ? { updatedAt: { ...(range.from ? { $gte: range.from } : {}), ...(range.to ? { $lte: range.to } : {}) } } : {};
   const [resolutionRows, responseRows, ambulanceStatus, providerFleet, hospitalActivity] = await Promise.all([
-    EmergencyRequestModel.aggregate<{ total: number; resolved: number }>([
+    EmergencyRequestModel.aggregate<{ total:number; resolved:number }>([
       { $match: match },
-      { $group: { _id: null, total: { $sum: 1 }, resolved: { $sum: { $cond: [{ $eq: ['$status', 'RESOLVED'] }, 1, 0] } } } },
-      { $project: { _id: 0, total: 1, resolved: 1 } },
+      { $group: { _id:null, total:{ $sum:1 }, resolved:{ $sum:{ $cond:[{ $eq:['$status','RESOLVED'] },1,0] } } } },
+      { $project:{ _id:0, total:1, resolved:1 } },
     ]).exec(),
-    EmergencyRequestModel.aggregate<{ averageMinutes: number; samples: number }>([
-      { $match: { ...match, 'statusHistory.status': 'REVIEWING' } },
-      { $project: {
-        reportedAt: 1,
-        reviewingAt: {
-          $let: {
-            vars: { review: { $filter: { input: '$statusHistory', as: 'h', cond: { $eq: ['$$h.status', 'REVIEWING'] } } } },
-            in: { $arrayElemAt: ['$$review.changedAt', 0] },
+    EmergencyRequestModel.aggregate<{ averageMinutes:number; samples:number }>([
+      { $match:{ ...match, 'statusHistory.status':'REVIEWING' } },
+      { $project:{
+        reportedAt:1,
+        reviewingAt:{
+          $let:{
+            vars:{ review:{ $filter:{ input:'$statusHistory', as:'h', cond:{ $eq:['$$h.status','REVIEWING'] } } } },
+            in:{ $arrayElemAt:['$$review.changedAt',0] },
           },
         },
       } },
-      { $match: { reviewingAt: { $type: 'date' } } },
-      { $group: { _id: null, averageMinutes: { $avg: { $divide: [{ $subtract: ['$reviewingAt', '$reportedAt'] }, 60000] } }, samples: { $sum: 1 } } },
-      { $project: { _id: 0, averageMinutes: 1, samples: 1 } },
+      { $match:{ reviewingAt:{ $type:'date' } } },
+      { $group:{ _id:null, averageMinutes:{ $avg:{ $divide:[{ $subtract:['$reviewingAt','$reportedAt'] },60000] } }, samples:{ $sum:1 } } },
+      { $project:{ _id:0, averageMinutes:1, samples:1 } },
     ]).exec(),
-    AmbulanceModel.aggregate<{ _id: string; value: number }>([
-      { $match: scopedAmbulanceMatch }, { $group: { _id: '$currentStatus', value: { $sum: 1 } } }, { $sort: { _id: 1 } },
+    AmbulanceModel.aggregate<{ _id:string; value:number }>([
+      { $group:{ _id:'$currentStatus', value:{ $sum:1 } } },
+      { $sort:{ _id:1 } },
     ]).exec(),
-    AmbulanceProviderModel.aggregate<{ id: string; name: string; value: number }>([
-      { $lookup: { from: 'ambulances', localField: '_id', foreignField: 'providerId', as: 'fleet' } },
-      { $project: { _id: 0, id: { $toString: '$_id' }, name: 1, value: { $size: '$fleet' } } },
-      { $sort: { value: -1, name: 1 } },
+    AmbulanceProviderModel.aggregate<{ id:string; name:string; value:number }>([
+      { $lookup:{ from:'ambulances', localField:'_id', foreignField:'providerId', as:'fleet' } },
+      { $project:{ _id:0, id:{ $toString:'$_id' }, name:1, value:{ $size:'$fleet' } } },
+      { $sort:{ value:-1, name:1 } },
     ]).exec(),
-    EmergencyRequestModel.aggregate<{ id: string; name: string; value: number }>([
-      { $match: match },
-      { $group: { _id: '$hospitalId', value: { $sum: 1 } } },
-      { $lookup: { from: 'hospitals', localField: '_id', foreignField: '_id', as: 'hospital' } },
-      { $unwind: { path: '$hospital', preserveNullAndEmptyArrays: true } },
-      { $project: { _id: 0, id: { $toString: '$_id' }, name: { $ifNull: ['$hospital.name', 'Unknown hospital'] }, value: 1 } },
-      { $sort: { value: -1, name: 1 } },
+    EmergencyRequestModel.aggregate<{ id:string; name:string; value:number }>([
+      { $match:match },
+      { $group:{ _id:'$hospitalId', value:{ $sum:1 } } },
+      { $lookup:{ from:'hospitals', localField:'_id', foreignField:'_id', as:'hospital' } },
+      { $unwind:{ path:'$hospital', preserveNullAndEmptyArrays:true } },
+      { $project:{ _id:0, id:{ $toString:'$_id' }, name:{ $ifNull:['$hospital.name','Unknown hospital'] }, value:1 } },
+      { $sort:{ value:-1, name:1 } },
     ]).exec(),
   ]);
 
@@ -126,10 +126,10 @@ export const getOperationalAnalytics = async (range: ReportRange) => {
   const resolved = resolutionRows[0]?.resolved ?? 0;
   return {
     resolutionRatio: total > 0 ? resolved / total : null,
-    responseToReview: responseRows[0] ?? { averageMinutes: null, samples: 0 },
-    ambulanceStatus: ambulanceStatus.map((row) => ({ label: row._id, value: row.value })),
-    providerFleet: providerFleet.map((row) => ({ label: row.name, id: row.id, value: row.value })),
-    hospitalActivity: hospitalActivity.map((row) => ({ label: row.name, id: row.id, value: row.value })),
+    responseToReview: responseRows[0] ?? { averageMinutes:null, samples:0 },
+    ambulanceStatus: ambulanceStatus.map((row)=>({ label:row._id, value:row.value })),
+    providerFleet: providerFleet.map((row)=>({ label:row.name, id:row.id, value:row.value })),
+    hospitalActivity: hospitalActivity.map((row)=>({ label:row.name, id:row.id, value:row.value })),
   };
 };
 
