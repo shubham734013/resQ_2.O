@@ -9,10 +9,8 @@ import {
   useUpdateUserStatus, useUpdateHospitalVerification, useUpdateHospitalStatus, useUpdateProviderVerification, useUpdateProviderStatus,
   useUpdateDriverVerification, useUpdateDriverStatus, useAdminReportOverview, useAdminEmergencyReports, useAdminAnalytics
 } from '../hooks/useAdminManagement';
-import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 import type { ReportOverview } from '../types/adminReports';
 import { adminApi } from '../services/adminApi';
-import { EmergencyTable, ReportTable } from '../components/admin/AdminTables';
 
 const Section = ({ children }: { children: React.ReactNode }) => <AdminLayout>{children}</AdminLayout>;
 const Loading = () => <div className="flex items-center justify-center p-12 text-sm text-slate-500" role="status">Loading live admin data…</div>;
