@@ -16,26 +16,27 @@ const dateBucket = { $dateToString: { format: '%Y-%m-%d', date: '$reportedAt', t
 const zeroStatus = () => Object.fromEntries(REPORT_STATUSES.map((status) => [status, 0])) as Record<HospitalEmergencyStatus, number>;
 
 export const getReportOverview = async (range: ReportRange) => {
+  const hospitalFilter = range.from || range.to ? { createdAt: { ...(range.from ? { $gte: range.from } : {}), ...(range.to ? { $lte: range.to } : {}) } } : {};
   const [emergency, hospitals, providers, ambulances, drivers] = await Promise.all([
     EmergencyRequestModel.aggregate<{ _id: HospitalEmergencyStatus; count: number }>([
       { $match: emergencyMatch(range) },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]).exec(),
-    Promise.all([HospitalModel.countDocuments(), HospitalModel.countDocuments({ verificationStatus: 'VERIFIED' })]),
-    Promise.all([AmbulanceProviderModel.countDocuments(), AmbulanceProviderModel.countDocuments({ verificationStatus: 'VERIFIED' })]),
+    Promise.all([HospitalModel.countDocuments(hospitalFilter), HospitalModel.countDocuments({ ...hospitalFilter, verificationStatus: 'VERIFIED' })]),
+    Promise.all([AmbulanceProviderModel.countDocuments(hospitalFilter), AmbulanceProviderModel.countDocuments({ ...hospitalFilter, verificationStatus: 'VERIFIED' })]),
     Promise.all([
-      AmbulanceModel.countDocuments(),
-      AmbulanceModel.countDocuments({ currentStatus: 'AVAILABLE' }),
-      AmbulanceModel.countDocuments({ currentStatus: 'BUSY' }),
-      AmbulanceModel.countDocuments({ currentStatus: 'OFFLINE' }),
-      AmbulanceModel.countDocuments({ currentStatus: 'MAINTENANCE' }),
-      AmbulanceDriverModel.countDocuments({ assignedAmbulanceId: { $exists: true, $ne: null } }),
+      AmbulanceModel.countDocuments(hospitalFilter),
+      AmbulanceModel.countDocuments({ ...hospitalFilter, currentStatus: 'AVAILABLE' }),
+      AmbulanceModel.countDocuments({ ...hospitalFilter, currentStatus: 'BUSY' }),
+      AmbulanceModel.countDocuments({ ...hospitalFilter, currentStatus: 'OFFLINE' }),
+      AmbulanceModel.countDocuments({ ...hospitalFilter, currentStatus: 'MAINTENANCE' }),
+      AmbulanceDriverModel.countDocuments({ ...hospitalFilter, assignedAmbulanceId: { $exists: true, $ne: null } }),
     ]),
     Promise.all([
-      AmbulanceDriverModel.countDocuments(),
-      AmbulanceDriverModel.countDocuments({ availabilityStatus: 'ONLINE' }),
-      AmbulanceDriverModel.countDocuments({ availabilityStatus: 'BUSY' }),
-      AmbulanceDriverModel.countDocuments({ availabilityStatus: 'OFFLINE' }),
+      AmbulanceDriverModel.countDocuments(hospitalFilter),
+      AmbulanceDriverModel.countDocuments({ ...hospitalFilter, availabilityStatus: 'ONLINE' }),
+      AmbulanceDriverModel.countDocuments({ ...hospitalFilter, availabilityStatus: 'BUSY' }),
+      AmbulanceDriverModel.countDocuments({ ...hospitalFilter, availabilityStatus: 'OFFLINE' }),
     ]),
   ]);
 
