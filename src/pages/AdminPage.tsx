@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw, Download } from 'lucide-react';
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
 import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
