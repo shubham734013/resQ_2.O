@@ -76,7 +76,8 @@ export const getEmergencyReports = async (range: ReportRange) => {
     ]).exec(),
   ]);
 
-  return { trend, status: statusRows, situations, hospitals };
+  const status = REPORT_STATUSES.map((name) => ({ _id: name, value: statusRows.find((row) => row._id === name)?.value ?? 0 }));
+  return { trend, status, situations, hospitals };
 };
 
 export const getOperationalAnalytics = async (range: ReportRange) => {
