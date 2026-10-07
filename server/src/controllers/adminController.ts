@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { sendSuccess } from '../utils/apiResponse.js';
 import * as s from '../services/adminService.js';
+import { getExportRows, getEmergencyReports, getOperationalAnalytics, getReportOverview, type ReportRange } from '../services/adminReportService.js';
 
 const getId = (req: Request): string => {
   const id = req.params.id;
@@ -63,8 +64,6 @@ export const driverVerificationController = async (req: Request, res: Response):
 
 export const driverStatusController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.updateDriverStatus(getId(req), (req.body as { status: 'ACTIVE' | 'SUSPENDED' | 'REJECTED' }).status));
-
-import { getExportRows, getEmergencyReports, getOperationalAnalytics, getReportOverview, type ReportRange } from '../services/adminReportService.js';
 
 const getReportRange = (res: Response): ReportRange => {
   const value = getValidatedQuery<{ from?: Date; to?: Date }>(res);
