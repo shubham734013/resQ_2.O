@@ -46,6 +46,7 @@ export const getReportOverview = async (range: ReportRange) => {
 
   return {
     range: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null },
+    generatedAt: new Date().toISOString(),
     emergencies: { totalRequests, activeRequests, received: status.RECEIVED, resolved: status.RESOLVED, cancelled: status.CANCELLED },
     hospitals: { total: hospitals[0], verified: hospitals[1] },
     ambulanceProviders: { total: providers[0], verified: providers[1] },
