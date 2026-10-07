@@ -63,3 +63,33 @@ export const driverVerificationController = async (req: Request, res: Response):
 
 export const driverStatusController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await s.updateDriverStatus(getId(req), (req.body as { status: 'ACTIVE' | 'SUSPENDED' | 'REJECTED' }).status));
+
+import { getExportRows, getEmergencyReports, getOperationalAnalytics, getReportOverview, type ReportRange } from '../services/adminReportService.js';
+
+const getReportRange = (res: Response): ReportRange => {
+  const value = getValidatedQuery<{ from?: Date; to?: Date }>(res);
+  return { from: value.from, to: value.to };
+};
+
+export const reportOverviewController = async (_req: Request, res: Response): Promise<void> =>
+  sendSuccess(res, await getReportOverview(getReportRange(res)));
+
+export const emergencyReportsController = async (_req: Request, res: Response): Promise<void> =>
+  sendSuccess(res, await getEmergencyReports(getReportRange(res)));
+
+export const analyticsReportsController = async (_req: Request, res: Response): Promise<void> =>
+  sendSuccess(res, await getOperationalAnalytics(getReportRange(res)));
+
+export const exportReportsController = async (_req: Request, res: Response): Promise<void> => {
+  const rows = await getExportRows(getReportRange(res));
+  const escape = (value: string | number) => '"' + String(value).replace(/"/g, '""') + '"';
+  const header = ['date','total_requests','received','reviewing','preparing','ambulance_coordination','resolved','cancelled'];
+  const csv = [
+    header.join(','),
+    ...rows.map((row) => [
+      escape(row._id), row.total, row.RECEIVED, row.REVIEWING, row.PREPARING,
+      row.AMBULANCE_COORDINATION, row.RESOLVED, row.CANCELLED,
+    ].join(',')),
+  ].join('\n') + '\n';
+  res.status(200).type('text/csv').set('Content-Disposition', 'attachment; filename="resq-emergency-report.csv"').send(csv);
+};
