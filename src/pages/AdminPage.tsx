@@ -5,10 +5,9 @@ import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
 import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
 import { Button } from '../components/common/Button';
-import { useAdminAmbulances, useAdminDrivers, useAdminHospitals, useAdminOverview, useAdminProviders, useAdminUsers, useUpdateDriverStatus, useUpdateDriverVerification, useUpdateHospitalStatus, useUpdateHospitalVerification, useUpdateProviderStatus, useUpdateProviderVerification, useUpdateUserStatus } from '../hooks/useAdminManagement';
+import { useAdminOverview, useAdminReportOverview, useAdminEmergencyReports, useAdminAnalytics } from '../hooks/useAdminManagement';
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 import { adminApi } from '../services/adminApi';
-import { useAdminReportOverview, useAdminEmergencyReports, useAdminAnalytics } from '../hooks/useAdminManagement';
 
 const Section = ({ children }: { children: ReactNode }) => <AdminLayout>{children}</AdminLayout>;
 const ErrorBox = ({ message, retry }: { message: string; retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{message}</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Retry</Button></div>;
