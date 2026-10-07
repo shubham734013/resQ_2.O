@@ -260,16 +260,13 @@ export const updateEmergencyStatus = async (hospitalId: string, emergencyId: str
     return emergencyOut(unchanged as unknown as Record<string, unknown>);
   }
 
-  const previousStatuses = (Object.entries(allowedEmergencyTransition) as Array<[HospitalEmergencyStatus, HospitalEmergencyStatus[]]>)
-    .filter(([, nextStatuses]) => nextStatuses.includes(status))
-    .map(([previous]) => previous);
-
-  if (!previousStatuses.length) {
+  const allowedNextStatuses = allowedEmergencyTransition[current.status];
+  if (!allowedNextStatuses?.includes(status)) {
     throw new AppError('INVALID_STATUS_TRANSITION', 'Emergency status transition is not allowed', 409);
   }
 
   const updated = await EmergencyRequestModel.findOneAndUpdate(
-    { _id: requestObjectId, hospitalId: hospitalObjectId, status: { $in: previousStatuses } },
+    { _id: requestObjectId, hospitalId: hospitalObjectId, status: current.status },
     {
       $set: { status },
       $push: {
