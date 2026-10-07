@@ -15,18 +15,17 @@ const dateRange = {
   to: z.coerce.date().optional(),
 };
 
-const withDateRange = <T extends z.ZodRawShape>(shape: T) =>
-  z.object(shape).strict().superRefine((value, ctx) => {
-    if (value.from && value.to && value.from > value.to) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['from'], message: 'from must be before to' });
+const reportDateRangeSchema = z.object(dateRange).strict().superRefine((value, ctx) => {
+  if (value.from && value.to && value.from > value.to) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['from'], message: 'from must be before to' });
+  }
+  if (value.from && value.to) {
+    const maxRangeMs = 366 * 24 * 60 * 60 * 1000;
+    if (value.to.getTime() - value.from.getTime() > maxRangeMs) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['to'], message: 'date range cannot exceed 366 days' });
     }
-    if (value.from && value.to) {
-      const maxRangeMs = 366 * 24 * 60 * 60 * 1000;
-      if (value.to.getTime() - value.from.getTime() > maxRangeMs) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['to'], message: 'date range cannot exceed 366 days' });
-      }
-    }
-  });
+  }
+});
 
 export const userListQuerySchema = z.object({
   search: z.string().trim().max(100).optional(), status: z.enum(ACCOUNT_STATUSES).optional(), role: z.enum(ROLES).optional(), city: z.string().trim().max(100).optional(),
@@ -54,15 +53,8 @@ export const driverListQuerySchema = z.object({
   sortBy: z.enum(['createdAt', 'updatedAt', 'fullName', 'email', 'licenseVerificationStatus', 'availabilityStatus', 'accountStatus']).default('createdAt'), ...pagination,
 }).strict();
 
-export const reportsQuerySchema = withDateRange({
-  from: dateRange.from,
-  to: dateRange.to,
-});
-
-export const reportsExportQuerySchema = withDateRange({
-  from: dateRange.from,
-  to: dateRange.to,
-});
+export const reportsQuerySchema = reportDateRangeSchema;
+export const reportsExportQuerySchema = reportDateRangeSchema;
 
 export const accountStatusSchema = z.object({ status: z.enum(['ACTIVE', 'SUSPENDED', 'REJECTED']) }).strict();
 export const verificationStatusSchema = z.object({ verificationStatus: z.enum(VERIFICATION_STATUSES) }).strict();
