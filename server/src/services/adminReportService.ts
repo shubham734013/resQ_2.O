@@ -16,7 +16,6 @@ const dateBucket = { $dateToString: { format: '%Y-%m-%d', date: '$reportedAt', t
 const zeroStatus = () => Object.fromEntries(REPORT_STATUSES.map((status) => [status, 0])) as Record<HospitalEmergencyStatus, number>;
 
 export const getReportOverview = async (range: ReportRange) => {
-  const hospitalFilter = range.from || range.to ? { createdAt: { ...(range.from ? { $gte: range.from } : {}), ...(range.to ? { $lte: range.to } : {}) } } : {};
   const [emergency, hospitals, providers, ambulances, drivers] = await Promise.all([
     EmergencyRequestModel.aggregate<{ _id: HospitalEmergencyStatus; count: number }>([
       { $match: emergencyMatch(range) },
