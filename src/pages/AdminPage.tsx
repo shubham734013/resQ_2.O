@@ -51,8 +51,9 @@ const SectionPlaceholder=({label}:{label:string})=><Panel title="Live management
 export const AdminEmergenciesPage = () => <Section><AdminPage title="Emergency monitor" description="Emergency operational records from MongoDB."><Panel title="Emergency requests"><Empty label="Use hospital emergency operations for detailed coordination." /></Panel></AdminPage></Section>;
 
 const rangeDefaults=()=>{
-  const end=new Date(); end.setUTCDate(end.getUTCDate()+1);
-  const start=new Date(end); start.setUTCDate(start.getUTCDate()-30);
+  const end=new Date();
+  const start=new Date(end);
+  start.setUTCDate(start.getUTCDate()-29);
   return {from:start.toISOString().slice(0,10),to:end.toISOString().slice(0,10)};
 };
 const rangeParams=(from:string,to:string)=>({from:from?new Date(`${from}T00:00:00.000Z`).toISOString():undefined,to:to?new Date(`${to}T23:59:59.999Z`).toISOString():undefined});
