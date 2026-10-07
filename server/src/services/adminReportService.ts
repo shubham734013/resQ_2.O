@@ -3,6 +3,7 @@ import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { EmergencyRequestModel, type HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 import { HospitalModel } from '../models/Hospital.js';
+import { Types } from 'mongoose';
 
 export interface ReportRange { from?: Date; to?: Date; }
 export const REPORT_STATUSES: HospitalEmergencyStatus[] = ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION','RESOLVED','CANCELLED'];
@@ -29,6 +30,7 @@ export const getReportOverview = async (range: ReportRange) => {
       AmbulanceModel.countDocuments({ currentStatus: 'BUSY' }),
       AmbulanceModel.countDocuments({ currentStatus: 'OFFLINE' }),
       AmbulanceModel.countDocuments({ currentStatus: 'MAINTENANCE' }),
+    AmbulanceModel.countDocuments({ assignedDriverId: { $exists: true, $ne: null } }),
     ]),
     Promise.all([
       AmbulanceDriverModel.countDocuments(),
@@ -48,7 +50,7 @@ export const getReportOverview = async (range: ReportRange) => {
     emergencies: { totalRequests, activeRequests, received: status.RECEIVED, resolved: status.RESOLVED, cancelled: status.CANCELLED },
     hospitals: { total: hospitals[0], verified: hospitals[1] },
     ambulanceProviders: { total: providers[0], verified: providers[1] },
-    ambulances: { total: ambulances[0], available: ambulances[1], busy: ambulances[2], offline: ambulances[3], maintenance: ambulances[4], unassigned: null },
+    ambulances: { total: ambulances[0], available: ambulances[1], busy: ambulances[2], offline: ambulances[3], maintenance: ambulances[4], unassigned: ambulances[0] - ambulances[5] },
     drivers: { total: drivers[0], online: drivers[1], busy: drivers[2], offline: drivers[3] },
   };
 };
