@@ -2,6 +2,7 @@ import type { HospitalEmergencyStatus } from './hospitalManagement';
 
 export interface ReportDateRange { from: string | null; to: string | null; }
 export interface ReportOverview {
+  generatedAt: string;
   range: ReportDateRange;
   emergencies: { totalRequests:number; activeRequests:number; received:number; resolved:number; cancelled:number };
   hospitals: { total:number; verified:number };
