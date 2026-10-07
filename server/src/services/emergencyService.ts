@@ -8,10 +8,7 @@ import type { z } from 'zod';
 import type { createEmergencyRequestSchema } from '../schemas/emergency.js';
 
 type CreateEmergencyInput = z.infer<typeof createEmergencyRequestSchema>;
-
-type EmergencyRequestOutputSource = EmergencyRequestDocument & {
-  _id: Types.ObjectId;
-};
+type EmergencyRequestOutputSource = EmergencyRequestDocument & { _id: Types.ObjectId };
 
 const assertId = (value: string, name: string) => {
   if (!Types.ObjectId.isValid(value)) throw new AppError('INVALID_ID', `Invalid ${name}`, 400);
@@ -46,48 +43,34 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
     emergencyAvailability: { $ne: 'UNAVAILABLE' },
-  })
-    .select('_id')
-    .lean()
-    .exec();
+  }).select('_id').lean().exec();
 
   if (!hospital) {
-    throw new AppError(
-      'HOSPITAL_NOT_OPERATIONAL',
-      'The selected hospital is not currently accepting emergency requests through ResQ',
-      409,
-    );
+    throw new AppError('HOSPITAL_NOT_OPERATIONAL', 'The selected hospital is not currently accepting emergency requests through ResQ', 409);
   }
 
+  const now = new Date();
   const request = await EmergencyRequestModel.create({
     requestCode: 'RSQ-' + randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase(),
     userId: userObjectId,
     hospitalId,
     situationType: input.situationType,
-    reportedAt: new Date(),
+    reportedAt: now,
     location: input.location,
     latitude: input.latitude,
     longitude: input.longitude,
     status: 'RECEIVED',
+    statusHistory: [{ status: 'RECEIVED', changedAt: now }],
   });
 
-  return output({
-    ...request.toObject(),
-    _id: request._id,
-  });
+  return output({ ...request.toObject(), _id: request._id });
 };
 
 export const getUserEmergencyRequest = async (userId: string, emergencyId: string) => {
   const userObjectId = assertId(userId, 'user');
   const requestId = assertId(emergencyId, 'emergency');
 
-  const request = await EmergencyRequestModel.findOne({
-    _id: requestId,
-    userId: userObjectId,
-  })
-    .lean()
-    .exec();
-
+  const request = await EmergencyRequestModel.findOne({ _id: requestId, userId: userObjectId }).lean().exec();
   if (!request) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
   return output(request);
 };
