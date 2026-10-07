@@ -270,7 +270,16 @@ export const updateEmergencyStatus = async (hospitalId: string, emergencyId: str
 
   const updated = await EmergencyRequestModel.findOneAndUpdate(
     { _id: requestObjectId, hospitalId: hospitalObjectId, status: { $in: previousStatuses } },
-    { $set: { status } },
+    {
+      $set: { status },
+      $push: {
+        statusHistory: {
+          status,
+          changedAt: new Date(),
+          previousStatus: previousStatuses[0],
+        },
+      },
+    },
     { new: true, runValidators: true },
   ).lean().exec();
 
