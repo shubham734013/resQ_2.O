@@ -10,6 +10,8 @@ import {
   providerListQuerySchema,
   userListQuerySchema,
   verificationStatusSchema,
+  reportsQuerySchema,
+  reportsExportQuerySchema,
 } from '../schemas/admin.js';
 import {
   overviewController,
@@ -30,6 +32,10 @@ import {
   driverController,
   driverVerificationController,
   driverStatusController,
+  reportOverviewController,
+  emergencyReportsController,
+  analyticsReportsController,
+  exportReportsController,
 } from '../controllers/adminController.js';
 import type { z } from 'zod';
 
@@ -67,3 +73,8 @@ adminRouter.get('/ambulance-drivers', validateQuery(driverListQuerySchema), driv
 adminRouter.get('/ambulance-drivers/:id', driverController);
 adminRouter.patch('/ambulance-drivers/:id/verification', validateBody(verificationStatusSchema), driverVerificationController);
 adminRouter.patch('/ambulance-drivers/:id/status', validateBody(accountStatusSchema), driverStatusController);
+
+adminRouter.get('/reports/overview', validateQuery(reportsQuerySchema), reportOverviewController);
+adminRouter.get('/reports/emergencies', validateQuery(reportsQuerySchema), emergencyReportsController);
+adminRouter.get('/reports/analytics', validateQuery(reportsQuerySchema), analyticsReportsController);
+adminRouter.get('/reports/export', validateQuery(reportsExportQuerySchema), exportReportsController);

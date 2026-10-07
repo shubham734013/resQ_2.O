@@ -247,7 +247,7 @@ export const allowedEmergencyTransition: Record<HospitalEmergencyStatus, Hospita
   CANCELLED: [],
 };
 
-export const updateEmergencyStatus = async (hospitalId: string, emergencyId: string, status: HospitalEmergencyStatus) => {
+export const updateEmergencyStatus = async (hospitalId: string, emergencyId: string, status: HospitalEmergencyStatus, changedBy?: string) => {
   const hospitalObjectId = assertHospitalId(hospitalId);
   if (!Types.ObjectId.isValid(emergencyId)) throw new AppError('INVALID_ID', 'Invalid emergency id', 400);
   const requestObjectId = new Types.ObjectId(emergencyId);
@@ -260,17 +260,24 @@ export const updateEmergencyStatus = async (hospitalId: string, emergencyId: str
     return emergencyOut(unchanged as unknown as Record<string, unknown>);
   }
 
-  const previousStatuses = (Object.entries(allowedEmergencyTransition) as Array<[HospitalEmergencyStatus, HospitalEmergencyStatus[]]>)
-    .filter(([, nextStatuses]) => nextStatuses.includes(status))
-    .map(([previous]) => previous);
-
-  if (!previousStatuses.length) {
+  const allowedNextStatuses = allowedEmergencyTransition[current.status];
+  if (!allowedNextStatuses?.includes(status)) {
     throw new AppError('INVALID_STATUS_TRANSITION', 'Emergency status transition is not allowed', 409);
   }
 
   const updated = await EmergencyRequestModel.findOneAndUpdate(
-    { _id: requestObjectId, hospitalId: hospitalObjectId, status: { $in: previousStatuses } },
-    { $set: { status } },
+    { _id: requestObjectId, hospitalId: hospitalObjectId, status: current.status },
+    {
+      $set: { status },
+      $push: {
+        statusHistory: {
+          status,
+          changedAt: new Date(),
+          previousStatus: current.status,
+          ...(changedBy && Types.ObjectId.isValid(changedBy) ? { changedBy: new Types.ObjectId(changedBy) } : {}),
+        },
+      },
+    },
     { new: true, runValidators: true },
   ).lean().exec();
 

@@ -1,4 +1,5 @@
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminList, AdminListParams, AdminOverview, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
+import type { EmergencyReports, OperationalAnalytics, ReportOverview } from '../types/adminReports';
 
 const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
 
@@ -62,4 +63,12 @@ export const adminApi = {
   driver: (id: string) => request<AdminAmbulanceDriver>(`/admin/ambulance-drivers/${encodeURIComponent(id)}`),
   driverVerification: (id: string, verificationStatus: AdminVerificationStatus) => request<AdminAmbulanceDriver>(`/admin/ambulance-drivers/${encodeURIComponent(id)}/verification`, { method: 'PATCH', body: JSON.stringify({ verificationStatus }) }),
   driverStatus: (id: string, status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'>) => request<AdminAmbulanceDriver>(`/admin/ambulance-drivers/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  reportsOverview: (params: { from?: string; to?: string }) => request<ReportOverview>(`/admin/reports/overview${query(params)}`),
+  reportsEmergencies: (params: { from?: string; to?: string }) => request<EmergencyReports>(`/admin/reports/emergencies${query(params)}`),
+  reportsAnalytics: (params: { from?: string; to?: string }) => request<OperationalAnalytics>(`/admin/reports/analytics${query(params)}`),
+  exportReports: async (params: { from?: string; to?: string }) => {
+    const response = await fetch(`${API_BASE}/admin/reports/export${query(params)}`, { credentials: 'include' });
+    if (!response.ok) throw new AdminApiError(response.status, 'EXPORT_FAILED', 'The report export could not be generated.');
+    return response.blob();
+  },
 };
