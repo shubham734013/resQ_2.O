@@ -1,4 +1,4 @@
-import type { HospitalEmergencyStatus } from './hospital.js';
+import type { HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 
 export interface ReportDateRange { from: string | null; to: string | null; }
 export interface ReportOverview {
@@ -6,7 +6,7 @@ export interface ReportOverview {
   emergencies: { totalRequests:number; activeRequests:number; received:number; resolved:number; cancelled:number };
   hospitals: { total:number; verified:number };
   ambulanceProviders: { total:number; verified:number };
-  ambulances: { total:number; available:number; busy:number; offline:number; maintenance:number; unassigned:number|null };
+  ambulances: { total:number; available:number; busy:number; offline:number; maintenance:number; unassigned:number };
   drivers: { total:number; online:number; busy:number; offline:number };
 }
 export interface ReportTrendPoint { _id:string; value:number; }
