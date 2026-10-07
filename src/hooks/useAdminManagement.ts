@@ -14,6 +14,9 @@ export const adminKeys = {
   ambulance: (id: string) => ['admin', 'ambulance', id] as const,
   drivers: (p: AdminListParams) => ['admin', 'drivers', p] as const,
   driver: (id: string) => ['admin', 'driver', id] as const,
+  reportsOverview: (p:{from?:string;to?:string}) => ['admin','reports','overview',p] as const,
+  reportsEmergencies: (p:{from?:string;to?:string}) => ['admin','reports','emergencies',p] as const,
+  reportsAnalytics: (p:{from?:string;to?:string}) => ['admin','reports','analytics',p] as const,
 };
 
 export const useAdminOverview = () => useQuery({ queryKey: adminKeys.overview, queryFn: adminApi.overview });
@@ -40,3 +43,7 @@ export const useUpdateProviderVerification = () => useAdminMutation(({ id, verif
 export const useUpdateProviderStatus = () => useAdminMutation(({ id, status }: { id: string; status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'> }) => adminApi.providerStatus(id, status), async (qc) => { await qc.invalidateQueries({ queryKey: ['admin', 'providers'] }); await qc.invalidateQueries({ queryKey: adminKeys.overview }); });
 export const useUpdateDriverVerification = () => useAdminMutation(({ id, verificationStatus }: { id: string; verificationStatus: AdminVerificationStatus }) => adminApi.driverVerification(id, verificationStatus), async (qc, v) => { await qc.invalidateQueries({ queryKey: ['admin', 'drivers'] }); await qc.invalidateQueries({ queryKey: adminKeys.driver(v.id) }); await qc.invalidateQueries({ queryKey: adminKeys.overview }); });
 export const useUpdateDriverStatus = () => useAdminMutation(({ id, status }: { id: string; status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'> }) => adminApi.driverStatus(id, status), async (qc) => { await qc.invalidateQueries({ queryKey: ['admin', 'drivers'] }); await qc.invalidateQueries({ queryKey: adminKeys.overview }); });
+
+export const useAdminReportOverview = (params: {from?: string; to?: string}) => useQuery({ queryKey: adminKeys.reportsOverview(params), queryFn: () => adminApi.reportsOverview(params), staleTime: 60_000 });
+export const useAdminEmergencyReports = (params: {from?: string; to?: string}) => useQuery({ queryKey: adminKeys.reportsEmergencies(params), queryFn: () => adminApi.reportsEmergencies(params), staleTime: 60_000 });
+export const useAdminAnalytics = (params: {from?: string; to?: string}) => useQuery({ queryKey: adminKeys.reportsAnalytics(params), queryFn: () => adminApi.reportsAnalytics(params), staleTime: 60_000 });
