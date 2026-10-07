@@ -81,6 +81,7 @@ export const getEmergencyReports = async (range: ReportRange) => {
 
 export const getOperationalAnalytics = async (range: ReportRange) => {
   const match = emergencyMatch(range);
+  const scopedAmbulanceMatch = range.from || range.to ? { updatedAt: { ...(range.from ? { $gte: range.from } : {}), ...(range.to ? { $lte: range.to } : {}) } } : {};
   const [resolutionRows, responseRows, ambulanceStatus, providerFleet, hospitalActivity] = await Promise.all([
     EmergencyRequestModel.aggregate<{ total: number; resolved: number }>([
       { $match: match },
@@ -103,7 +104,7 @@ export const getOperationalAnalytics = async (range: ReportRange) => {
       { $project: { _id: 0, averageMinutes: 1, samples: 1 } },
     ]).exec(),
     AmbulanceModel.aggregate<{ _id: string; value: number }>([
-      { $group: { _id: '$currentStatus', value: { $sum: 1 } } }, { $sort: { _id: 1 } },
+      { $match: scopedAmbulanceMatch }, { $group: { _id: '$currentStatus', value: { $sum: 1 } } }, { $sort: { _id: 1 } },
     ]).exec(),
     AmbulanceProviderModel.aggregate<{ id: string; name: string; value: number }>([
       { $lookup: { from: 'ambulances', localField: '_id', foreignField: 'providerId', as: 'fleet' } },
