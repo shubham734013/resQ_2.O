@@ -127,7 +127,24 @@ export const acceptRequest=async(did:string,id:string)=>{
   }
   return tripOut(trip.toObject());
 };
-export const rejectRequest=async(did:string,id:string)=>{const d=await operationalDriver(did);const x=await EmergencyRequestModel.findOneAndUpdate({_id:oid(id,'request'),status:'AMBULANCE_COORDINATION',driverId:{$exists:false},ambulanceId:d.assignedAmbulanceId},{$unset:{ambulanceId:1,ambulanceProviderId:1}},{new:true}).lean().exec();if(!x)throw new AppError('REQUEST_ALREADY_ASSIGNED','Request is no longer available',409);const a=d.assignedAmbulanceId?await AmbulanceModel.findOne({_id:d.assignedAmbulanceId,providerId:d.providerId}).exec():null;if(a){a.currentStatus='AVAILABLE';await a.save();}return requestOut(x);};
+export const rejectRequest=async(did:string,id:string)=>{
+  const d=await operationalDriver(did);
+  const requestId=oid(id,'request');
+  if(!d.assignedAmbulanceId)throw new AppError('DRIVER_AMBULANCE_REQUIRED','Driver has no assigned ambulance',409);
+  const request=await EmergencyRequestModel.findOneAndUpdate(
+    {_id:requestId,status:'AMBULANCE_COORDINATION',driverId:{$exists:false},ambulanceId:d.assignedAmbulanceId},
+    {$unset:{ambulanceId:1,ambulanceProviderId:1}},
+    {new:true}
+  ).lean().exec();
+  if(!request)throw new AppError('REQUEST_ALREADY_ASSIGNED','Request is no longer available',409);
+  const trip=await TripModel.findOneAndUpdate(
+    {emergencyRequestId:requestId,ambulanceId:d.assignedAmbulanceId,status:'ASSIGNED',driverId:{$exists:false}},
+    {$set:{status:'CANCELLED'},$push:{statusHistory:{status:'CANCELLED',changedAt:new Date(),actorId:d._id,actorRole:'AMBULANCE_DRIVER',previousStatus:'ASSIGNED'}}},{new:true}
+  ).exec();
+  await AmbulanceModel.updateOne({_id:d.assignedAmbulanceId,providerId:d.providerId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec();
+  if(trip) await HospitalPatientModel.updateOne({emergencyId:requestId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},{$unset:{ambulanceId:1,etaMinutes:1}}).exec();
+  return requestOut(request);
+};
 const activeTripStatuses:TripStatus[]=['ASSIGNED','ACCEPTED','TO_PICKUP','AT_PICKUP','PATIENT_ONBOARD','TO_HOSPITAL','AT_HOSPITAL'];
 const transition:{[K in TripStatus]?:TripStatus[]}={ASSIGNED:['ACCEPTED','CANCELLED'],ACCEPTED:['TO_PICKUP','CANCELLED'],TO_PICKUP:['AT_PICKUP','CANCELLED'],AT_PICKUP:['PATIENT_ONBOARD','CANCELLED'],PATIENT_ONBOARD:['TO_HOSPITAL','CANCELLED'],TO_HOSPITAL:['AT_HOSPITAL','CANCELLED'],AT_HOSPITAL:['COMPLETED'],COMPLETED:[],CANCELLED:[]};
 async function driverTrip(id:string,did:string){const x=await TripModel.findOne({_id:oid(id,'trip'),driverId:oid(did,'driver')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Trip not found',404);return x;}
