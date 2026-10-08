@@ -24,7 +24,8 @@ type HospitalFacility = {
   location?: { type: 'Point'; coordinates: [number, number] };
 };
 
-const categoryFor = (hospital: Pick<HospitalFacility, 'hospitalType' | 'services' | 'capabilities'>): 'emergency' | 'trauma' | 'urgent_care' | 'pediatric' => {
+type Category = 'emergency' | 'trauma' | 'urgent_care' | 'pediatric';
+const categoryFor = (hospital: Pick<HospitalFacility, 'hospitalType' | 'services' | 'capabilities'>): Category => {
   const text = [hospital.hospitalType, ...hospital.services, ...hospital.capabilities].join(' ').toLowerCase();
   if (text.includes('trauma')) return 'trauma';
   if (text.includes('pediatric') || text.includes('paediatric')) return 'pediatric';
@@ -65,6 +66,7 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
     verificationStatus: 'VERIFIED',
     location: { $exists: true },
   };
+  const andFilters: Record<string, unknown>[] = [];
   if (query.emergencyOnly) baseFilter.emergencyAvailability = 'AVAILABLE';
   if (query.category !== 'all') {
     const categoryMap: Record<string, RegExp> = {
@@ -73,22 +75,16 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
       urgent_care: /urgent/i,
       pediatric: /pediatric|paediatric/i,
     };
-    const categoryFilter = {
-      $or: [
-        { hospitalType: categoryMap[query.category] },
-        { services: categoryMap[query.category] },
-        { capabilities: categoryMap[query.category] },
-      ],
-    };
-    baseFilter.$and = [categoryFilter];
+    const categoryRegex = categoryMap[query.category];
+    if (categoryRegex) andFilters.push({ $or: [{ hospitalType: categoryRegex }, { services: categoryRegex }, { capabilities: categoryRegex }] });
   }
   if (query.q) {
     const escaped = query.q.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
     const text = new RegExp(escaped, 'i');
-    const textFilter = { $or: [{ name: text }, { address: text }, { city: text }, { state: text }, { services: text }, { capabilities: text }] };
-    const existingAnd = Array.isArray(baseFilter.$and) ? baseFilter.$and : [];
-    baseFilter.$and = [...existingAnd, textFilter];
+    andFilters.push({ $or: [{ name: text }, { address: text }, { city: text }, { state: text }, { services: text }, { capabilities: text }] });
   }
+  if (andFilters.length) baseFilter.$and = andFilters;
+
   if (query.latitude !== undefined && query.longitude !== undefined) {
     const pipeline = [
       {
@@ -108,14 +104,16 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
         },
       },
     ];
-    const [result] = await HospitalModel.aggregate<{ items: HospitalFacility[]; total: Array<{ count: number }> }>(pipeline).exec();
-    const items = result?.items ?? [];
-    const total = result?.total[0]?.count ?? 0;
+    const [result] = await HospitalModel.aggregate<Record<string, unknown>>(pipeline).exec();
+    const items = Array.isArray(result?.items) ? result.items as HospitalFacility[] : [];
+    const totalBlock = Array.isArray(result?.total) ? result.total as Array<{ count?: number }> : [];
+    const total = typeof totalBlock[0]?.count === 'number' ? totalBlock[0].count : 0;
     return {
-      items: items.map((item) => hospitalToFacility(item, (item as unknown as { distanceMeters?: number }).distanceMeters)),
+      items: items.map((item) => hospitalToFacility(item, (item as HospitalFacility & { distanceMeters?: number }).distanceMeters)),
       pagination: { page: query.page, limit: query.limit, total, totalPages: total ? Math.ceil(total / query.limit) : 0 },
     };
   }
+
   const [items, total] = await Promise.all([
     HospitalModel.find(baseFilter).select('-passwordHash -email').sort({ updatedAt: -1 }).skip((query.page - 1) * query.limit).limit(query.limit).lean().exec(),
     HospitalModel.countDocuments(baseFilter).exec(),
