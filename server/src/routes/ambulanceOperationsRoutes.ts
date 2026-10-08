@@ -3,6 +3,7 @@ import { authenticate } from '../middlewares/authenticate.js';
 import { authorizeRole } from '../middlewares/authorizeRole.js';
 import { validateBody } from '../middlewares/validate.js';
 import { z } from 'zod';
+import { locationUpdateSchema } from '../schemas/location.js';
 import {
  providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,
  providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,
@@ -34,6 +35,7 @@ provider.get('/trips/:id',c.providerTrip);
 
 const driver=Router();
 driver.use(authenticate,authorizeRole('AMBULANCE_DRIVER'));
+driver.patch('/location',validateBody(locationUpdateSchema),c.driverLocationUpdate);
 driver.get('/profile',c.driverProfile);
 driver.patch('/profile',validateBody(driverUpdateSchema.omit({password:true})),c.driverProfileUpdate);
 driver.get('/status',c.driverStatus);
