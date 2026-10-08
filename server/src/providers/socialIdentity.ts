@@ -30,11 +30,15 @@ const cachedFetch = async <T>(key: string, url: string, ttlMs: number): Promise<
   return value;
 };
 
+let testVerifier: ((provider: SocialProvider, credential: string) => Promise<VerifiedSocialIdentity>) | null = null;
+export const setSocialCredentialVerifierForTest = (verifier: typeof testVerifier): void => { testVerifier = verifier; };
+export const resetSocialCredentialVerifierForTest = (): void => { testVerifier = null; };
+
 const verifyJwtWithJwks = async (
   token: string,
   jwksUrl: string,
-  expectedIssuer: string,
-  expectedAudience: string,
+  expectedIssuer: string | [string, ...string[]],
+  expectedAudience: string | [string, ...string[]],
 ): Promise<JwtPayload & Record<string, unknown>> => {
   const decoded = jwt.decode(token, { complete: true });
   if (!decoded || typeof decoded !== 'object' || !decoded.header || typeof decoded.header.kid !== 'string') {
@@ -63,13 +67,15 @@ const verifyGoogle = async (credential: string): Promise<VerifiedSocialIdentity>
   const payload = await verifyJwtWithJwks(
     credential,
     'https://www.googleapis.com/oauth2/v3/certs',
-    'https://accounts.google.com',
+    ['https://accounts.google.com', 'accounts.google.com'] as [string, ...string[]],
     expectedAudience,
   );
   const providerSubject = typeof payload.sub === 'string' ? payload.sub : '';
   const email = typeof payload.email === 'string' ? payload.email.toLowerCase() : '';
-  const name = typeof payload.name === 'string' ? payload.name : '';
-  if (!providerSubject || !email || !name || payload.email_verified !== true) {
+  const name = typeof payload.name === 'string' && payload.name.trim()
+    ? payload.name.trim()
+    : (typeof payload.given_name === 'string' ? `${payload.given_name} ${payload.family_name || ''}`.trim() : email.split('@')[0]) || 'Google User';
+  if (!providerSubject || !email || payload.email_verified !== true) {
     throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Google account identity could not be verified', 401);
   }
   return { provider: 'GOOGLE', providerSubject, email, name, emailVerified: true };
@@ -92,20 +98,28 @@ const verifyMicrosoft = async (credential: string): Promise<VerifiedSocialIdenti
   const expectedIssuer = oidc.issuer.includes('{tenantid}')
     ? oidc.issuer.replace('{tenantid}', tokenTenant)
     : oidc.issuer;
-  const payload = await verifyJwtWithJwks(credential, oidc.jwks_uri, expectedIssuer, env.MICROSOFT_CLIENT_ID);
+  const expectedIssuers: [string, ...string[]] = [
+    expectedIssuer,
+    `https://login.microsoftonline.com/${tokenTenant}/v2.0`,
+    `https://sts.windows.net/${tokenTenant}/`,
+  ];
+  const expectedAudiences: [string, ...string[]] = [
+    env.MICROSOFT_CLIENT_ID,
+    `api://${env.MICROSOFT_CLIENT_ID}`,
+  ];
+  const payload = await verifyJwtWithJwks(credential, oidc.jwks_uri, expectedIssuers, expectedAudiences);
   if (configuredTenant && !['common', 'organizations', 'consumers'].includes(configuredTenant) && payload.tid !== configuredTenant) {
     throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Microsoft tenant is not allowed', 401);
   }
-  if (payload.tid !== tokenTenant || payload.iss !== expectedIssuer) {
-    throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Microsoft token issuer is invalid', 401);
-  }
-  const providerSubject = typeof payload.sub === 'string' ? payload.sub : '';
+  const providerSubject = typeof payload.sub === 'string' ? payload.sub : (typeof payload.oid === 'string' ? payload.oid : '');
   const candidate = typeof payload.email === 'string'
     ? payload.email
-    : typeof payload.preferred_username === 'string' ? payload.preferred_username : '';
+    : typeof payload.preferred_username === 'string' ? payload.preferred_username : (typeof payload.upn === 'string' ? payload.upn : '');
   const email = candidate.toLowerCase();
-  const name = typeof payload.name === 'string' ? payload.name : email;
-  if (!providerSubject || !email || !name) {
+  const name = typeof payload.name === 'string' && payload.name.trim()
+    ? payload.name.trim()
+    : (email.split('@')[0] || 'Microsoft User');
+  if (!providerSubject || !email) {
     throw new AppError('INVALID_SOCIAL_CREDENTIAL', 'Microsoft account identity could not be verified', 401);
   }
   return { provider: 'MICROSOFT', providerSubject, email, name, emailVerified: true };
@@ -114,4 +128,7 @@ const verifyMicrosoft = async (credential: string): Promise<VerifiedSocialIdenti
 export const verifySocialCredential = async (
   provider: SocialProvider,
   credential: string,
-): Promise<VerifiedSocialIdentity> => provider === 'GOOGLE' ? verifyGoogle(credential) : verifyMicrosoft(credential);
+): Promise<VerifiedSocialIdentity> => {
+  if (testVerifier) return testVerifier(provider, credential);
+  return provider === 'GOOGLE' ? verifyGoogle(credential) : verifyMicrosoft(credential);
+};

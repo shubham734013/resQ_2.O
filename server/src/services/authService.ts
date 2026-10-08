@@ -126,10 +126,11 @@ const createAuthResult = async (account:AccountWithPassword):Promise<AuthResult>
 const identityFromDocument=(doc:{_id:{toString():string};email:string;name?:string;accountStatus:AccountStatus},role:Role):AuthenticatedIdentity =>
   publicIdentity(accountFrom(doc._id.toString(),doc.email,doc.name??doc.email,role,doc.accountStatus));
 
-export const registerUser=async(input:UserRegistrationInput)=>{
+export const registerUser=async(input:UserRegistrationInput):Promise<AuthResult>=>{
   await ensureUniqueContact(input.email,input.phone); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await UserModel.create({...input,email:normalizeEmail(input.email),passwordHash,role:'USER',accountStatus:'ACTIVE',authProvider:'LOCAL',savedFacilityIds:[]});
-  return identityFromDocument(a,'USER');
+  const normalized=normalizeEmail(input.email);
+  const a=await UserModel.create({...input,email:normalized,passwordHash,role:'USER',accountStatus:'ACTIVE',authProvider:'LOCAL',savedFacilityIds:[]});
+  return createAuthResult(accountFrom(a._id.toString(),a.email,a.name,'USER','ACTIVE',passwordHash));
 };
 export const registerHospital=async(input:HospitalRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
@@ -151,24 +152,120 @@ export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInpu
 export const login=async(input:LoginInput)=>{const a=await findAccountByEmail(input.email);if(!a||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
 export const adminLogin=async(input:LoginInput)=>{if(normalizeEmail(input.email)!==normalizeEmail(env.RESQ_ADMIN_EMAIL))throw INVALID_CREDENTIALS;const a=await findUserAccountByEmail(input.email);if(!a||a.role!=='ADMIN'||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
 
-const createSocialAccount=async(identity:VerifiedSocialIdentity,role:'USER'|'AMBULANCE_PROVIDER'):Promise<AccountWithPassword>=>{
-  if(role==='USER'){
-    const a=await UserModel.create({name:identity.name,email:identity.email,authProvider:identity.provider,providerSubject:identity.providerSubject,role:'USER',accountStatus:'ACTIVE',emailVerified:true,savedFacilityIds:[]});
-    return accountFrom(a._id.toString(),a.email,a.name,'USER','ACTIVE');
+const createSocialAccount = async (identity: VerifiedSocialIdentity, role: 'USER' | 'AMBULANCE_PROVIDER'): Promise<AccountWithPassword> => {
+  const normalized = normalizeEmail(identity.email);
+  if (role === 'USER') {
+    const a = await UserModel.create({
+      name: identity.name,
+      email: normalized,
+      authProvider: identity.provider,
+      providerSubject: identity.providerSubject,
+      role: 'USER',
+      accountStatus: 'ACTIVE',
+      emailVerified: true,
+      savedFacilityIds: [],
+    });
+    return accountFrom(a._id.toString(), a.email, a.name, 'USER', 'ACTIVE');
   }
-  const registrationNumber='SOCIAL-'+randomUUID();
-  const a=await AmbulanceProviderModel.create({name:identity.name,email:identity.email,phone:'',passwordHash:undefined,authProvider:identity.provider,providerSubject:identity.providerSubject,registrationNumber,serviceType:'',profileCompletionStatus:'INCOMPLETE',verificationStatus:'PENDING',accountStatus:'PENDING'});
-  return accountFrom(a._id.toString(),a.email,a.name,'AMBULANCE_PROVIDER','PENDING',undefined,{verificationStatus:'PENDING',profileCompletionStatus:'INCOMPLETE'});
+  const registrationNumber = 'SOCIAL-' + randomUUID();
+  const a = await AmbulanceProviderModel.create({
+    name: identity.name,
+    email: normalized,
+    phone: '',
+    passwordHash: undefined,
+    authProvider: identity.provider,
+    providerSubject: identity.providerSubject,
+    registrationNumber,
+    serviceType: '',
+    profileCompletionStatus: 'INCOMPLETE',
+    verificationStatus: 'PENDING',
+    accountStatus: 'PENDING',
+  });
+  return accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', 'PENDING', undefined, {
+    verificationStatus: 'PENDING',
+    profileCompletionStatus: 'INCOMPLETE',
+  });
 };
 
-export const socialLogin=async(provider:SocialProvider,credential:string,roleHint:'USER'|'AMBULANCE_PROVIDER'='USER')=>{
-  const verified=await verifySocialCredential(provider,credential);
-  const legacyLinked=(await UserModel.findOne({authProvider:provider,providerSubject:verified.providerSubject}).select('+passwordHash').exec()) ?? (await AmbulanceProviderModel.findOne({authProvider:provider,providerSubject:verified.providerSubject}).select('+passwordHash').exec());
-  const linked=await ExternalIdentityModel.findOne({provider,providerSubject:verified.providerSubject}).exec();
-  if(linked){if(linked.role!==roleHint)throw new AppError('ROLE_MISMATCH','This social identity is linked to a different ResQ role',409);const account=await findByIdentity({id:linked.accountId,email:linked.email,role:linked.role,accountStatus:'ACTIVE'});if(!account)throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND','The linked ResQ account could not be found',401);return createAuthResult(account);}
-  if(legacyLinked){const account=await findAccountByEmail(verified.email);if(!account)throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND','The linked ResQ account could not be found',401);if(account.role!==roleHint)throw new AppError('ROLE_MISMATCH','This social identity is linked to a different ResQ role',409);await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:account.email});return createAuthResult(account);}
-  const existing=await findAccountByEmail(verified.email);if(existing)throw new AppError('ACCOUNT_LINKING_REQUIRED','A ResQ account already exists with this email. Sign in to that account and link this provider before using social sign-in.',409);
-  const account=await createSocialAccount(verified,roleHint);await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:verified.email});return createAuthResult(account);
+export const socialLogin = async (
+  provider: SocialProvider,
+  credential: string,
+  roleHint: 'USER' | 'AMBULANCE_PROVIDER' = 'USER',
+) => {
+  const verified = await verifySocialCredential(provider, credential);
+  const normalizedEmail = normalizeEmail(verified.email);
+
+  // 1. Check if external identity is already registered
+  const linked = await ExternalIdentityModel.findOne({ provider, providerSubject: verified.providerSubject }).exec();
+  if (linked) {
+    let account = await findByIdentity({ id: linked.accountId, email: linked.email, role: linked.role, accountStatus: 'ACTIVE' });
+    if (!account) {
+      account = await findAccountByEmail(normalizedEmail);
+      if (account) {
+        linked.accountId = account.id;
+        linked.email = account.email;
+        linked.role = account.role;
+        await linked.save();
+      }
+    }
+    if (!account) throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND', 'The linked ResQ account could not be found', 401);
+    assertLoginAllowed(account.accountStatus);
+    return createAuthResult(account);
+  }
+
+  // 2. Check legacy user linkage
+  const legacyUser = await UserModel.findOne({ authProvider: provider, providerSubject: verified.providerSubject }).select('+passwordHash').exec();
+  if (legacyUser) {
+    const account = accountFrom(legacyUser._id.toString(), legacyUser.email, legacyUser.name, legacyUser.role, legacyUser.accountStatus, legacyUser.passwordHash);
+    await ExternalIdentityModel.create({ provider, providerSubject: verified.providerSubject, accountId: account.id, role: account.role, email: account.email }).catch(() => null);
+    assertLoginAllowed(account.accountStatus);
+    return createAuthResult(account);
+  }
+
+  // 3. Deterministic linking to existing account with same verified email
+  const existing = await findAccountByEmail(normalizedEmail);
+  if (existing) {
+    try {
+      await ExternalIdentityModel.findOneAndUpdate(
+        { provider, providerSubject: verified.providerSubject },
+        { provider, providerSubject: verified.providerSubject, accountId: existing.id, role: existing.role, email: existing.email },
+        { upsert: true, new: true },
+      ).exec();
+    } catch {
+      // Ignore concurrent upsert collision
+    }
+    if (existing.role === 'USER') {
+      await UserModel.updateOne({ _id: existing.id }, { $set: { emailVerified: true } }).exec();
+    }
+    assertLoginAllowed(existing.accountStatus);
+    return createAuthResult(existing);
+  }
+
+  // 4. New user onboarding via social sign-in
+  try {
+    const account = await createSocialAccount({ ...verified, email: normalizedEmail }, roleHint);
+    await ExternalIdentityModel.create({
+      provider,
+      providerSubject: verified.providerSubject,
+      accountId: account.id,
+      role: account.role,
+      email: normalizedEmail,
+    });
+    assertLoginAllowed(account.accountStatus);
+    return createAuthResult(account);
+  } catch (error: unknown) {
+    const raceAccount = await findAccountByEmail(normalizedEmail);
+    if (raceAccount) {
+      await ExternalIdentityModel.findOneAndUpdate(
+        { provider, providerSubject: verified.providerSubject },
+        { provider, providerSubject: verified.providerSubject, accountId: raceAccount.id, role: raceAccount.role, email: raceAccount.email },
+        { upsert: true, new: true },
+      ).exec();
+      assertLoginAllowed(raceAccount.accountStatus);
+      return createAuthResult(raceAccount);
+    }
+    throw error;
+  }
 };
 export const linkSocialAccount=async(identity:AuthenticatedIdentity,provider:SocialProvider,credential:string)=>{
   const account=await findByIdentity(identity);if(!account)throw new AppError('UNAUTHORIZED','Authenticated account was not found',401);const verified=await verifySocialCredential(provider,credential);if(verified.email!==account.email)throw new AppError('ACCOUNT_LINKING_REQUIRED','The verified provider email must match your ResQ account email',409);

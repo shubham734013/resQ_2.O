@@ -27,6 +27,24 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req: Request, 
   }
 
   if (isMongoDuplicateKeyError(error)) {
+    const mongoErr = error as { keyPattern?: Record<string, unknown>; keyValue?: Record<string, unknown> };
+    const keys = Object.keys(mongoErr.keyPattern || mongoErr.keyValue || {});
+    if (keys.includes('email')) {
+      res.status(409).json({ success: false, error: { code: 'EMAIL_ALREADY_EXISTS', message: 'An account with this email already exists' } });
+      return;
+    }
+    if (keys.includes('phone')) {
+      res.status(409).json({ success: false, error: { code: 'PHONE_ALREADY_EXISTS', message: 'An account with this phone number already exists' } });
+      return;
+    }
+    if (keys.includes('registrationNumber')) {
+      res.status(409).json({ success: false, error: { code: 'REGISTRATION_NUMBER_ALREADY_EXISTS', message: 'Registration number is already in use' } });
+      return;
+    }
+    if (keys.includes('licenseNumber')) {
+      res.status(409).json({ success: false, error: { code: 'LICENSE_NUMBER_ALREADY_EXISTS', message: 'License number is already in use' } });
+      return;
+    }
     res.status(409).json({ success: false, error: { code: 'DUPLICATE_RESOURCE', message: 'A resource with the same unique value already exists' } });
     return;
   }

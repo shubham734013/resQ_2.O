@@ -5,7 +5,11 @@ import { clearAuthCookies, getCookie, REFRESH_TOKEN_COOKIE, setAuthCookies } fro
 import { sendSuccess } from '../utils/apiResponse.js';
 import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, SocialAuthInput, DriverProfileInput, ProviderProfileInput } from '../schemas/auth.js';
 
-export const registerUserController=async(req:Request,res:Response)=>{sendSuccess(res,await registerUser(req.body as UserRegistrationInput),201);};
+export const registerUserController = async (req: Request, res: Response) => {
+  const result = await registerUser(req.body as UserRegistrationInput);
+  setAuthCookies(res, result.accessToken, result.refreshToken);
+  sendSuccess(res, { ...result.user, user: result.user }, 201);
+};
 export const registerHospitalController=async(req:Request,res:Response)=>{sendSuccess(res,await registerHospital(req.body as HospitalRegistrationInput),201);};
 export const registerAmbulanceProviderController=async(req:Request,res:Response)=>{sendSuccess(res,await registerAmbulanceProvider(req.body as AmbulanceProviderRegistrationInput),201);};
 export const registerAmbulanceDriverController=async(req:Request,res:Response)=>{sendSuccess(res,await registerAmbulanceDriver(req.body as AmbulanceDriverRegistrationInput),201);};

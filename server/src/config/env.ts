@@ -11,10 +11,13 @@ const envSchema = z.object({
   RESQ_ADMIN_PASSWORD: z.string().min(12),
   CORS_ORIGINS: z.string().default(''),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
   MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
   MICROSOFT_TENANT_ID: z.string().min(1).optional(),
   MICROSOFT_AUTHORITY: z.string().url().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_REDIRECT_URI: z.string().optional(),
   GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
 });
 
