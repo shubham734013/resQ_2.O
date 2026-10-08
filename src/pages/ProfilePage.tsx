@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Shield, User } from 'lucide-react';
 import { Button } from '../components/common/Button';
-import { useUpdateUserProfile, useUserProfile } from '../hooks/useUser';
+import { useCancelEmergency, useUpdateUserProfile, useUserEmergencies, useUserProfile } from '../hooks/useUser';
 import type { UserProfile } from '../services/userApi';
 
 const initialForm=(p:UserProfile)=>({
@@ -11,6 +11,8 @@ const initialForm=(p:UserProfile)=>({
 
 export const ProfilePage=()=>{
   const q=useUserProfile();
+  const emergencies=useUserEmergencies({page:1,limit:10});
+  const cancelEmergency=useCancelEmergency();
   const update=useUpdateUserProfile();
   const [form,setForm]=useState({name:'',phone:'',address:'',city:'',state:'',country:'',latitude:'',longitude:''});
   useEffect(()=>{if(q.data)setForm(initialForm(q.data));},[q.data]);
@@ -35,6 +37,7 @@ export const ProfilePage=()=>{
       {update.isSuccess&&<div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Profile updated successfully.</div>}
       <Button type="submit" variant="primary" disabled={update.isPending}>{update.isPending?'Saving…':'Save changes'}</Button>
     </form>}
+    <section className="bg-white rounded-xl border border-slate-200/90 p-5 space-y-4 shadow-xs"><div><h2 className="text-sm font-semibold text-slate-900">Emergency history</h2><p className="text-xs text-slate-500">Your emergency requests and their current backend status.</p></div>{emergencies.isLoading?<div className="p-5 text-center text-sm text-slate-500">Loading emergency history…</div>:emergencies.isError?<div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><div className="flex items-center justify-between"><span>Unable to load emergency history.</span><Button size="sm" variant="secondary" onClick={()=>void emergencies.refetch()}>Retry</Button></div></div>:!emergencies.data?.items.length?<div className="p-5 text-center text-sm text-slate-500">No emergency requests yet.</div>:<div className="space-y-2">{emergencies.data.items.map((item)=><div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-slate-900">{item.requestCode}</p><p className="text-xs text-slate-500">{item.situationType} · {new Date(item.reportedAt).toLocaleString()}</p><p className="mt-1 text-xs font-medium text-slate-700">{item.status}</p></div>{['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION'].includes(item.status)&&<Button size="sm" variant="secondary" disabled={cancelEmergency.isPending} onClick={()=>{if(window.confirm('Cancel this emergency request?'))cancelEmergency.mutate(item.id);}}>Cancel</Button>}</div>)}</div>}</section>
     <section className="bg-white rounded-xl border border-slate-200/90 p-5 space-y-3 text-xs text-slate-600 shadow-xs"><div className="flex items-center gap-2 font-semibold text-slate-900"><Shield className="w-4 h-4"/><span>Emergency coordination notice</span></div><p className="leading-relaxed">ResQ is a healthcare navigation and emergency coordination platform. It does not diagnose medical conditions or replace local emergency responders.</p></section>
   </div>;
 };
