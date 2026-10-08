@@ -178,17 +178,81 @@ export const rejectRequest=async(did:string,id:string)=>{
 const activeTripStatuses:TripStatus[]=['ASSIGNED','ACCEPTED','TO_PICKUP','AT_PICKUP','PATIENT_ONBOARD','TO_HOSPITAL','AT_HOSPITAL'];
 const transition:{[K in TripStatus]?:TripStatus[]}={ASSIGNED:['ACCEPTED','CANCELLED'],ACCEPTED:['TO_PICKUP','CANCELLED'],TO_PICKUP:['AT_PICKUP','CANCELLED'],AT_PICKUP:['PATIENT_ONBOARD','CANCELLED'],PATIENT_ONBOARD:['TO_HOSPITAL','CANCELLED'],TO_HOSPITAL:['AT_HOSPITAL','CANCELLED'],AT_HOSPITAL:['COMPLETED'],COMPLETED:[],CANCELLED:[]};
 async function driverTrip(id:string,did:string){const x=await TripModel.findOne({_id:oid(id,'trip'),driverId:oid(did,'driver')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Trip not found',404);return x;}
-async function moveTrip(did:string,id:string,next:TripStatus){const current=await driverTrip(id,did);if(!transition[current.status]?.includes(next))throw new AppError('INVALID_TRIP_TRANSITION','Trip transition is not allowed',409);const set:Partial<TripDocument>={status:next};const now=new Date();if(next==='AT_PICKUP')set.arrivedAtPickupAt=now;if(next==='PATIENT_ONBOARD')set.patientPickedUpAt=now;if(next==='AT_HOSPITAL')set.arrivedAtHospitalAt=now;if(next==='COMPLETED')set.completedAt=now;const x=await TripModel.findOneAndUpdate({_id:current._id,driverId:oid(did,'driver'),status:current.status},{$set:{...set},$push:{statusHistory:{status:next,changedAt:now,actorId:oid(did,'driver'),actorRole:'AMBULANCE_DRIVER',previousStatus:current.status}}},{new:true,runValidators:true}).lean().exec();if(!x)throw new AppError('INVALID_TRIP_TRANSITION','Trip changed before this action could be applied',409);if(next==='AT_HOSPITAL')await HospitalPatientModel.updateOne({emergencyId:x.emergencyRequestId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},{$set:{coordinationStatus:'AT_HOSPITAL',ambulanceId:x.ambulanceId}}).exec();
-if(next==='COMPLETED'){
-  const emergency=await EmergencyRequestModel.findById(x.emergencyRequestId).lean().exec();
-  if(!emergency||emergency.status!=='AMBULANCE_COORDINATION')throw new AppError('EMERGENCY_NOT_ACTIVE','Emergency is not in ambulance coordination state',409);
-  await Promise.all([
-    AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
-    AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
-    HospitalPatientModel.updateOne({emergencyId:x.emergencyRequestId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},{$set:{coordinationStatus:'RESOLVED',ambulanceId:x.ambulanceId}}).exec(),
-    EmergencyRequestModel.updateOne({_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION'},{$set:{status:'RESOLVED'},$push:{statusHistory:{status:'RESOLVED',changedAt:new Date(),previousStatus:'AMBULANCE_COORDINATION',actorId:x.driverId,actorRole:'AMBULANCE_DRIVER'}}}).exec(),
-  ]);
-}return tripOut(x);};
+async function moveTrip(did:string,id:string,next:TripStatus){
+  const driverId=oid(did,'driver');
+  const current=await driverTrip(id,did);
+  if(!transition[current.status]?.includes(next))throw new AppError('INVALID_TRIP_TRANSITION','Trip transition is not allowed',409);
+  if(next!=='COMPLETED'){
+    const set:Partial<TripDocument>={status:next};
+    const now=new Date();
+    if(next==='AT_PICKUP')set.arrivedAtPickupAt=now;
+    if(next==='PATIENT_ONBOARD')set.patientPickedUpAt=now;
+    if(next==='AT_HOSPITAL')set.arrivedAtHospitalAt=now;
+    const x=await TripModel.findOneAndUpdate(
+      {_id:current._id,driverId,status:current.status},
+      {$set:set,$push:{statusHistory:{status:next,changedAt:now,actorId:driverId,actorRole:'AMBULANCE_DRIVER',previousStatus:current.status}}},
+      {new:true,runValidators:true},
+    ).lean().exec();
+    if(!x)throw new AppError('INVALID_TRIP_TRANSITION','Trip changed before this action could be applied',409);
+    if(next==='AT_HOSPITAL'){
+      await HospitalPatientModel.updateOne(
+        {emergencyId:x.emergencyRequestId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+        {$set:{coordinationStatus:'AT_HOSPITAL',ambulanceId:x.ambulanceId}},
+      ).exec();
+    }
+    return tripOut(x);
+  }
+
+  const session=await startSession();
+  let completed:TripDocument|null=null;
+  try{
+    await session.withTransaction(async()=>{
+      const now=new Date();
+      const trip=await TripModel.findOneAndUpdate(
+        {_id:current._id,driverId,status:'AT_HOSPITAL'},
+        {$set:{status:'COMPLETED',completedAt:now},$push:{statusHistory:{status:'COMPLETED',changedAt:now,actorId:driverId,actorRole:'AMBULANCE_DRIVER',previousStatus:'AT_HOSPITAL'}}},
+        {new:true,runValidators:true,session},
+      ).exec();
+      if(!trip)throw new AppError('INVALID_TRIP_TRANSITION','Trip changed before completion could be applied',409);
+
+      const emergency=await EmergencyRequestModel.findOne({_id:trip.emergencyRequestId,status:'AMBULANCE_COORDINATION'}).session(session).lean().exec();
+      if(!emergency)throw new AppError('EMERGENCY_NOT_ACTIVE','Emergency is not in ambulance coordination state',409);
+
+      const ambulance=await AmbulanceModel.findOneAndUpdate(
+        {_id:trip.ambulanceId,currentStatus:'BUSY',accountStatus:'ACTIVE',verificationStatus:'VERIFIED'},
+        {$set:{currentStatus:'AVAILABLE'}},
+        {new:true,session},
+      ).lean().exec();
+      if(!ambulance)throw new AppError('AMBULANCE_STATE_CONFLICT','Ambulance state is no longer consistent with the active trip',409);
+
+      const driver=await AmbulanceDriverModel.findOneAndUpdate(
+        {_id:driverId,availabilityStatus:'BUSY',accountStatus:'ACTIVE',licenseVerificationStatus:'VERIFIED'},
+        {$set:{availabilityStatus:'ONLINE'}},
+        {new:true,session},
+      ).lean().exec();
+      if(!driver)throw new AppError('DRIVER_STATE_CONFLICT','Driver state is no longer consistent with the active trip',409);
+
+      const patient=await HospitalPatientModel.findOneAndUpdate(
+        {emergencyId:trip.emergencyRequestId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+        {$set:{coordinationStatus:'RESOLVED',ambulanceId:trip.ambulanceId}},
+        {new:true,session},
+      ).lean().exec();
+      if(!patient)throw new AppError('PATIENT_CASE_CONFLICT','Hospital patient case is unavailable for completion',409);
+
+      const resolved=await EmergencyRequestModel.findOneAndUpdate(
+        {_id:trip.emergencyRequestId,status:'AMBULANCE_COORDINATION'},
+        {$set:{status:'RESOLVED'},$push:{statusHistory:{status:'RESOLVED',changedAt:now,previousStatus:'AMBULANCE_COORDINATION',actorId:driverId,actorRole:'AMBULANCE_DRIVER'}}},
+        {new:true,runValidators:true,session},
+      ).lean().exec();
+      if(!resolved)throw new AppError('EMERGENCY_STATE_CONFLICT','Emergency changed before completion could be finalized',409);
+      completed=trip;
+    });
+  } finally {
+    await session.endSession();
+  }
+  if(!completed)throw new AppError('TRIP_COMPLETION_FAILED','Trip completion did not produce a completed trip',500);
+  return tripOut(completed);
+}
 export const listDriverTrips=async(did:string,q:TripQuery)=>{await operationalDriver(did);const f:QueryFilter<TripDocument>={driverId:oid(did,'driver')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
 export const getDriverTrip=async(did:string,id:string)=>tripOut(await driverTrip(id,did));
 export const arrivedPickup=async(did:string,id:string)=>moveTrip(did,id,'AT_PICKUP');
