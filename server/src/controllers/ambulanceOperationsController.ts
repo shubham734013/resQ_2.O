@@ -26,6 +26,7 @@ export const assignRequest=async(req:Request,res:Response)=>sendSuccess(res,awai
 export const providerTrips=async(req:Request,res:Response)=>sendSuccess(res,await service.listProviderTrips(authId(req,'AMBULANCE_PROVIDER'),q(res)));
 export const providerTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.getProviderTrip(authId(req,'AMBULANCE_PROVIDER'),id(req)));
 
+export const driverLocationUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverLocation(authId(req,'AMBULANCE_DRIVER'),req.body));
 export const driverProfile=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverProfile(authId(req,'AMBULANCE_DRIVER')));
 export const driverProfileUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverProfile(authId(req,'AMBULANCE_DRIVER'),req.body));
 export const driverStatus=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverStatus(authId(req,'AMBULANCE_DRIVER')));
