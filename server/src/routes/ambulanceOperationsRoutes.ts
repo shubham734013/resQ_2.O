@@ -5,7 +5,7 @@ import { validateBody } from '../middlewares/validate.js';
 import { z } from 'zod';
 import {
  providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,ambulanceLocationUpdateSchema,
- providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,
+ providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,ambulanceLocationUpdateSchema,
 } from '../schemas/ambulance.js';
 import * as c from '../controllers/ambulanceOperationsController.js';
 
@@ -38,6 +38,7 @@ driver.get('/profile',c.driverProfile);
 driver.patch('/profile',validateBody(driverUpdateSchema.omit({password:true})),c.driverProfileUpdate);
 driver.get('/status',c.driverStatus);
 driver.patch('/status',validateBody(driverStatusSchema),c.driverStatusUpdate);
+driver.patch('/location',validateBody(ambulanceLocationUpdateSchema),c.driverLocationUpdate);
 driver.patch('/location',validateBody(ambulanceLocationUpdateSchema),c.driverLocationUpdate);
 driver.get('/requests',validateQuery(driverRequestQuerySchema),c.driverRequests);
 driver.get('/requests/:id',c.driverRequest);
