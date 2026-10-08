@@ -3,17 +3,20 @@ import { adminLoginController, driverProfileController, linkSocialController, lo
 import { authenticate } from '../middlewares/authenticate.js';
 import { authorizeRole } from '../middlewares/authorizeRole.js';
 import { validateBody } from '../middlewares/validate.js';
+import { rateLimit } from '../middlewares/rateLimit.js';
 import { ambulanceDriverRegistrationSchema, ambulanceProviderRegistrationSchema, hospitalRegistrationSchema, loginSchema, userRegistrationSchema, socialAuthSchema, driverProfileSchema, providerProfileSchema } from '../schemas/auth.js';
 
 export const authRouter=Router();
-authRouter.post('/register/user',validateBody(userRegistrationSchema),registerUserController);
-authRouter.post('/register/hospital',validateBody(hospitalRegistrationSchema),registerHospitalController);
-authRouter.post('/register/ambulance-provider',validateBody(ambulanceProviderRegistrationSchema),registerAmbulanceProviderController);
-authRouter.post('/register/ambulance-driver',validateBody(ambulanceDriverRegistrationSchema),registerAmbulanceDriverController);
-authRouter.post('/login',validateBody(loginSchema),loginController);
-authRouter.post('/admin/login',validateBody(loginSchema),adminLoginController);
-authRouter.post('/google',validateBody(socialAuthSchema), (req,res,next)=>{req.params.provider='GOOGLE';void socialLoginController(req,res).catch(next);});
-authRouter.post('/microsoft',validateBody(socialAuthSchema), (req,res,next)=>{req.params.provider='MICROSOFT';void socialLoginController(req,res).catch(next);});
+const authLimiter=rateLimit({windowMs:15*60*1000,max:20,keyPrefix:'auth'});
+const adminLimiter=rateLimit({windowMs:15*60*1000,max:10,keyPrefix:'admin-auth'});
+authRouter.post('/register/user',authLimiter,validateBody(userRegistrationSchema),registerUserController);
+authRouter.post('/register/hospital',authLimiter,validateBody(hospitalRegistrationSchema),registerHospitalController);
+authRouter.post('/register/ambulance-provider',authLimiter,validateBody(ambulanceProviderRegistrationSchema),registerAmbulanceProviderController);
+authRouter.post('/register/ambulance-driver',authLimiter,validateBody(ambulanceDriverRegistrationSchema),registerAmbulanceDriverController);
+authRouter.post('/login',authLimiter,validateBody(loginSchema),loginController);
+authRouter.post('/admin/login',adminLimiter,validateBody(loginSchema),adminLoginController);
+authRouter.post('/google',authLimiter,validateBody(socialAuthSchema),(req,res,next)=>{req.params.provider='GOOGLE';void socialLoginController(req,res).catch(next);});
+authRouter.post('/microsoft',authLimiter,validateBody(socialAuthSchema),(req,res,next)=>{req.params.provider='MICROSOFT';void socialLoginController(req,res).catch(next);});
 authRouter.post('/link/google',authenticate,authorizeRole('USER','AMBULANCE_PROVIDER'),validateBody(socialAuthSchema),(req,res,next)=>{req.params.provider='GOOGLE';void linkSocialController(req,res).catch(next);});
 authRouter.post('/link/microsoft',authenticate,authorizeRole('USER','AMBULANCE_PROVIDER'),validateBody(socialAuthSchema),(req,res,next)=>{req.params.provider='MICROSOFT';void linkSocialController(req,res).catch(next);});
 authRouter.patch('/driver/profile',authenticate,authorizeRole('AMBULANCE_DRIVER'),validateBody(driverProfileSchema),driverProfileController);
