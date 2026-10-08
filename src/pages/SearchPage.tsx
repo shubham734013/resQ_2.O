@@ -24,6 +24,10 @@ export const SearchPage = () => {
   const [emergencyOnly, setEmergencyOnly] = useState(false);
   const [mobileView, setMobileView] = useState<'map' | 'list'>('map');
 
+  const hasLocation = Number.isFinite(currentLocation.latitude)
+    && Number.isFinite(currentLocation.longitude)
+    && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
+
   const {
     facilities,
     selectedFacility,
@@ -36,11 +40,10 @@ export const SearchPage = () => {
     searchQuery,
     category,
     emergencyOnly,
+    latitude: hasLocation ? currentLocation.latitude : undefined,
+    longitude: hasLocation ? currentLocation.longitude : undefined,
+    radiusMeters: 50000,
   });
-
-  const hasLocation = Number.isFinite(currentLocation.latitude)
-    && Number.isFinite(currentLocation.longitude)
-    && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
 
   const handleClear = () => {
     setSearchQuery('');
