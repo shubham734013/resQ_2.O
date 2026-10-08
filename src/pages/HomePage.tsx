@@ -71,10 +71,15 @@ export const HomePage = () => {
     setSearchQuery(suggestion);
   };
 
+  const locatedFacilities = facilities.filter((facility): facility is Facility & { latitude: number; longitude: number } =>
+    typeof facility.latitude === 'number' && typeof facility.longitude === 'number'
+  );
+  const nearbyLocated = (nearby.data?.items ?? []).filter((item): item is typeof item & { latitude: number; longitude: number } =>
+    typeof item.latitude === 'number' && typeof item.longitude === 'number'
+  );
   const mapMarkers = useMemo(() => {
-    const source = nearby.data?.items ?? [];
-    if (source.length > 0) {
-      return source.map((item) => ({
+    if (nearbyLocated.length > 0) {
+      return nearbyLocated.map((item) => ({
         id: item.id,
         latitude: item.latitude,
         longitude: item.longitude,
@@ -87,18 +92,16 @@ export const HomePage = () => {
         },
       }));
     }
-    return facilities
-      .filter((facility) => Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude))
-      .map((facility) => ({
-        id: facility.id,
-        latitude: facility.latitude,
-        longitude: facility.longitude,
-        title: facility.name,
-        subtitle: facility.openStatus,
-        isEmergency: facility.emergencyAvailable,
-        onClick: () => handleSelectFacility(facility),
-      }));
-  }, [nearby.data?.items, facilities, handleSelectFacility]);
+    return locatedFacilities.map((facility) => ({
+      id: facility.id,
+      latitude: facility.latitude,
+      longitude: facility.longitude,
+      title: facility.name,
+      subtitle: facility.openStatus,
+      isEmergency: facility.emergencyAvailable,
+      onClick: () => handleSelectFacility(facility),
+    }));
+  }, [nearbyLocated, locatedFacilities, facilities, handleSelectFacility]);
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-slate-100">
@@ -199,7 +202,7 @@ export const HomePage = () => {
           className="flex-1 h-full relative overflow-hidden bg-slate-200"
         >
           <MapView
-            center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (facilities[0] ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude } : undefined)}
+            center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (locatedFacilities[0] ? { latitude: locatedFacilities[0].latitude, longitude: locatedFacilities[0].longitude } : undefined)}
             userLocation={hasLocation ? currentLocation : undefined}
             markers={mapMarkers}
             interactive
