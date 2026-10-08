@@ -94,28 +94,28 @@ export const getServices = async (hospitalId: string) => { const profile = await
 export const updateServices = async (hospitalId: string, input: ServicesInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { services: input.services } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { services: profileOut(hospital as unknown as Record<string, unknown>).services, updatedAt: hospital.updatedAt };
 };
 export const getCapabilities = async (hospitalId: string) => { const profile = await getProfile(hospitalId); return { capabilities: profile.capabilities, updatedAt: profile.updatedAt }; };
 export const updateCapabilities = async (hospitalId: string, input: CapabilitiesInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { capabilities: input.capabilities } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { capabilities: profileOut(hospital as unknown as Record<string, unknown>).capabilities, updatedAt: hospital.updatedAt };
 };
 export const getAvailability = async (hospitalId: string) => { const profile = await getProfile(hospitalId); return { emergencyAvailability: profile.emergencyAvailability, updatedAt: profile.updatedAt }; };
 export const updateAvailability = async (hospitalId: string, input: AvailabilityInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { emergencyAvailability: input.emergencyAvailability } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { emergencyAvailability: hospital.emergencyAvailability, updatedAt: hospital.updatedAt };
 };
 export const getResources = async (hospitalId: string) => { const profile = await getProfile(hospitalId); return { resourceSummary: profile.resourceSummary, updatedAt: profile.updatedAt }; };
 export const updateResources = async (hospitalId: string, input: ResourcesInput) => {
   const id = assertHospitalId(hospitalId);
   const hospital = await HospitalModel.findByIdAndUpdate(id, { $set: { resourceSummary: input.resourceSummary } }, { new: true, runValidators: true }).select('-passwordHash').lean().exec();
-  if (!hospital) notFound('Hospital profile not found');
+  if (!hospital) throw new AppError('NOT_FOUND', 'Hospital profile not found', 404);
   return { resourceSummary: profileOut(hospital as unknown as Record<string, unknown>).resourceSummary, updatedAt: hospital.updatedAt };
 };
 
