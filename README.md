@@ -1,75 +1,135 @@
-# React + TypeScript + Vite
+# ResQ 2.0
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ResQ 2.0 is a healthcare emergency coordination platform connecting users, hospitals, ambulance providers, ambulance drivers, and administrators around shared MongoDB-backed operational state.
 
-Currently, two official plugins are available:
+ResQ is a coordination/navigation product. It is not a diagnostic or treatment system.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Roles
 
-## React Compiler
+USER — facility discovery, emergency requests, status/history, profile, and saved facilities.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+HOSPITAL — emergency intake, review/preparation, ambulance coordination, hospital operational information.
 
-## Expanding the ESLint configuration
+AMBULANCE_PROVIDER — fleet/driver management and emergency dispatch.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+AMBULANCE_DRIVER — dispatch acceptance, live location, pickup/transport/hospital handover.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+ADMIN — platform monitoring, verification/account controls, emergency monitoring, reporting and analytics.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Architecture
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Frontend:
+- React + TypeScript + Vite
+- Tailwind CSS
+- React Router
+- TanStack Query
+- Framer Motion
+- Lucide React
 
-```
+Backend:
+- Node.js + Express + TypeScript
+- MongoDB + Mongoose
+- Zod
+- JWT access/refresh sessions
+- bcrypt
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Maps/location:
+- Google Maps JavaScript API
+- Google Places/Geocoding/Routes integrations
+- Browser Geolocation
+- MongoDB GeoJSON / 2dsphere
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The backend is authoritative for authentication, ownership, role permissions, operational state, and lifecycle transitions.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Emergency lifecycle
 
-```
+USER → facility discovery → situation selection → location confirmation → facility recommendation → emergency request → HOSPITAL review → preparation → ambulance coordination → PROVIDER dispatch → DRIVER acceptance → pickup → patient onboard → hospital arrival → handover → trip completion → emergency resolution.
+
+Emergency statuses:
+RECEIVED, REVIEWING, PREPARING, AMBULANCE_COORDINATION, RESOLVED, CANCELLED.
+
+Trip statuses:
+ASSIGNED, ACCEPTED, TO_PICKUP, AT_PICKUP, PATIENT_ONBOARD, TO_HOSPITAL, AT_HOSPITAL, COMPLETED, CANCELLED.
+
+Critical cancellation and trip-completion paths use MongoDB transactions.
+
+## Live ambulance location
+
+Driver location is sourced from browser geolocation and sent through the authenticated driver endpoint. The server derives the driver and assigned ambulance from authenticated ownership.
+
+Freshness:
+- LIVE: under 30 seconds
+- RECENT: 30 seconds to 2 minutes
+- STALE: over 2 minutes
+- UNKNOWN: no valid timestamp
+
+Operational coordinates are exposed according to role-aware backend authorization.
+
+## Admin reporting
+
+Reports and analytics use MongoDB-backed aggregation for emergency volume/status, situation and hospital distributions, fleet/driver state, resolution ratio, response-to-review timing where history exists, and CSV export.
+
+## Security
+
+The API provides:
+- production CORS allowlisting
+- credential-safe HTTP-only cookies
+- origin/CSRF protection for browser mutations
+- authentication and refresh rate limiting
+- request body limits
+- security headers
+- role and ownership checks
+- backend state-transition validation
+- safe production error responses without stack traces or raw error objects
+
+## Local development
+
+Prerequisites:
+- Node.js 22+
+- MongoDB or MongoDB Atlas
+- Google Cloud credentials for Maps features
+
+Frontend:
+`npm install`
+`npm run dev`
+
+Backend:
+`cd server && npm install`
+`cd server && npm run dev`
+
+## Environment
+
+Frontend variables are listed in `.env.example`.
+
+Backend requires:
+- MONGODB_URI
+- JWT_SECRET
+- JWT_REFRESH_SECRET
+- RESQ_ADMIN_EMAIL
+- RESQ_ADMIN_PASSWORD
+- CORS_ORIGINS in production
+- corresponding Google/Microsoft credentials
+- GOOGLE_MAPS_SERVER_API_KEY for server-side Maps features
+
+Never commit real secrets.
+
+## Validation
+
+Frontend:
+`npm run typecheck`
+`npm run lint`
+`npm run build`
+
+Backend:
+`cd server && npm run typecheck`
+`cd server && npm run lint`
+`cd server && npm test`
+`cd server && npm run build`
+
+Transactional workflows require a MongoDB deployment that supports transactions, such as MongoDB Atlas or a replica set.
+
+## Product boundaries
+
+ResQ coordinates emergency access and transport. It does not diagnose patients and does not guarantee admission, beds, ICU access, treatment, ambulance availability, or clinical outcomes unless the corresponding operational commitment is explicitly modeled and verified.
+
+The initial real-time strategy uses TanStack Query polling on operational views. WebSockets/SSE are intentionally not introduced without a demonstrated need.
