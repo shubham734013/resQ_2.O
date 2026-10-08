@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GeoPoint, LocationPermissionState, LocationState } from '../types/maps';
 
 const errorMessage = (error: GeolocationPositionError): string => {
@@ -24,6 +24,14 @@ export function useCurrentLocation(): LocationState {
   const [loading, setLoading] = useState(false);
   const [permissionState, setPermissionState] = useState<LocationPermissionState>('unknown');
   const [error, setError] = useState<string | null>(null);
+  const watchId = useRef<number | null>(null);
+
+  const stopWatching = useCallback(() => {
+    if (watchId.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+  }, []);
 
   const refreshLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -55,9 +63,33 @@ export function useCurrentLocation(): LocationState {
 
   useEffect(() => {
     let active = true;
-    void readPermission().then((state) => { if (active) setPermissionState(state); });
-    return () => { active = false; };
-  }, []);
+    void readPermission().then((state) => {
+      if (!active) return;
+      setPermissionState(state);
+      if (state === 'granted') {
+        stopWatching();
+        watchId.current = navigator.geolocation.watchPosition(
+          (position) => {
+            setLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracyMeters: position.coords.accuracy,
+              timestamp: position.timestamp,
+            });
+            setPermissionState('granted');
+            setLoading(false);
+          },
+          (positionError) => {
+            setError(errorMessage(positionError));
+            setPermissionState(positionError.code === positionError.PERMISSION_DENIED ? 'denied' : 'unknown');
+            setLoading(false);
+          },
+          { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 },
+        );
+      }
+    });
+    return () => { active = false; stopWatching(); };
+  }, [stopWatching]);
 
   return { location, loading, permissionState, error, refreshLocation };
 }
