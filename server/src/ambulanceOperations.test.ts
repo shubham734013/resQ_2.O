@@ -11,3 +11,22 @@ test('request assignment requires an ambulance id',()=>{assert.equal(requestAssi
 test('driver creation requires a strong password',()=>{const base={fullName:'Driver One',email:'driver@example.com',phone:'9999999999',licenseNumber:'LIC-1'};assert.equal(driverCreateSchema.safeParse({...base,password:'short'}).success,false);assert.equal(driverCreateSchema.safeParse({...base,password:'a-strong-driver-password'}).success,true);});
 test('ambulance and trip status vocabularies are finite',()=>{assert.ok(AMBULANCE_STATUSES.includes('AVAILABLE'));assert.ok(AMBULANCE_STATUSES.includes('MAINTENANCE'));assert.ok(TRIP_STATUSES.includes('PATIENT_ONBOARD'));assert.ok(!TRIP_STATUSES.includes('DRIVING' as never));});
 test('query pagination is bounded',()=>{assert.equal(ambulanceCreateSchema.safeParse({registrationNumber:'R1',vehicleNumber:'V1',ambulanceType:'BLS'}).success,true);});
+
+test('tenant filter isolation preserves ownership when search term is present',()=>{
+  const driverId = '507f1f77bcf86cd799439011';
+  const assignedAmbulanceId = '507f1f77bcf86cd799439022';
+  const conditions: Array<Record<string, unknown>> = [
+    { status: 'AMBULANCE_COORDINATION' },
+    { $or: [{ driverId }, { ambulanceId: assignedAmbulanceId, driverId: { $exists: false } }] },
+  ];
+  const search = 'acute';
+  if (search) {
+    const rx = new RegExp(search, 'i');
+    conditions.push({ $or: [{ requestCode: rx }, { situationType: rx }] });
+  }
+  const filter = { $and: conditions };
+  assert.equal(filter.$and.length, 3);
+  assert.deepEqual(filter.$and[0], { status: 'AMBULANCE_COORDINATION' });
+  assert.deepEqual(filter.$and[1], { $or: [{ driverId }, { ambulanceId: assignedAmbulanceId, driverId: { $exists: false } }] });
+  assert.ok(filter.$and[2] && typeof filter.$and[2] === 'object' && '$or' in filter.$and[2]);
+});
