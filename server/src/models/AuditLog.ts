@@ -1,5 +1,4 @@
 import { Schema, model, Types } from 'mongoose';
-import type { Role } from '../types/roles.js';
 
 export const AUDIT_ACTOR_ROLES = ['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER', 'ADMIN', 'SYSTEM'] as const;
 export type AuditActorRole = (typeof AUDIT_ACTOR_ROLES)[number];
@@ -24,15 +23,12 @@ const schema = new Schema<AuditLogDocument>({
   actorId: { type: Schema.Types.ObjectId, required: false },
   actorRole: { type: String, enum: AUDIT_ACTOR_ROLES, required: true },
   action: { type: String, required: true, trim: true, index: true },
-  entityType: { type: String, enum: AUDIT_ENTITY_TYPES, required: true, index: true },
+  entityType: { type: String, required: true, enum: AUDIT_ENTITY_TYPES, index: true },
   entityId: { type: Schema.Types.ObjectId, required: true, index: true },
   previousState: { type: Schema.Types.Mixed },
   newState: { type: Schema.Types.Mixed },
   reason: { type: String, trim: true },
-  requestMetadata: {
-    ip: String,
-    userAgent: String,
-  },
+  requestMetadata: { ip: String, userAgent: String },
   createdAt: { type: Date, default: Date.now, index: true },
 }, { versionKey: false });
 
