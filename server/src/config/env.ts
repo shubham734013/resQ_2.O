@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development','test','production']).default('development'),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(5000),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
@@ -18,9 +18,21 @@ const envSchema = z.object({
   GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
 });
 
-const validatedSchema = envSchema.superRefine((value, ctx) => {\n  if (value.NODE_ENV === 'production' && value.CORS_ORIGINS.trim() === '') {\n    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['CORS_ORIGINS'], message: 'CORS_ORIGINS is required in production' });\n  }\n});\n\nconst parsed = validatedSchema.safeParse(process.env);
+const validatedSchema = envSchema.superRefine((value, ctx) => {
+  if (value.NODE_ENV === 'production' && value.CORS_ORIGINS.trim() === '') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['CORS_ORIGINS'],
+      message: 'CORS_ORIGINS is required in production',
+    });
+  }
+});
+
+const parsed = validatedSchema.safeParse(process.env);
+
 if (!parsed.success) {
-  const messages = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
-  throw new Error(`Invalid environment configuration: ${messages.join('; ')}`);
+  const messages = parsed.error.issues.map((issue) => issue.path.join('.') + ': ' + issue.message);
+  throw new Error('Invalid environment configuration: ' + messages.join('; '));
 }
+
 export const env = parsed.data;
