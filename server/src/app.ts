@@ -8,17 +8,34 @@ import { mapsRouter } from './routes/mapsRoutes.js';
 import { geospatialRouter } from './routes/geospatialRoutes.js';
 import { facilityRouter } from './routes/facilityRoutes.js';
 import { geocodingRouter } from './routes/geocodingRoutes.js';
-import { ambulanceProviderRouter,ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
+import { ambulanceProviderRouter, ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
 import { emergencyRouter } from './routes/emergencyRoutes.js';
+import { userRouter } from './routes/userRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { getAllowedOrigins, mutationOriginGuard, originGuard, securityHeaders } from './middlewares/security.js';
+
 export const app=express();
+const allowedOrigins=getAllowedOrigins();
+
 app.disable('x-powered-by');
-app.use(cors({origin:true,credentials:true}));
+app.use(securityHeaders);
+app.use(originGuard);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) { callback(null, true); return; }
+    if (!allowedOrigins.length || allowedOrigins.includes(origin)) { callback(null, true); return; }
+    callback(new Error('CORS origin is not allowed'));
+  },
+  credentials:true,
+}));
+app.use(mutationOriginGuard);
 app.use(express.json({limit:'1mb'}));
+
 app.use('/api/v1/health',healthRouter);
 app.use('/api/v1/auth',authRouter);
 app.use('/api/v1/admin',adminRouter);
 app.use('/api/v1/hospital',hospitalRouter);
+app.use('/api/v1/users',userRouter);
 app.use('/api/v1',geospatialRouter);
 app.use('/api/v1/facilities',facilityRouter);
 app.use('/api/v1/maps',mapsRouter);
