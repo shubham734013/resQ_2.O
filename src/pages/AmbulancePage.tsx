@@ -39,7 +39,6 @@ export const AmbulancePage=()=>{
 
  useEffect(() => {
    if (!location || status.data?.status === 'OFFLINE') return;
-   const key = ['driver-location', location.latitude.toFixed(5), location.longitude.toFixed(5), Math.round(location.accuracyMeters ?? 0)].join(':');
    const lastSent = Number(sessionStorage.getItem('resq-driver-location-sent-at') ?? '0');
    if (Date.now() - lastSent < 15000) return;
    sessionStorage.setItem('resq-driver-location-sent-at', String(Date.now()));
