@@ -1,6 +1,6 @@
 import type { CreateEmergencyRequest, EmergencyRequestView } from '../types/emergency';
 
-const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
+const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
 
 export class EmergencyApiError extends Error {
   readonly status: number;
