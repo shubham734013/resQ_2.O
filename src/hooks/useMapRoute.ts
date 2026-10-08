@@ -28,7 +28,7 @@ export function useMapRoute(facility: Facility | null, location: UserLocation | 
   const origin = location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
     ? { latitude: location.latitude, longitude: location.longitude }
     : null;
-  const destination = facility
+  const destination = facility && Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude)
     ? { latitude: facility.latitude, longitude: facility.longitude }
     : null;
 
