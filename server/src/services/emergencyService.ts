@@ -139,7 +139,10 @@ export const getUserEmergencyRequest = async (userId: string, emergencyId: strin
   const requestId = assertId(emergencyId, 'emergency');
   const request = await EmergencyRequestModel.findOne({ _id: requestId, userId: userObjectId }).lean().exec();
   if (!request) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
-  return output(export const cancelUserEmergencyRequest = async (userId: string, emergencyId: string) => {
+  return output(request);
+};
+
+export const cancelUserEmergencyRequest = async (userId: string, emergencyId: string) => {
   const userObjectId = assertId(userId, 'user');
   const requestId = assertId(emergencyId, 'emergency');
   const current = await EmergencyRequestModel.findOne({ _id: requestId, userId: userObjectId }).lean().exec();
@@ -148,16 +151,20 @@ export const getUserEmergencyRequest = async (userId: string, emergencyId: strin
     throw new AppError('EMERGENCY_NOT_CANCELLABLE', 'This emergency is no longer eligible for user cancellation', 409);
   }
 
-  const trip = await TripModel.findOne({ emergencyRequestId: requestId, status: { $in: EMERGENCY_ACTIVE_TRIP_STATUSES } }).lean().exec();
-  if (trip && (EMERGENCY_MATERIAL_TRANSPORT_STATUSES as readonly string[]).includes(trip.status)) {
-    throw new AppError('TRANSPORT_ALREADY_STARTED', 'Cancellation is not allowed after patient transport has started', 409);
-  }
-
   const session = await startSession();
   let updatedRequest: NonNullable<RequestDocument> | null = null;
   try {
     await session.withTransaction(async () => {
       const now = new Date();
+      const activeTrip = await TripModel.findOne({
+        emergencyRequestId: requestId,
+        status: { $in: EMERGENCY_ACTIVE_TRIP_STATUSES },
+      }).session(session).lean().exec();
+
+      if (activeTrip && (EMERGENCY_MATERIAL_TRANSPORT_STATUSES as readonly string[]).includes(activeTrip.status)) {
+        throw new AppError('TRANSPORT_ALREADY_STARTED', 'Cancellation is not allowed after patient transport has started', 409);
+      }
+
       const updated = await EmergencyRequestModel.findOneAndUpdate(
         { _id: requestId, userId: userObjectId, status: current.status },
         {
@@ -175,15 +182,6 @@ export const getUserEmergencyRequest = async (userId: string, emergencyId: strin
         { new: true, runValidators: true, session },
       ).lean().exec();
       if (!updated) throw new AppError('STALE_EMERGENCY_UPDATE', 'Emergency request changed before cancellation could be applied', 409);
-
-      const activeTrip = await TripModel.findOne({
-        emergencyRequestId: requestId,
-        status: { $in: EMERGENCY_ACTIVE_TRIP_STATUSES },
-      }).session(session).lean().exec();
-
-      if (activeTrip && (EMERGENCY_MATERIAL_TRANSPORT_STATUSES as readonly string[]).includes(activeTrip.status)) {
-        throw new AppError('TRANSPORT_ALREADY_STARTED', 'Cancellation is not allowed after patient transport has started', 409);
-      }
 
       if (activeTrip) {
         const cancelledTrip = await TripModel.findOneAndUpdate(
