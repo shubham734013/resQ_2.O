@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { randomUUID } from 'node:crypto';
 import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
@@ -102,7 +103,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   return output(linked);
 };
 
-const cryptoSafeCode = () => Math.random().toString(36).slice(2, 14).toUpperCase();
+const cryptoSafeCode = () => randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
 
 export const listUserEmergencyRequests = async (
   userId: string,
