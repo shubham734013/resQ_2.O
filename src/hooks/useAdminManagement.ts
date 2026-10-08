@@ -12,6 +12,8 @@ export const adminKeys = {
   provider: (id: string) => ['admin', 'provider', id] as const,
   ambulances: (p: AdminListParams) => ['admin', 'ambulances', p] as const,
   ambulance: (id: string) => ['admin', 'ambulance', id] as const,
+  emergencies: (p:Record<string,unknown>) => ['admin','emergencies',p] as const,
+  emergency: (id:string) => ['admin','emergency',id] as const,
   drivers: (p: AdminListParams) => ['admin', 'drivers', p] as const,
   driver: (id: string) => ['admin', 'driver', id] as const,
   reportsOverview: (p:{from?:string;to?:string}) => ['admin','reports','overview',p] as const,
@@ -28,6 +30,8 @@ export const useAdminProviders = (params: AdminListParams) => useQuery({ queryKe
 export const useAdminProvider = (id: string) => useQuery({ queryKey: adminKeys.provider(id), queryFn: () => adminApi.provider(id), enabled: Boolean(id) });
 export const useAdminAmbulances = (params: AdminListParams) => useQuery({ queryKey: adminKeys.ambulances(params), queryFn: () => adminApi.ambulances(params) });
 export const useAdminAmbulance = (id: string) => useQuery({ queryKey: adminKeys.ambulance(id), queryFn: () => adminApi.ambulance(id), enabled: Boolean(id) });
+export const useAdminEmergencies = (params: Parameters<typeof adminApi.emergencies>[0]) => useQuery({ queryKey: adminKeys.emergencies(params), queryFn: () => adminApi.emergencies(params), refetchInterval: 15_000, staleTime: 5_000 });
+export const useAdminEmergency = (id:string) => useQuery({ queryKey: adminKeys.emergency(id), queryFn: () => adminApi.emergency(id), enabled:Boolean(id), refetchInterval:15_000, staleTime:5_000 });
 export const useAdminDrivers = (params: AdminListParams) => useQuery({ queryKey: adminKeys.drivers(params), queryFn: () => adminApi.drivers(params) });
 export const useAdminDriver = (id: string) => useQuery({ queryKey: adminKeys.driver(id), queryFn: () => adminApi.driver(id), enabled: Boolean(id) });
 
