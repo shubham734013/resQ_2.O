@@ -23,7 +23,7 @@ app.use(originGuard);
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) { callback(null, true); return; }
-    if (!allowedOrigins.length || allowedOrigins.includes(origin)) { callback(null, true); return; }
+    if (allowedOrigins.includes(origin)) { callback(null, true); return; }
     callback(new Error('CORS origin is not allowed'));
   },
   credentials:true,
