@@ -30,7 +30,21 @@ export const useAdminProviders = (params: AdminListParams) => useQuery({ queryKe
 export const useAdminProvider = (id: string) => useQuery({ queryKey: adminKeys.provider(id), queryFn: () => adminApi.provider(id), enabled: Boolean(id) });
 export const useAdminAmbulances = (params: AdminListParams) => useQuery({ queryKey: adminKeys.ambulances(params), queryFn: () => adminApi.ambulances(params) });
 export const useAdminAmbulance = (id: string) => useQuery({ queryKey: adminKeys.ambulance(id), queryFn: () => adminApi.ambulance(id), enabled: Boolean(id) });
-export const useAdminEmergencies = (params: Parameters<typeof adminApi.emergencies>[0]) => useQuery({ queryKey: adminKeys.emergencies(params), queryFn: () => adminApi.emergencies(params), refetchInterval: 15_000, staleTime: 5_000 });
+
+export const useUpdateAmbulanceVerification = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, verificationStatus }: { id:string; verificationStatus: AdminVerificationStatus }) => adminApi.ambulanceVerification(id, verificationStatus),
+    onSuccess: (_, variables) => { void qc.invalidateQueries({ queryKey: adminKeys.ambulance(variables.id) }); void qc.invalidateQueries({ queryKey: ['admin','ambulances'] }); void qc.invalidateQueries({ queryKey: adminKeys.overview }); },
+  });
+};
+export const useUpdateAmbulanceStatus = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id:string; status: Extract<AdminAccountStatus,'ACTIVE'|'SUSPENDED'|'REJECTED'> }) => adminApi.ambulanceStatus(id, status),
+    onSuccess: (_, variables) => { void qc.invalidateQueries({ queryKey: adminKeys.ambulance(variables.id) }); void qc.invalidateQueries({ queryKey: ['admin','ambulances'] }); void qc.invalidateQueries({ queryKey: adminKeys.overview }); },
+  });
+};export const useAdminEmergencies = (params: Parameters<typeof adminApi.emergencies>[0]) => useQuery({ queryKey: adminKeys.emergencies(params), queryFn: () => adminApi.emergencies(params), refetchInterval: 15_000, staleTime: 5_000 });
 export const useAdminEmergency = (id:string) => useQuery({ queryKey: adminKeys.emergency(id), queryFn: () => adminApi.emergency(id), enabled:Boolean(id), refetchInterval:15_000, staleTime:5_000 });
 export const useAdminDrivers = (params: AdminListParams) => useQuery({ queryKey: adminKeys.drivers(params), queryFn: () => adminApi.drivers(params) });
 export const useAdminDriver = (id: string) => useQuery({ queryKey: adminKeys.driver(id), queryFn: () => adminApi.driver(id), enabled: Boolean(id) });
