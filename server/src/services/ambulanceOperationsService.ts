@@ -5,6 +5,7 @@ import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel, type EmergencyRequestDocument } from '../models/EmergencyRequest.js';
 import { TripModel, type TripDocument } from '../models/Trip.js';
+import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type * as S from '../schemas/ambulance.js';
@@ -79,7 +80,7 @@ export const unassignDriver=async(pid:string,aid:string)=>{
   return {unassigned:true};
 };
 const requestFilter=(pid:string,q:RequestQuery)=>{const p=oid(pid,'provider');const f:QueryFilter<EmergencyRequestDocument>={status:'AMBULANCE_COORDINATION',$or:[{ambulanceProviderId:p},{ambulanceProviderId:{$exists:false}}]};if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.driver)f.driverId=oid(q.driver,'driver');if(q.status&&q.status!=='AMBULANCE_COORDINATION')f.status=q.status;if(q.search)f.$and=[{$or:[{requestCode:new RegExp(escape(q.search),'i')},{situationType:new RegExp(escape(q.search),'i')}]}];if(q.from||q.to)f.reportedAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};return f;};
-export const listProviderRequests=async(pid:string,q:RequestQuery)=>{await operationalProvider(pid);const f=requestFilter(pid,q);const [items,total]=await Promise.all([EmergencyRequestModel.find(f).sort({reportedAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),EmergencyRequestModel.countDocuments(f).exec()]);return page(items.map(requestOut),total,q);};
+export const listProviderRequests=async(pid:string,q:RequestQuery)=>{await operationalProvider(pid);const f=requestFilter(pid,q);const [items,total]=await Promise.all([EmergencyRequestModel.find(f).sort({reportedAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),EmergencyRequestModel.countDocuments(f).exec()]);return page(items.map((item) => requestOut(item)),total,q);};
 export const getProviderRequest=async(pid:string,id:string)=>{await operationalProvider(pid);const p=oid(pid,'provider');const x=await EmergencyRequestModel.findOne({_id:oid(id,'request'),status:'AMBULANCE_COORDINATION',$or:[{ambulanceProviderId:p},{ambulanceProviderId:{$exists:false}}]}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Request not found',404);return requestOut(x);};
 export const assignRequest=async(pid:string,rid:string,aid:string)=>{
   await operationalProvider(pid);
