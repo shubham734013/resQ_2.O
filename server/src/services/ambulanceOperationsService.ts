@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { Types, type QueryFilter } from 'mongoose';
+import { Types, startSession, type QueryFilter } from 'mongoose';
 import { AmbulanceProviderModel, type AmbulanceProviderDocument } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
