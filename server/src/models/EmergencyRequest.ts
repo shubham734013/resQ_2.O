@@ -1,12 +1,16 @@
 import { Schema, model, Types } from 'mongoose';
+import { ROLES, type Role } from '../types/roles.js';
 
 export const HOSPITAL_EMERGENCY_STATUSES = ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION','RESOLVED','CANCELLED'] as const;
 export type HospitalEmergencyStatus = (typeof HOSPITAL_EMERGENCY_STATUSES)[number];
 
+export type EmergencyStatusActorRole = Role | 'SYSTEM';
+
 export interface EmergencyStatusHistoryEntry {
   status: HospitalEmergencyStatus;
   changedAt: Date;
-  changedBy?: Types.ObjectId;
+  actorId?: Types.ObjectId;
+  actorRole: EmergencyStatusActorRole;
   previousStatus?: HospitalEmergencyStatus;
 }
 
@@ -33,7 +37,8 @@ export interface EmergencyRequestDocument {
 const statusHistorySchema = new Schema<EmergencyStatusHistoryEntry>({
   status: { type: String, enum: HOSPITAL_EMERGENCY_STATUSES, required: true },
   changedAt: { type: Date, required: true },
-  changedBy: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+  actorId: { type: Schema.Types.ObjectId, required: false },
+  actorRole: { type: String, enum: [...ROLES, 'SYSTEM'], required: true, default: 'SYSTEM' },
   previousStatus: { type: String, enum: HOSPITAL_EMERGENCY_STATUSES, required: false },
 }, { _id: false });
 
