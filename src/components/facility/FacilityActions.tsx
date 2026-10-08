@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bookmark, BookmarkCheck, Navigation, Phone, ShieldAlert } from 'lucide-react';
 import type { Facility } from '../../types/facility';
@@ -26,11 +26,9 @@ export const FacilityActions = ({
   const saved = useSavedFacilities();
   const save = useSaveFacility();
   const remove = useRemoveSavedFacility();
-  const [isSaved, setIsSaved] = useState(false);
-
-  useEffect(() => {
-    setIsSaved(Boolean(saved.data?.items.some((item) => item.id === facility.id)));
-  }, [facility.id, saved.data]);
+  const isServerSaved = Boolean(saved.data?.items.some((item) => item.id === facility.id));
+  const [overrideSaved, setOverrideSaved] = useState<boolean | null>(null);
+  const isSaved = overrideSaved ?? isServerSaved;
 
   const handleDirections = () => {
     if (onDirections) { onDirections(); return; }
@@ -41,8 +39,8 @@ export const FacilityActions = ({
     window.location.href = `tel:${facility.phone.replace(/[^0-9+]/g, '')}`;
   };
   const toggleSaved = () => {
-    if (isSaved) remove.mutate(facility.id, { onSuccess: () => setIsSaved(false) });
-    else save.mutate(facility.id, { onSuccess: () => setIsSaved(true) });
+    if (isSaved) remove.mutate(facility.id, { onSuccess: () => setOverrideSaved(false) });
+    else save.mutate(facility.id, { onSuccess: () => setOverrideSaved(true) });
   };
 
   return (

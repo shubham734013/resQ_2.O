@@ -264,7 +264,7 @@ export const HomePage = () => {
             {/* Map Canvas */}
             <div className="flex-1 w-full h-full">
               <MapView
-                center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (facilities[0] ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude } : undefined)}
+                center={hasLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : (locatedFacilities[0] ? { latitude: locatedFacilities[0].latitude, longitude: locatedFacilities[0].longitude } : undefined)}
                 userLocation={hasLocation ? currentLocation : undefined}
                 markers={mapMarkers}
                 interactive

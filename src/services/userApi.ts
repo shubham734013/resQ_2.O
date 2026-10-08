@@ -1,5 +1,3 @@
-import type { Facility } from '../types/facility';
-
 const API_BASE=(()=>{const value=(import.meta.env.VITE_API_BASE_URL as string|undefined)?.trim();if(!value)throw new Error('VITE_API_BASE_URL is required.');return value.replace(/\/$/,'');})();
 
 class UserApiError extends Error { readonly status:number; readonly code:string; constructor(status:number,code:string,message:string){super(message);this.name='UserApiError';this.status=status;this.code=code;} }

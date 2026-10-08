@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types, type PipelineStage } from 'mongoose';
 import { HospitalModel } from '../models/Hospital.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
@@ -90,7 +90,7 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
       type: 'Point',
       coordinates: [query.longitude, query.latitude],
     };
-    const pipeline = [
+    const pipeline: PipelineStage[] = [
       {
         $geoNear: {
           near,

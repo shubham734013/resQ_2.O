@@ -36,11 +36,11 @@ export const FacilityLocation = ({ facility, userLocation, className = '' }: Fac
       </div>
 
       <div className="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-xs h-[300px] lg:h-[380px] relative">
-        {hasCoordinates ? (
+        {hasCoordinates && typeof latitude === 'number' && typeof longitude === 'number' ? (
           <MapView
             center={{ latitude, longitude }}
             userLocation={Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude) ? userLocation : undefined}
-            destination={{ latitude: facility.latitude, longitude: facility.longitude, name: facility.name, address: facility.address, isEmergency: facility.emergencyAvailable }}
+            destination={{ latitude, longitude, name: facility.name, address: facility.address, isEmergency: facility.emergencyAvailable }}
             activeRoute={route}
             interactive
             className="h-full w-full"

@@ -280,7 +280,7 @@ export const getAmbulance = async (hospitalId: string, ambulanceId: string) => {
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
   }).lean().exec();
-  if (!ambulance) notFound('Ambulance not found');
+  if (!ambulance) throw new AppError('NOT_FOUND', 'Ambulance not found', 404);
   const driver = await AmbulanceDriverModel.findOne({ assignedAmbulanceId: ambulance._id })
     .select('fullName phone availabilityStatus')
     .lean().exec();

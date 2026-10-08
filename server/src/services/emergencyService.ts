@@ -9,10 +9,10 @@ import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type { createEmergencyRequestSchema } from '../schemas/emergency.js';
-import type { HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
+import type { EmergencyRequestDocument, HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 
 type CreateEmergencyInput = z.infer<typeof createEmergencyRequestSchema>;
-type RequestDocument = Awaited<ReturnType<typeof EmergencyRequestModel.findOne>>;
+export type EmergencyRecord = EmergencyRequestDocument & { _id: Types.ObjectId | string };
 
 export const USER_CANCELLABLE_STATUSES: HospitalEmergencyStatus[] = ['RECEIVED', 'REVIEWING', 'PREPARING', 'AMBULANCE_COORDINATION'];
 export const EMERGENCY_ACTIVE_TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] as const;
@@ -23,7 +23,7 @@ const assertId = (value: string, name: string) => {
   return new Types.ObjectId(value);
 };
 
-const output = (request: NonNullable<RequestDocument>) => ({
+const output = (request: EmergencyRecord) => ({
   id: String(request._id),
   requestCode: request.requestCode,
   hospitalId: String(request.hospitalId),
@@ -152,7 +152,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
   }
 
   const session = await startSession();
-  let updatedRequest: NonNullable<RequestDocument> | null = null;
+  let updatedRequest: EmergencyRecord | null = null;
   try {
     await session.withTransaction(async () => {
       const now = new Date();

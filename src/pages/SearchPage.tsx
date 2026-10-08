@@ -69,8 +69,8 @@ export const SearchPage = () => {
 
   const mapCenter = hasLocation
     ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
-    : facilities[0]
-      ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude }
+    : locatedFacilities[0]
+      ? { latitude: locatedFacilities[0].latitude, longitude: locatedFacilities[0].longitude }
       : undefined;
 
   return (

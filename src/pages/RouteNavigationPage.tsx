@@ -214,15 +214,15 @@ export const RouteNavigationPage = () => {
           ======================================================== */}
       <div className="relative w-full h-full flex-1">
         <MapView
-          center={{ latitude: facility.latitude, longitude: facility.longitude }}
+          center={typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? { latitude: facility.latitude, longitude: facility.longitude } : undefined}
           userLocation={currentLocation}
-          destination={{
+          destination={typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? {
             latitude: facility.latitude,
             longitude: facility.longitude,
             name: facility.name,
             address: facility.address,
             isEmergency: isEmergency || facility.emergencyAvailable,
-          }}
+          } : undefined}
           activeRoute={activeRoute}
           alternativeRoutes={navigationMode === 'preview' ? alternativeRoutes : []}
           onSelectRoute={setSelectedRouteId}
