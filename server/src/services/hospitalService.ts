@@ -272,3 +272,31 @@ export const listAmbulances = async (hospitalId: string, query: AmbulanceQuery) 
     updatedAt: x.updatedAt,
   }) as HospitalAmbulance), total, query.page, query.limit);
 };
+export const getAmbulance = async (hospitalId: string, ambulanceId: string) => {
+  assertHospitalId(hospitalId);
+  if (!Types.ObjectId.isValid(ambulanceId)) throw new AppError('INVALID_ID', 'Invalid ambulance id', 400);
+  const ambulance = await AmbulanceModel.findOne({
+    _id: ambulanceId,
+    accountStatus: 'ACTIVE',
+    verificationStatus: 'VERIFIED',
+  }).lean().exec();
+  if (!ambulance) notFound('Ambulance not found');
+  const driver = await AmbulanceDriverModel.findOne({ assignedAmbulanceId: ambulance._id })
+    .select('fullName phone availabilityStatus')
+    .lean().exec();
+  return {
+    id: String(ambulance._id),
+    registrationNumber: ambulance.registrationNumber,
+    vehicleNumber: ambulance.vehicleNumber,
+    ambulanceType: ambulance.ambulanceType,
+    capabilities: ambulance.capabilities,
+    currentStatus: ambulance.currentStatus,
+    currentLatitude: ambulance.currentLatitude,
+    currentLongitude: ambulance.currentLongitude,
+    assignedDriverId: driver ? String(driver._id) : undefined,
+    assignedDriverName: driver?.fullName,
+    assignedDriverPhone: driver?.phone,
+    assignedDriverStatus: driver?.availabilityStatus,
+    updatedAt: ambulance.updatedAt,
+  };
+};
