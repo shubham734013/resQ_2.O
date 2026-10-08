@@ -23,8 +23,9 @@ const message = (error: unknown): string => error instanceof Error ? error.messa
 
 export const AdminOverviewPage = () => {
   const q = useAdminOverview();
-  if (q.isLoading) return <Section><AdminPage title="Operations overview" description="Live ResQ platform metrics."><Loading /></AdminPage></Section>;
-  if (q.isError || !q.data) return <Section><AdminPage title="Operations overview"><ErrorBox message={message(q.error)} retry={() => void q.refetch()} /></AdminPage></Section>;
+  const reports = useAdminEmergencyReports({ from: (() => { const d = new Date(); d.setUTCDate(d.getUTCDate() - 29); return d.toISOString().slice(0, 10) + 'T00:00:00.000Z'; })(), to: new Date().toISOString() });
+  if (q.isLoading || reports.isLoading) return <Section><AdminPage title="Operations overview" description="Live ResQ platform metrics."><Loading /></AdminPage></Section>;
+  if (q.isError || !q.data || reports.isError || !reports.data) return <Section><AdminPage title="Operations overview"><ErrorBox message={message(q.error || reports.error)} retry={() => { void q.refetch(); void reports.refetch(); }} /></AdminPage></Section>;
   const d = q.data;
   const metrics = [
     { label:'Users', value:String(d.totalUsers), detail:`${d.activeUsers} active` },
@@ -34,7 +35,21 @@ export const AdminOverviewPage = () => {
     { label:'Drivers', value:String(d.totalAmbulanceDrivers), detail:`${d.onlineDrivers} online` },
     { label:'Active emergencies', value:String(d.activeEmergencies), detail:`${d.resolvedEmergencies} resolved · ${d.cancelledEmergencies} cancelled` },
   ];
-  return <Section><AdminPage title="Operations overview" description="Live MongoDB-backed platform metrics."><MetricGrid metrics={metrics}/><div className="mt-6 grid gap-6 lg:grid-cols-3"><Panel title="Fleet state"><div className="space-y-2 p-5 text-sm"><div className="flex justify-between"><span>Available ambulances</span><b>{d.availableAmbulances}</b></div><div className="flex justify-between"><span>Busy ambulances</span><b>{d.busyAmbulances}</b></div><div className="flex justify-between"><span>Offline ambulances</span><b>{d.offlineAmbulances}</b></div><div className="flex justify-between"><span>Maintenance</span><b>{d.maintenanceAmbulances}</b></div></div></Panel><Panel title="Driver state"><div className="space-y-2 p-5 text-sm"><div className="flex justify-between"><span>Online</span><b>{d.onlineDrivers}</b></div><div className="flex justify-between"><span>Busy</span><b>{d.busyDrivers}</b></div><div className="flex justify-between"><span>Offline</span><b>{d.offlineDrivers}</b></div></div></Panel><Panel title="Verification queue"><div className="space-y-2 p-5 text-sm"><div className="flex justify-between"><span>Hospitals pending</span><b>{d.pendingHospitals}</b></div><div className="flex justify-between"><span>Providers pending</span><b>{d.pendingProviders}</b></div><div className="flex justify-between"><span>Drivers pending</span><b>{d.pendingDrivers}</b></div></div></Panel></div><div className="mt-6 grid gap-6 lg:grid-cols-3"><Panel title="Emergency state"><div className="p-5 text-sm space-y-2"><div className="flex justify-between"><span>Active</span><b>{d.activeEmergencies}</b></div><div className="flex justify-between"><span>Resolved</span><b>{d.resolvedEmergencies}</b></div><div className="flex justify-between"><span>Cancelled</span><b>{d.cancelledEmergencies}</b></div></div></Panel><Panel title="Network verification"><div className="p-5 text-sm space-y-2"><div className="flex justify-between"><span>Verified hospitals</span><b>{d.verifiedHospitals}</b></div><div className="flex justify-between"><span>Verified providers</span><b>{d.verifiedProviders}</b></div><div className="flex justify-between"><span>Verified drivers</span><b>{d.verifiedDrivers}</b></div></div></Panel><Panel title="Users"><div className="p-5 text-sm space-y-2"><div className="flex justify-between"><span>Active</span><b>{d.activeUsers}</b></div><div className="flex justify-between"><span>Suspended</span><b>{d.suspendedUsers}</b></div></div></Panel></div></AdminPage></Section>;
+  return <Section><AdminPage title="Operations overview" description="Live MongoDB-backed platform metrics.">
+    <MetricGrid metrics={metrics}/>
+    <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <Panel title="Fleet state"><div className="space-y-2 p-5 text-sm"><div className="flex justify-between"><span>Available ambulances</span><b>{d.availableAmbulances}</b></div><div className="flex justify-between"><span>Busy ambulances</span><b>{d.busyAmbulances}</b></div><div className="flex justify-between"><span>Offline ambulances</span><b>{d.offlineAmbulances}</b></div><div className="flex justify-between"><span>Maintenance</span><b>{d.maintenanceAmbulances}</b></div></div></Panel>
+      <Panel title="Driver state"><div className="space-y-2 p-5 text-sm"><div className="flex justify-between"><span>Online</span><b>{d.onlineDrivers}</b></div><div className="flex justify-between"><span>Busy</span><b>{d.busyDrivers}</b></div><div className="flex justify-between"><span>Offline</span><b>{d.offlineDrivers}</b></div></div></Panel>
+      <Panel title="Verification queue"><div className="space-y-2 p-5 text-sm"><div className="flex justify-between"><span>Hospitals pending</span><b>{d.pendingHospitals}</b></div><div className="flex justify-between"><span>Providers pending</span><b>{d.pendingProviders}</b></div><div className="flex justify-between"><span>Drivers pending</span><b>{d.pendingDrivers}</b></div></div></Panel>
+    </div>
+    <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <TrendChart title="Emergency volume — last 30 days" description="Live requests grouped by UTC date." data={reports.data.trend.map(x=>({label:x._id,value:x.value}))}/>
+      <CategoryChart title="Emergency situations" data={reports.data.situations.map(x=>({label:x._id,value:x.value}))}/>
+    </div>
+    <div className="mt-6">
+      <CategoryChart title="Hospital activity" data={reports.data.hospitals.map(x=>({label:x.name,value:x.value}))}/>
+    </div>
+  </AdminPage></Section>;
 };
 
 export const AdminUsersPage = () => {
