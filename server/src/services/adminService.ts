@@ -11,7 +11,7 @@ import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js'
 import type { AmbulanceStatus } from '../models/Ambulance.js';
 import type { DriverAvailabilityStatus } from '../models/AmbulanceDriver.js';
 import type { AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminOverview, AdminRelationshipRef, AdminUser, Pagination } from '../types/admin.js';
-import { getLocationFreshness } from './locationService.js';
+import { getLocationFreshness } from '../schemas/location.js';
 
 type ListOptions={page:number;limit:number;sortBy:string;sortOrder:'asc'|'desc'};
 type UserFilters=ListOptions&{search?:string;status?:AccountStatus;role?:Role;city?:string;from?:Date;to?:Date};
