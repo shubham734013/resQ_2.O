@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types, startSession } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
@@ -139,13 +139,9 @@ export const getUserEmergencyRequest = async (userId: string, emergencyId: strin
   const requestId = assertId(emergencyId, 'emergency');
   const request = await EmergencyRequestModel.findOne({ _id: requestId, userId: userObjectId }).lean().exec();
   if (!request) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
-  return output(request);
-};
-
-export const cancelUserEmergencyRequest = async (userId: string, emergencyId: string) => {
+  return output(export const cancelUserEmergencyRequest = async (userId: string, emergencyId: string) => {
   const userObjectId = assertId(userId, 'user');
   const requestId = assertId(emergencyId, 'emergency');
-
   const current = await EmergencyRequestModel.findOne({ _id: requestId, userId: userObjectId }).lean().exec();
   if (!current) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
   if (!USER_CANCELLABLE_STATUSES.includes(current.status)) {
@@ -157,48 +153,104 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
     throw new AppError('TRANSPORT_ALREADY_STARTED', 'Cancellation is not allowed after patient transport has started', 409);
   }
 
-  const now = new Date();
-  const updated = await EmergencyRequestModel.findOneAndUpdate(
-    { _id: requestId, userId: userObjectId, status: current.status },
-    {
-      $set: { status: 'CANCELLED' },
-      $push: {
-        statusHistory: {
-          status: 'CANCELLED',
-          changedAt: now,
-          actorId: userObjectId,
-          actorRole: 'USER',
-          previousStatus: current.status,
+  const session = await startSession();
+  let updatedRequest: NonNullable<RequestDocument> | null = null;
+  try {
+    await session.withTransaction(async () => {
+      const now = new Date();
+      const updated = await EmergencyRequestModel.findOneAndUpdate(
+        { _id: requestId, userId: userObjectId, status: current.status },
+        {
+          $set: { status: 'CANCELLED' },
+          $push: {
+            statusHistory: {
+              status: 'CANCELLED',
+              changedAt: now,
+              actorId: userObjectId,
+              actorRole: 'USER',
+              previousStatus: current.status,
+            },
+          },
         },
-      },
-    },
-    { new: true, runValidators: true },
-  ).lean().exec();
+        { new: true, runValidators: true, session },
+      ).lean().exec();
+      if (!updated) throw new AppError('STALE_EMERGENCY_UPDATE', 'Emergency request changed before cancellation could be applied', 409);
 
-  if (!updated) throw new AppError('STALE_EMERGENCY_UPDATE', 'Emergency request changed before cancellation could be applied', 409);
+      const activeTrip = await TripModel.findOne({
+        emergencyRequestId: requestId,
+        status: { $in: EMERGENCY_ACTIVE_TRIP_STATUSES },
+      }).session(session).lean().exec();
 
-  if (trip) {
-    await TripModel.updateOne(
-      { _id: trip._id, status: { $in: EMERGENCY_ACTIVE_TRIP_STATUSES } },
-      { $set: { status: 'CANCELLED' } },
-    ).exec();
-    await Promise.all([
-      AmbulanceModel.updateOne({ _id: trip.ambulanceId, currentStatus: 'BUSY' }, { $set: { currentStatus: 'AVAILABLE' } }).exec(),
-      AmbulanceDriverModel.updateOne({ _id: trip.driverId, availabilityStatus: 'BUSY' }, { $set: { availabilityStatus: 'ONLINE' } }).exec(),
-    ]);
-  } else if (current.ambulanceId) {
-    await AmbulanceModel.updateOne({ _id: current.ambulanceId, currentStatus: 'BUSY' }, { $set: { currentStatus: 'AVAILABLE' } }).exec();
-    if (current.driverId) {
-      await AmbulanceDriverModel.updateOne({ _id: current.driverId, availabilityStatus: 'BUSY' }, { $set: { availabilityStatus: 'ONLINE' } }).exec();
-    }
+      if (activeTrip && (EMERGENCY_MATERIAL_TRANSPORT_STATUSES as readonly string[]).includes(activeTrip.status)) {
+        throw new AppError('TRANSPORT_ALREADY_STARTED', 'Cancellation is not allowed after patient transport has started', 409);
+      }
+
+      if (activeTrip) {
+        const cancelledTrip = await TripModel.findOneAndUpdate(
+          { _id: activeTrip._id, status: { $in: ['ASSIGNED', 'ACCEPTED'] } },
+          {
+            $set: { status: 'CANCELLED' },
+            $push: {
+              statusHistory: {
+                status: 'CANCELLED',
+                changedAt: now,
+                actorId: userObjectId,
+                actorRole: 'USER',
+                previousStatus: activeTrip.status,
+              },
+            },
+          },
+          { new: true, runValidators: true, session },
+        ).lean().exec();
+        if (!cancelledTrip) throw new AppError('TRIP_STATE_CONFLICT', 'Trip changed before cancellation could be applied', 409);
+
+        const ambulance = await AmbulanceModel.findOneAndUpdate(
+          { _id: activeTrip.ambulanceId, currentStatus: 'BUSY' },
+          { $set: { currentStatus: 'AVAILABLE' } },
+          { new: true, session },
+        ).lean().exec();
+        if (!ambulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state could not be released safely', 409);
+
+        if (activeTrip.driverId) {
+          const driver = await AmbulanceDriverModel.findOneAndUpdate(
+            { _id: activeTrip.driverId, availabilityStatus: 'BUSY' },
+            { $set: { availabilityStatus: 'ONLINE' } },
+            { new: true, session },
+          ).lean().exec();
+          if (!driver) throw new AppError('DRIVER_STATE_CONFLICT', 'Driver state could not be released safely', 409);
+        }
+      } else if (current.ambulanceId) {
+        const ambulance = await AmbulanceModel.findOneAndUpdate(
+          { _id: current.ambulanceId, currentStatus: 'BUSY' },
+          { $set: { currentStatus: 'AVAILABLE' } },
+          { new: true, session },
+        ).lean().exec();
+        if (!ambulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state could not be released safely', 409);
+        if (current.driverId) {
+          const driver = await AmbulanceDriverModel.findOneAndUpdate(
+            { _id: current.driverId, availabilityStatus: 'BUSY' },
+            { $set: { availabilityStatus: 'ONLINE' } },
+            { new: true, session },
+          ).lean().exec();
+          if (!driver) throw new AppError('DRIVER_STATE_CONFLICT', 'Driver state could not be released safely', 409);
+        }
+      }
+
+      const patient = await HospitalPatientModel.findOneAndUpdate(
+        { emergencyId: requestId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
+        { $set: { coordinationStatus: 'CANCELLED' }, $unset: { ambulanceId: 1, etaMinutes: 1 } },
+        { new: true, session },
+      ).lean().exec();
+      if (!patient) throw new AppError('PATIENT_CASE_CONFLICT', 'Hospital patient case could not be cancelled safely', 409);
+
+      updatedRequest = updated;
+    });
+  } finally {
+    await session.endSession();
   }
 
-  await HospitalPatientModel.updateOne(
-    { emergencyId: requestId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
-    { $set: { coordinationStatus: 'CANCELLED' }, $unset: { ambulanceId: 1, etaMinutes: 1 } },
-  ).exec();
-
-  return output(updated);
+  if (!updatedRequest) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
+  return output(updatedRequest);
 };
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^()|[\]\\]/g, '\\$&');
