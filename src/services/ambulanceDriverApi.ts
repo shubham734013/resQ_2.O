@@ -7,6 +7,7 @@ export const ambulanceDriverApi={
 getProfile:()=>request<Driver>('/ambulance-driver/profile'),
 updateProfile:(body:unknown)=>request<Driver>('/ambulance-driver/profile',{method:'PATCH',body:JSON.stringify(body)}),
 getStatus:()=>request<{status:string;updatedAt:string}>('/ambulance-driver/status'),
+updateLocation:(body:{latitude:number;longitude:number;accuracy:number;timestamp:number})=>request<{ambulanceId:string;latitude:number;longitude:number;updatedAt:string;freshness:string;accuracyMeters:number}>('/ambulance-driver/location',{method:'PATCH',body:JSON.stringify(body)}),
 updateStatus:(status:string)=>request<{status:string;updatedAt:string}>('/ambulance-driver/status',{method:'PATCH',body:JSON.stringify({status})}),
 getRequests:(p:Record<string,unknown>={})=>request<{items:AmbulanceRequest[];pagination:Pagination}>(`/ambulance-driver/requests${qs(p)}`),
 getRequest:(id:string)=>request<AmbulanceRequest>(`/ambulance-driver/requests/${encodeURIComponent(id)}`),
