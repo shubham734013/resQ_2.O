@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { env } from './config/env.js';
 import { healthRouter } from './routes/healthRoutes.js';
 import { authRouter } from './routes/authRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
@@ -13,7 +14,15 @@ import { emergencyRouter } from './routes/emergencyRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 export const app=express();
 app.disable('x-powered-by');
-app.use(cors({origin:true,credentials:true}));
+const allowedOrigins = env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) { callback(null, true); return; }
+    callback(new Error('CORS origin not allowed'));
+  },
+  credentials:true,
+}));
+app.use(express.urlencoded({extended:false,limit:'100kb'}));
 app.use(express.json({limit:'1mb'}));
 app.use('/api/v1/health',healthRouter);
 app.use('/api/v1/auth',authRouter);
