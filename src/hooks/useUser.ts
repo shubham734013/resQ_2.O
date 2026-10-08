@@ -4,6 +4,7 @@ import { userApi } from '../services/userApi';
 export const userKeys={
   profile:['user','profile'] as const,
   savedFacilities:['user','saved-facilities'] as const,
+  emergencies:(p:Record<string,unknown>)=>['user','emergencies',p] as const,
 };
 
 export const useUserProfile=()=>useQuery({queryKey:userKeys.profile,queryFn:userApi.profile,staleTime:60_000});
@@ -16,6 +17,8 @@ export const useSaveFacility=()=>{
   const qc=useQueryClient();
   return useMutation({mutationFn:userApi.saveFacility,onSuccess:()=>{void qc.invalidateQueries({queryKey:userKeys.savedFacilities});}});
 };
+export const useUserEmergencies=(params:Record<string,unknown>={})=>useQuery({queryKey:userKeys.emergencies(params),queryFn:()=>import('../services/emergencyApi').then(({emergencyApi})=>emergencyApi.list(params)),refetchInterval:15_000,staleTime:5_000});
+export const useCancelEmergency=()=>{const qc=useQueryClient();return useMutation({mutationFn:(id:string)=>import('../services/emergencyApi').then(({emergencyApi})=>emergencyApi.cancel(id)),onSuccess:()=>{void qc.invalidateQueries({queryKey:['user','emergencies']});}}};
 export const useRemoveSavedFacility=()=>{
   const qc=useQueryClient();
   return useMutation({mutationFn:userApi.removeSavedFacility,onSuccess:()=>{void qc.invalidateQueries({queryKey:userKeys.savedFacilities});}});
