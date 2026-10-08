@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
+import { EmergencyStatusHistoryModel } from '../models/EmergencyStatusHistory.js';
 import type { EmergencyRequestDocument } from '../models/EmergencyRequest.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
@@ -89,5 +90,49 @@ export const getUserEmergencyRequest = async (userId: string, emergencyId: strin
     .exec();
 
   if (!request) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
+  return output(request);
+};
+
+type EmergencyQuery = { page:number; limit:number; status?:string; from?:Date; to?:Date; search?:string };
+
+const recordHistory = async (requestId:Types.ObjectId, previousStatus:string|undefined, status:string, actorId:string|undefined, actorRole:'USER'|'HOSPITAL'|'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER'|'ADMIN'|'SYSTEM') => {
+  await EmergencyStatusHistoryModel.create({
+    emergencyRequestId:requestId,
+    actorId:actorId ? assertId(actorId,'actor') : undefined,
+    actorRole,
+    previousStatus,
+    status,
+    changedAt:new Date(),
+  });
+};
+
+export const listUserEmergencyRequests = async (userId:string, q:EmergencyQuery) => {
+  const uid=assertId(userId,'user');
+  const filter:Record<string,unknown>={userId:uid};
+  if(q.status) filter.status=q.status;
+  if(q.from||q.to) filter.reportedAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};
+  if(q.search) filter.$or=[{requestCode:new RegExp(q.search.replace(/[.*+?^()|[\]\\]/g,'\\$&'),'i')},{situationType:new RegExp(q.search.replace(/[.*+?^()|[\]\\]/g,'\\$&'),'i')}];
+  const [items,total]=await Promise.all([
+    EmergencyRequestModel.find(filter).sort({reportedAt:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),
+    EmergencyRequestModel.countDocuments(filter).exec(),
+  ]);
+  return {items:items.map(output),pagination:{page:q.page,limit:q.limit,total,totalPages:total?Math.ceil(total/q.limit):0}};
+};
+
+export const cancelUserEmergencyRequest = async (userId:string, emergencyId:string) => {
+  const uid=assertId(userId,'user');
+  const rid=assertId(emergencyId,'emergency');
+  const cancellable=['RECEIVED','REVIEWING','PREPARING'] as const;
+  const request=await EmergencyRequestModel.findOneAndUpdate(
+    {_id:rid,userId:uid,status:{$in:[...cancellable]}},
+    {$set:{status:'CANCELLED'}},
+    {new:true}
+  ).lean().exec();
+  if(!request) {
+    const existing=await EmergencyRequestModel.findOne({_id:rid,userId:uid}).select('status').lean().exec();
+    if(!existing) throw new AppError('NOT_FOUND','Emergency request not found',404);
+    throw new AppError('CANCELLATION_NOT_ALLOWED',`Emergency cannot be cancelled from status ${existing.status}`,409);
+  }
+  await recordHistory(rid, undefined, 'CANCELLED', userId, 'USER');
   return output(request);
 };
