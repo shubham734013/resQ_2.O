@@ -137,10 +137,12 @@ export const FacilityPreview = ({
               <Navigation className="w-3.5 h-3.5 text-slate-700" aria-hidden="true" />
               <span>{facility.distance}</span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-600 justify-end mt-0.5">
-              <Clock className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-              <span>{facility.estimatedTime}</span>
-            </div>
+            {facility.estimatedTime && (
+              <div className="flex items-center gap-1 text-[11px] text-slate-600 justify-end mt-0.5">
+                <Clock className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                <span>{facility.estimatedTime}</span>
+              </div>
+            )}
           </div>
         </div>
 
