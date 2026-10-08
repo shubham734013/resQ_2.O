@@ -251,4 +251,4 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
   return output(updatedRequest);
 };
 
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\const escapeRegex = (value: string) => value.replace(/[.*+?^()|[\]\\]/g, '\\$&');');
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
