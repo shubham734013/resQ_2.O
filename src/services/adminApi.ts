@@ -17,7 +17,7 @@ export class AdminApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload && typeof payload === 'object' && 'error' in payload ? (payload as { error?: { code?: string; message?: string } }).error : undefined;
@@ -73,7 +73,7 @@ export const adminApi = {
   reportsEmergencies: (params: { from?: string; to?: string }) => request<EmergencyReports>(`/admin/reports/emergencies${query(params)}`),
   reportsAnalytics: (params: { from?: string; to?: string }) => request<OperationalAnalytics>(`/admin/reports/analytics${query(params)}`),
   exportReports: async (params: { from?: string; to?: string }) => {
-    const response = await fetch(`${API_BASE}/admin/reports/export${query(params)}`, { credentials: 'include' });
+    const response = await fetch(`${API_BASE_URL}/admin/reports/export${query(params)}`, { credentials: 'include' });
     if (!response.ok) throw new AdminApiError(response.status, 'EXPORT_FAILED', 'The report export could not be generated.');
     return response.blob();
   },
