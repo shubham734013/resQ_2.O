@@ -13,5 +13,9 @@ const userId=(req:Request)=>{
 export const getProfile=async(req:Request,res:Response)=>sendSuccess(res,await getUserProfile((req as AuthenticatedRequest).auth!));
 export const updateProfile=async(req:Request,res:Response)=>sendSuccess(res,await updateUserProfile((req as AuthenticatedRequest).auth!,req.body));
 export const listSavedFacilities=async(req:Request,res:Response)=>sendSuccess(res,await userService.listSavedFacilities(userId(req)));
-export const addSavedFacility=async(req:Request,res:Response)=>sendSuccess(res,await userService.addSavedFacility(userId(req),String(req.params.facilityId)));
+export const addSavedFacility=async(req:Request,res:Response)=>{
+  const fid=req.params.facilityId??(req.body as {facilityId?:string})?.facilityId;
+  if(!fid)throw new Error('facilityId is required');
+  sendSuccess(res,await userService.addSavedFacility(userId(req),String(fid)));
+};
 export const removeSavedFacility=async(req:Request,res:Response)=>sendSuccess(res,await userService.removeSavedFacility(userId(req),String(req.params.facilityId)));

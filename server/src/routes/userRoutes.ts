@@ -18,5 +18,6 @@ userRouter.use(authenticate,authorizeRole('USER'));
 userRouter.get('/profile',getProfile);
 userRouter.patch('/profile',validateBody(userProfileUpdateSchema),updateProfile);
 userRouter.get('/saved-facilities',listSavedFacilities);
+userRouter.post('/saved-facilities',validateBody(z.object({facilityId:z.string().regex(/^[0-9a-fA-F]{24}$/,'Invalid facility id')}).strict()),addSavedFacility);
 userRouter.post('/saved-facilities/:facilityId',validateFacilityParam,addSavedFacility);
 userRouter.delete('/saved-facilities/:facilityId',validateFacilityParam,removeSavedFacility);
