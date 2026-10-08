@@ -2,7 +2,11 @@ import { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 
-export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request, res: Response, next: NextFunction): void => {
+const writeLog = (payload: Record<string, unknown>): void => {
+  process.stderr.write(JSON.stringify({ timestamp: new Date().toISOString(), service: 'resq-api', ...payload }) + '\n');
+};
+
+export const errorHandler: ErrorRequestHandler = (error: unknown, req: Request, res: Response, next: NextFunction): void => {
   void next;
 
   if (error instanceof z.ZodError) {
@@ -33,8 +37,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request,
   const message = statusCode >= 500 ? 'Internal server error' : err.message;
   const details = 'details' in err ? err.details : undefined;
 
-  if (statusCode >= 500) console.error(error);
-  else console.warn(`${code}: ${message}`);
+  writeLog({ level: statusCode >= 500 ? 'error' : 'warn', code, statusCode, method: req.method, path: req.path });
 
   res.status(statusCode).json({
     success: false,
