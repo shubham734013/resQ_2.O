@@ -3,7 +3,7 @@ import type { Facility } from '../types/facility';
 const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(API_BASE + path, { credentials: 'include' });
+  const response = await fetch(API_BASE_URL + path, { credentials: 'include' });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String((payload as { error?: { message?: string } }).error?.message ?? 'Facility request failed') : 'Facility request failed');
   if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new Error('Invalid facility response');
