@@ -70,8 +70,8 @@ export const AmbulancePage=()=>{
  const complete=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.completeTrip(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
 
  const routeDestination=activeTrip?.status==='TO_HOSPITAL' || activeTrip?.status==='AT_HOSPITAL'
-   ? (activeRequest.data && typeof activeRequest.data.latitude==='number' && typeof activeRequest.data.longitude==='number'
-      ? {latitude:activeRequest.data.latitude,longitude:activeRequest.data.longitude}:null)
+   ? (activeRequest.data && typeof activeRequest.data.hospitalLatitude==='number' && typeof activeRequest.data.hospitalLongitude==='number'
+      ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:null)
    : destination;
 
  if(routeMode==='request' && selectedRequest) return <AmbulanceLayout><div className="mx-auto w-full max-w-2xl px-4 py-8"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Incoming emergency</p><h1 className="mt-1 text-3xl font-bold">Emergency request</h1><div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 space-y-4"><div><p className="text-xs text-slate-500">Request</p><p className="font-semibold">{selectedRequest.requestCode}</p></div><div><p className="text-xs text-slate-500">Situation</p><p className="font-semibold">{selectedRequest.situationType}</p></div><div><p className="text-xs text-slate-500">Pickup</p><p className="font-semibold">{selectedRequest.location??'Coordinates provided by dispatch'}</p></div><div><p className="text-xs text-slate-500">Hospital</p><p className="font-semibold">Destination hospital ID: {selectedRequest.hospitalId}</p></div></div><div className="mt-5 grid gap-2 sm:grid-cols-2"><Button size="lg" variant="emergency" fullWidth onClick={()=>accept.mutate(selectedRequest.id)} disabled={accept.isPending}>Accept Request</Button><Button size="lg" variant="secondary" fullWidth onClick={()=>reject.mutate(selectedRequest.id)} disabled={reject.isPending}>Reject</Button></div></div></AmbulanceLayout>;
