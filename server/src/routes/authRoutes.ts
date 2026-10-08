@@ -9,6 +9,7 @@ import { ambulanceDriverRegistrationSchema, ambulanceProviderRegistrationSchema,
 export const authRouter=Router();
 const authLimiter=rateLimit({windowMs:15*60*1000,max:20,keyPrefix:'auth'});
 const adminLimiter=rateLimit({windowMs:15*60*1000,max:10,keyPrefix:'admin-auth'});
+const refreshLimiter=rateLimit({windowMs:15*60*1000,max:30,keyPrefix:'refresh'});
 authRouter.post('/register/user',authLimiter,validateBody(userRegistrationSchema),registerUserController);
 authRouter.post('/register/hospital',authLimiter,validateBody(hospitalRegistrationSchema),registerHospitalController);
 authRouter.post('/register/ambulance-provider',authLimiter,validateBody(ambulanceProviderRegistrationSchema),registerAmbulanceProviderController);
@@ -23,4 +24,4 @@ authRouter.patch('/driver/profile',authenticate,authorizeRole('AMBULANCE_DRIVER'
 authRouter.patch('/provider/profile',authenticate,authorizeRole('AMBULANCE_PROVIDER'),validateBody(providerProfileSchema),providerProfileController);
 authRouter.get('/me',authenticate,meController);
 authRouter.post('/logout',logoutController);
-authRouter.post('/refresh',refreshController);
+authRouter.post('/refresh',refreshLimiter,refreshController);
