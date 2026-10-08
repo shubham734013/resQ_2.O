@@ -18,13 +18,13 @@ export interface Facility {
   type: string;
   category: 'emergency' | 'trauma' | 'urgent_care' | 'pediatric';
   distance: string;
-  distanceMeters: number;
+  distanceMeters?: number;
   estimatedTime: string;
   emergencyAvailable: boolean;
   verified: boolean;
   lastUpdated: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
   address: string;
   phone: string;
   openStatus: string;
