@@ -65,5 +65,17 @@ export const listProviderTrips=async(pid:string,q:TripQuery)=>{await operational
 export const getProviderTrip=async(pid:string,id:string)=>{await operationalProvider(pid);const x=await TripModel.findOne({_id:oid(id,'trip'),providerId:oid(pid,'provider')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Trip not found',404);return tripOut(x);};
 export const getDriverProfile=async(id:string)=>driverOut(await operationalDriver(id));
 export const updateDriverProfile=async(id:string,input:z.infer<typeof S.driverUpdateSchema>)=>{const d=await operationalDriver(id);const {password: _password,...profileUpdate}=input;void _password;const update:Partial<AmbulanceDriverDocument>={...profileUpdate};const x=await AmbulanceDriverModel.findByIdAndUpdate(d._id,{$set:update},{new:true,runValidators:true}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
+export const updateDriverLocation=async(did:string,input:z.infer<typeof S.ambulanceLocationUpdateSchema>)=>{
+ const d=await operationalDriver(did);
+ if(!d.assignedAmbulanceId) throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED','Driver has no assigned ambulance',409);
+ if(d.availabilityStatus!=='BUSY') throw new AppError('DRIVER_NOT_ON_TRIP','Location updates are allowed only while the driver is operational',409);
+ const a=await AmbulanceModel.findOneAndUpdate(
+   {_id:d.assignedAmbulanceId,providerId:d.providerId,verificationStatus:'VERIFIED',accountStatus:'ACTIVE'},
+   {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:input.timestamp}},
+   {new:true}
+ ).lean().exec();
+ if(!a) throw new AppError('AMBULANCE_UNAVAILABLE','Assigned ambulance is not operational',409);
+ return {ambulanceId:String(a._id),latitude:a.currentLatitude,longitude:a.currentLongitude,accuracy:input.accuracy,locationUpdatedAt:a.locationUpdatedAt,updatedAt:a.updatedAt};
+};
 export const getDriverStatus=async(id:string)=>{const d=await AmbulanceDriverModel.findById(oid(id,'driver')).lean().exec();if(!d)throw new AppError('NOT_FOUND','Driver not found',404);return {status:d.availabilityStatus,updatedAt:d.updatedAt};};
 export const updateDriverStatus=async(id:string,status:DriverAvailabilityStatus)=>{const d=await operationalDriver(id);const activeTrip=await TripModel.exists({driverId:d._id,status:{$in:activeTripStatuses}});if(status==='BUSY'&&!activeTrip)throw new AppError('INVALID_DRIVER_STATUS','Driver cannot be BUSY without an active trip',409);if(status==='OFFLINE'&&activeTrip)throw new AppError('DRIVER_ON_ACTIVE_TRIP','Driver cannot go offline during an active trip',409);const x=await AmbulanceDriverModel.findByIdAndUpdate(d._id,{$set:{availabilityStatus:status}},{new:true}).lean().exec();return {status:x!.availabilityStatus,updatedAt:x!.updatedAt};};
