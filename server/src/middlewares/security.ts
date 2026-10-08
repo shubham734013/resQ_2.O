@@ -13,7 +13,7 @@ export const originGuard = (req: Request, _res: Response, next: NextFunction): v
     return;
   }
   const allowed = getAllowedOrigins();
-  if (!allowed.length || allowed.includes(origin)) {
+  if (allowed.includes(origin)) {
     next();
     return;
   }
@@ -31,7 +31,7 @@ export const mutationOriginGuard = (req: Request, _res: Response, next: NextFunc
     return;
   }
   const allowed = getAllowedOrigins();
-  if (allowed.length && !allowed.includes(origin)) {
+  if (!allowed.includes(origin)) {
     next(new AppError('CSRF_ORIGIN_BLOCKED', 'Request origin is not allowed for this operation', 403));
     return;
   }
