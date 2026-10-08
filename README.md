@@ -1,75 +1,36 @@
-# React + TypeScript + Vite
+# ResQ 2.0
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ResQ is a healthcare emergency coordination platform connecting users, verified hospitals, ambulance providers, ambulance drivers, and administrators through shared backend state.
 
-Currently, two official plugins are available:
+## Stack
+Frontend: React, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query, Framer Motion, Lucide React.
+Backend: Node.js, Express, TypeScript, MongoDB, Mongoose, Zod, JWT, bcrypt.
+Maps: Google Maps JavaScript API, Places API, Routes API, Geocoding, browser geolocation, MongoDB GeoJSON.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Roles
+USER, HOSPITAL, AMBULANCE_PROVIDER, AMBULANCE_DRIVER, ADMIN.
 
-## React Compiler
+## Operational model
+Emergency requests are persisted in MongoDB and use RECEIVED, REVIEWING, PREPARING, AMBULANCE_COORDINATION, RESOLVED, and CANCELLED states. Ambulance trips use ASSIGNED, ACCEPTED, TO_PICKUP, AT_PICKUP, PATIENT_ONBOARD, TO_HOSPITAL, AT_HOSPITAL, COMPLETED, and CANCELLED states.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The backend enforces role and ownership checks. Dispatch and driver acceptance use conditional MongoDB updates to protect against stale concurrent writes.
 
-## Expanding the ESLint configuration
+## Live ambulance location
+An authenticated assigned driver can publish device location through PATCH /api/v1/ambulance-driver/location. Latitude, longitude, accuracy, and timestamp are validated, and coordinates are persisted as GeoJSON.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## User emergency APIs
+POST /api/v1/emergencies
+GET /api/v1/emergencies
+GET /api/v1/emergencies/:id
+POST /api/v1/emergencies/:id/cancel
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Environment
+Frontend: configure VITE_API_BASE_URL plus required Google/Microsoft client values.
+Backend: configure MONGODB_URI, JWT secrets, admin credentials, Google/Microsoft settings, and comma-separated CORS_ORIGINS.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Development
+Frontend: npm install, npm run typecheck, npm run lint, npm run build.
+Backend: cd server, npm install, npm run typecheck, npm run lint, npm test, npm run build.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+## Product boundary
+ResQ does not claim guaranteed admission, ICU capacity, treatment, ambulance availability, fabricated ETAs, or fabricated locations. Operational UI must be backed by persisted backend state.
