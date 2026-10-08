@@ -12,7 +12,7 @@ import { AppError } from '../utils/AppError.js';
 import { verifySocialCredential, type VerifiedSocialIdentity } from '../providers/socialIdentity.js';
 import type { AuthenticatedIdentity, SocialProvider, JwtClaims } from '../types/auth.js';
 import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js';
-import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, DriverProfileInput, ProviderProfileInput } from '../schemas/auth.js';
+import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, DriverProfileInput, ProviderProfileInput, UserProfileUpdateInput } from '../schemas/auth.js';
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
@@ -128,40 +128,32 @@ const identityFromDocument=(doc:{_id:{toString():string};email:string;name?:stri
 
 export const registerUser=async(input:UserRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await UserModel.create({...input,email:normalizeEmail(input.email),passwordHash,role:'USER',accountStatus:'ACTIVE',authProvider:'LOCAL'});
+  const a=await UserModel.create({...input,email:normalizeEmail(input.email),passwordHash,role:'USER',accountStatus:'ACTIVE',authProvider:'LOCAL',savedFacilityIds:[]});
   return identityFromDocument(a,'USER');
 };
 export const registerHospital=async(input:HospitalRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await HospitalModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING'});
-  return identityFromDocument(a,'HOSPITAL');
+  const a=await HospitalModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING'}); return identityFromDocument(a,'HOSPITAL');
 };
 export const registerAmbulanceProvider=async(input:AmbulanceProviderRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await AmbulanceProviderModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'});
-  return identityFromDocument(a,'AMBULANCE_PROVIDER');
+  const a=await AmbulanceProviderModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'}); return identityFromDocument(a,'AMBULANCE_PROVIDER');
 };
 export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueLicenseNumber(input.licenseNumber);
   if(!await AmbulanceProviderModel.exists({_id:input.providerId})) throw new AppError('PROVIDER_NOT_FOUND','Ambulance provider was not found',404);
+  const provider = await AmbulanceProviderModel.findOne({_id:input.providerId,accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).lean().exec();
+  if(!provider) throw new AppError('PROVIDER_NOT_OPERATIONAL','Driver cannot be registered against an inactive or unverified provider',409);
   const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await AmbulanceDriverModel.create({...input,email:normalizeEmail(input.email),passwordHash,licenseVerificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'});
-  return identityFromDocument(a,'AMBULANCE_DRIVER');
+  const a=await AmbulanceDriverModel.create({...input,email:normalizeEmail(input.email),passwordHash,licenseVerificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'}); return identityFromDocument(a,'AMBULANCE_DRIVER');
 };
 
-export const login=async(input:LoginInput)=>{
-  const a=await findAccountByEmail(input.email); if(!a||!a.passwordHash) throw INVALID_CREDENTIALS; if(!(await bcrypt.compare(input.password,a.passwordHash))) throw INVALID_CREDENTIALS;
-  assertLoginAllowed(a.accountStatus); return createAuthResult(a);
-};
-export const adminLogin=async(input:LoginInput)=>{
-  if(normalizeEmail(input.email)!==normalizeEmail(env.RESQ_ADMIN_EMAIL)) throw INVALID_CREDENTIALS;
-  const a=await findUserAccountByEmail(input.email); if(!a||a.role!=='ADMIN'||!a.passwordHash) throw INVALID_CREDENTIALS;
-  if(!(await bcrypt.compare(input.password,a.passwordHash))) throw INVALID_CREDENTIALS; assertLoginAllowed(a.accountStatus); return createAuthResult(a);
-};
+export const login=async(input:LoginInput)=>{const a=await findAccountByEmail(input.email);if(!a||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
+export const adminLogin=async(input:LoginInput)=>{if(normalizeEmail(input.email)!==normalizeEmail(env.RESQ_ADMIN_EMAIL))throw INVALID_CREDENTIALS;const a=await findUserAccountByEmail(input.email);if(!a||a.role!=='ADMIN'||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
 
 const createSocialAccount=async(identity:VerifiedSocialIdentity,role:'USER'|'AMBULANCE_PROVIDER'):Promise<AccountWithPassword>=>{
   if(role==='USER'){
-    const a=await UserModel.create({name:identity.name,email:identity.email,authProvider:identity.provider,providerSubject:identity.providerSubject,role:'USER',accountStatus:'ACTIVE',emailVerified:true});
+    const a=await UserModel.create({name:identity.name,email:identity.email,authProvider:identity.provider,providerSubject:identity.providerSubject,role:'USER',accountStatus:'ACTIVE',emailVerified:true,savedFacilityIds:[]});
     return accountFrom(a._id.toString(),a.email,a.name,'USER','ACTIVE');
   }
   const registrationNumber='SOCIAL-'+randomUUID();
@@ -171,75 +163,55 @@ const createSocialAccount=async(identity:VerifiedSocialIdentity,role:'USER'|'AMB
 
 export const socialLogin=async(provider:SocialProvider,credential:string,roleHint:'USER'|'AMBULANCE_PROVIDER'='USER')=>{
   const verified=await verifySocialCredential(provider,credential);
-  const legacyLinked=(await UserModel.findOne({authProvider:provider,providerSubject:verified.providerSubject}).select('+passwordHash').exec()) ??
-    (await AmbulanceProviderModel.findOne({authProvider:provider,providerSubject:verified.providerSubject}).select('+passwordHash').exec());
+  const legacyLinked=(await UserModel.findOne({authProvider:provider,providerSubject:verified.providerSubject}).select('+passwordHash').exec()) ?? (await AmbulanceProviderModel.findOne({authProvider:provider,providerSubject:verified.providerSubject}).select('+passwordHash').exec());
   const linked=await ExternalIdentityModel.findOne({provider,providerSubject:verified.providerSubject}).exec();
-  if(linked){
-    if(linked.role!==roleHint) throw new AppError('ROLE_MISMATCH','This social identity is linked to a different ResQ role',409);
-    const account=await findByIdentity({id:linked.accountId,email:linked.email,role:linked.role,accountStatus:'ACTIVE'});
-    if(!account) throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND','The linked ResQ account could not be found',401);
-    return createAuthResult(account);
-  }
-  if(legacyLinked) {
-    const account = await findAccountByEmail(verified.email);
-    if (!account) throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND','The linked ResQ account could not be found',401);
-    if(account.role!==roleHint) throw new AppError('ROLE_MISMATCH','This social identity is linked to a different ResQ role',409);
-    await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:account.email});
-    return createAuthResult(account);
-  }
-  const existing=await findAccountByEmail(verified.email);
-  if(existing) throw new AppError('ACCOUNT_LINKING_REQUIRED','A ResQ account already exists with this email. Sign in to that account and link this provider before using social sign-in.',409);
-  const account=await createSocialAccount(verified,roleHint);
-  await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:verified.email});
-  return createAuthResult(account);
+  if(linked){if(linked.role!==roleHint)throw new AppError('ROLE_MISMATCH','This social identity is linked to a different ResQ role',409);const account=await findByIdentity({id:linked.accountId,email:linked.email,role:linked.role,accountStatus:'ACTIVE'});if(!account)throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND','The linked ResQ account could not be found',401);return createAuthResult(account);}
+  if(legacyLinked){const account=await findAccountByEmail(verified.email);if(!account)throw new AppError('SOCIAL_ACCOUNT_NOT_FOUND','The linked ResQ account could not be found',401);if(account.role!==roleHint)throw new AppError('ROLE_MISMATCH','This social identity is linked to a different ResQ role',409);await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:account.email});return createAuthResult(account);}
+  const existing=await findAccountByEmail(verified.email);if(existing)throw new AppError('ACCOUNT_LINKING_REQUIRED','A ResQ account already exists with this email. Sign in to that account and link this provider before using social sign-in.',409);
+  const account=await createSocialAccount(verified,roleHint);await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:verified.email});return createAuthResult(account);
 };
-
 export const linkSocialAccount=async(identity:AuthenticatedIdentity,provider:SocialProvider,credential:string)=>{
-  const account=await findByIdentity(identity); if(!account) throw new AppError('UNAUTHORIZED','Authenticated account was not found',401);
-  const verified=await verifySocialCredential(provider,credential);
-  if(verified.email!==account.email) throw new AppError('ACCOUNT_LINKING_REQUIRED','The verified provider email must match your ResQ account email',409);
-  const occupied=await ExternalIdentityModel.findOne({provider,providerSubject:verified.providerSubject}).exec();
-  if(occupied&&occupied.accountId!==account.id) throw new AppError('SOCIAL_IDENTITY_ALREADY_LINKED','This provider identity is already linked to another ResQ account',409);
-  const existingForAccount=await ExternalIdentityModel.findOne({accountId:account.id,provider}).exec();
-  if(existingForAccount&&existingForAccount.providerSubject!==verified.providerSubject) throw new AppError('PROVIDER_ALREADY_LINKED','Another identity for this provider is already linked',409);
-  if(!occupied) await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:account.email});
-  return publicIdentity(account);
+  const account=await findByIdentity(identity);if(!account)throw new AppError('UNAUTHORIZED','Authenticated account was not found',401);const verified=await verifySocialCredential(provider,credential);if(verified.email!==account.email)throw new AppError('ACCOUNT_LINKING_REQUIRED','The verified provider email must match your ResQ account email',409);
+  const occupied=await ExternalIdentityModel.findOne({provider,providerSubject:verified.providerSubject}).exec();if(occupied&&occupied.accountId!==account.id)throw new AppError('SOCIAL_IDENTITY_ALREADY_LINKED','This provider identity is already linked to another ResQ account',409);
+  const existingForAccount=await ExternalIdentityModel.findOne({accountId:account.id,provider}).exec();if(existingForAccount&&existingForAccount.providerSubject!==verified.providerSubject)throw new AppError('PROVIDER_ALREADY_LINKED','Another identity for this provider is already linked',409);
+  if(!occupied)await ExternalIdentityModel.create({provider,providerSubject:verified.providerSubject,accountId:account.id,role:account.role,email:account.email});return publicIdentity(account);
 };
 
-const driverFieldsComplete=(d:{fullName?:string;phone?:string;licenseNumber?:string;address?:string;city?:string;state?:string;country?:string;registeredLatitude?:number;registeredLongitude?:number}) =>
-  Boolean(d.fullName&&d.phone&&d.licenseNumber&&d.address&&d.city&&d.state&&d.country&&typeof d.registeredLatitude==='number'&&typeof d.registeredLongitude==='number');
-
+const driverFieldsComplete=(d:Partial<DriverProfileInput>) => Boolean(d.fullName&&d.phone&&d.licenseNumber&&d.address&&d.city&&d.state&&d.country&&typeof d.registeredLatitude==='number'&&typeof d.registeredLongitude==='number');
 export const updateDriverProfile=async(identity:AuthenticatedIdentity,input:DriverProfileInput)=>{
-  if(identity.role!=='AMBULANCE_DRIVER') throw new AppError('FORBIDDEN','Only drivers can update driver profiles',403);
-  const a=await AmbulanceDriverModel.findById(identity.id).exec(); if(!a) throw new AppError('UNAUTHORIZED','Driver account was not found',401);
-  if(await AmbulanceDriverModel.exists({licenseNumber:input.licenseNumber,_id:{$ne:a._id}})) throw new AppError('LICENSE_NUMBER_ALREADY_EXISTS','License number is already in use',409);
-  a.fullName=input.fullName;a.phone=input.phone;a.licenseNumber=input.licenseNumber;a.address=input.address;a.city=input.city;a.state=input.state;a.country=input.country;
-  a.registeredLatitude=input.registeredLatitude;a.registeredLongitude=input.registeredLongitude;a.profileCompletionStatus=driverFieldsComplete(input)?'COMPLETE':'INCOMPLETE'; await a.save();
+  if(identity.role!=='AMBULANCE_DRIVER')throw new AppError('FORBIDDEN','Only drivers can update driver profiles',403);const a=await AmbulanceDriverModel.findById(identity.id).exec();if(!a)throw new AppError('UNAUTHORIZED','Driver account was not found',401);
+  if(await AmbulanceDriverModel.exists({licenseNumber:input.licenseNumber,_id:{$ne:a._id}}))throw new AppError('LICENSE_NUMBER_ALREADY_EXISTS','License number is already in use',409);
+  a.fullName=input.fullName;a.phone=input.phone;a.licenseNumber=input.licenseNumber;a.address=input.address;a.city=input.city;a.state=input.state;a.country=input.country;a.registeredLatitude=input.registeredLatitude;a.registeredLongitude=input.registeredLongitude;a.profileCompletionStatus=driverFieldsComplete(input)?'COMPLETE':'INCOMPLETE';await a.save();
   return publicIdentity(accountFrom(a._id.toString(),a.email,a.fullName,'AMBULANCE_DRIVER',a.accountStatus,undefined,{profileCompletionStatus:a.profileCompletionStatus,licenseVerificationStatus:a.licenseVerificationStatus}));
 };
 export const updateProviderProfile=async(identity:AuthenticatedIdentity,input:ProviderProfileInput)=>{
-  if(identity.role!=='AMBULANCE_PROVIDER') throw new AppError('FORBIDDEN','Only providers can update provider profiles',403);
-  const a=await AmbulanceProviderModel.findById(identity.id).exec(); if(!a) throw new AppError('UNAUTHORIZED','Provider account was not found',401);
-  const duplicate=await AmbulanceProviderModel.findOne({registrationNumber:input.registrationNumber,_id:{$ne:a._id}}).exec();
-  if(duplicate) throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS','Registration number is already in use',409);
-  a.name=input.name;a.phone=input.phone;a.registrationNumber=input.registrationNumber;a.serviceType=input.serviceType;a.address=input.address;a.city=input.city;a.state=input.state;a.country=input.country;
-  a.latitude=input.latitude;a.longitude=input.longitude;a.profileCompletionStatus='COMPLETE'; await a.save();
+  if(identity.role!=='AMBULANCE_PROVIDER')throw new AppError('FORBIDDEN','Only providers can update provider profiles',403);const a=await AmbulanceProviderModel.findById(identity.id).exec();if(!a)throw new AppError('UNAUTHORIZED','Provider account was not found',401);
+  const duplicate=await AmbulanceProviderModel.findOne({registrationNumber:input.registrationNumber,_id:{$ne:a._id}}).exec();if(duplicate)throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS','Registration number is already in use',409);
+  a.name=input.name;a.phone=input.phone;a.registrationNumber=input.registrationNumber;a.serviceType=input.serviceType;a.address=input.address;a.city=input.city;a.state=input.state;a.country=input.country;a.latitude=input.latitude;a.longitude=input.longitude;a.profileCompletionStatus='COMPLETE';await a.save();
   return publicIdentity(accountFrom(a._id.toString(),a.email,a.name,'AMBULANCE_PROVIDER',a.accountStatus,undefined,{verificationStatus:a.verificationStatus,profileCompletionStatus:'COMPLETE'}));
 };
 
+export const getUserProfile=async(identity:AuthenticatedIdentity)=>{
+  if(identity.role!=='USER')throw new AppError('FORBIDDEN','Only users can access the user profile',403);
+  const user=await UserModel.findById(identity.id).select('-passwordHash').lean().exec();if(!user)throw new AppError('UNAUTHORIZED','User account was not found',401);
+  return {id:String(user._id),name:user.name,email:user.email,phone:user.phone,address:user.address,city:user.city,state:user.state,country:user.country,latitude:user.latitude,longitude:user.longitude,createdAt:user.createdAt,updatedAt:user.updatedAt};
+};
+
+export const updateUserProfile=async(identity:AuthenticatedIdentity,input:UserProfileUpdateInput)=>{
+  if(identity.role!=='USER')throw new AppError('FORBIDDEN','Only users can update the user profile',403);
+  const user=await UserModel.findById(identity.id).exec();if(!user)throw new AppError('UNAUTHORIZED','User account was not found',401);
+  if(input.phone&&input.phone!==user.phone&&await UserModel.exists({phone:input.phone,_id:{$ne:user._id}}))throw new AppError('PHONE_ALREADY_EXISTS','Phone number is already in use',409);
+  const update={...input};Object.assign(user,update);await user.save();
+  return getUserProfile(identity);
+};
+
 export const authenticateAccessToken=async(token:string)=>{
-  const c=verifyToken(token,env.JWT_SECRET,'access');
-  const identity:AuthenticatedIdentity={id:c.sub,email:c.email,name:c.name??c.email,role:c.role,accountStatus:c.accountStatus,verificationStatus:c.verificationStatus,profileCompletionStatus:c.profileCompletionStatus,licenseVerificationStatus:c.licenseVerificationStatus};
-  const account=await findByIdentity(identity);
-  if(!account||account.email!==identity.email||account.role!==identity.role) throw new AppError('INVALID_TOKEN','Authentication token is invalid',401);
-  assertLoginAllowed(account.accountStatus);
-  return publicIdentity(account);
+  const c=verifyToken(token,env.JWT_SECRET,'access');const identity:AuthenticatedIdentity={id:c.sub,email:c.email,name:c.name??c.email,role:c.role,accountStatus:c.accountStatus,verificationStatus:c.verificationStatus,profileCompletionStatus:c.profileCompletionStatus,licenseVerificationStatus:c.licenseVerificationStatus};
+  const account=await findByIdentity(identity);if(!account||account.email!==identity.email||account.role!==identity.role)throw new AppError('INVALID_TOKEN','Authentication token is invalid',401);assertLoginAllowed(account.accountStatus);return publicIdentity(account);
 };
 export const refreshAuthentication=async(refreshToken:string)=>{
-  const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh'); if(!c.jti) throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);
-  const s=await AuthSessionModel.findOne({tokenId:c.jti}).select('+tokenHash').exec(); if(!s||s.tokenHash!==hashToken(refreshToken)) throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);
-  const account=await findByIdentity({id:c.sub,email:c.email,name:c.name??c.email,role:c.role,accountStatus:c.accountStatus}); if(!account) throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);
-  assertLoginAllowed(account.accountStatus); await AuthSessionModel.deleteOne({_id:s._id}).exec(); return createAuthResult(account);
+  const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh');if(!c.jti)throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);const s=await AuthSessionModel.findOne({tokenId:c.jti}).select('+tokenHash').exec();if(!s||s.tokenHash!==hashToken(refreshToken))throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);
+  const account=await findByIdentity({id:c.sub,email:c.email,name:c.name??c.email,role:c.role,accountStatus:c.accountStatus});if(!account)throw new AppError('INVALID_TOKEN','Refresh token is invalid',401);assertLoginAllowed(account.accountStatus);await AuthSessionModel.deleteOne({_id:s._id}).exec();return createAuthResult(account);
 };
-export const logout=async(refreshToken:string|undefined)=>{if(!refreshToken)return;try{const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh');if(c.jti)await AuthSessionModel.deleteOne({tokenId:c.jti}).exec();}catch(error: unknown) { void error; }};
+export const logout=async(refreshToken:string|undefined)=>{if(!refreshToken)return;try{const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh');if(c.jti)await AuthSessionModel.deleteOne({tokenId:c.jti}).exec();}catch(error:unknown){void error;}};
 export const getCurrentUser=async(identity:AuthenticatedIdentity)=>{const a=await findByIdentity(identity);if(!a)throw new AppError('UNAUTHORIZED','Authenticated account was not found',401);return publicIdentity(a);};
