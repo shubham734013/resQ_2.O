@@ -4,8 +4,6 @@ import { HospitalModel } from '../models/Hospital.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
-import { TripModel } from '../models/Trip.js';
-import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type { adminEmergencyListQuerySchema } from '../schemas/admin.js';
