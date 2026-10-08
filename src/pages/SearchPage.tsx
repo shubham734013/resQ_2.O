@@ -51,19 +51,20 @@ export const SearchPage = () => {
     setEmergencyOnly(false);
   };
 
+  const locatedFacilities = facilities.filter((facility): facility is Facility & { latitude: number; longitude: number } =>
+    typeof facility.latitude === 'number' && typeof facility.longitude === 'number'
+  );
   const mapMarkers = useMemo(
-    () => facilities
-      .filter((facility) => Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude))
-      .map((facility) => ({
-        id: facility.id,
-        latitude: facility.latitude,
-        longitude: facility.longitude,
-        title: facility.name,
-        subtitle: facility.openStatus,
-        isEmergency: facility.emergencyAvailable,
-        onClick: () => setSelectedFacilityId(facility.id),
-      })),
-    [facilities, setSelectedFacilityId],
+    () => locatedFacilities.map((facility) => ({
+      id: facility.id,
+      latitude: facility.latitude,
+      longitude: facility.longitude,
+      title: facility.name,
+      subtitle: facility.openStatus,
+      isEmergency: facility.emergencyAvailable,
+      onClick: () => setSelectedFacilityId(facility.id),
+    })),
+    [locatedFacilities, setSelectedFacilityId],
   );
 
   const mapCenter = hasLocation
