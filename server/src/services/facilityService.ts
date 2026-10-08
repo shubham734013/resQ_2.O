@@ -86,10 +86,14 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
   if (andFilters.length) baseFilter.$and = andFilters;
 
   if (query.latitude !== undefined && query.longitude !== undefined) {
+    const near: { type: 'Point'; coordinates: [number, number] } = {
+      type: 'Point',
+      coordinates: [query.longitude, query.latitude],
+    };
     const pipeline = [
       {
         $geoNear: {
-          near: { type: 'Point', coordinates: [query.longitude, query.latitude] },
+          near,
           key: 'location',
           distanceField: 'distanceMeters',
           spherical: true,
