@@ -6,7 +6,7 @@ import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitive
 import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
 import { EmergencyTable } from '../components/admin/AdminTables';
 import { Button } from '../components/common/Button';
-import { useAdminAmbulances, useAdminDrivers, useAdminHospitals, useAdminOverview, useAdminProviders, useAdminReportOverview, useAdminEmergencyReports, useAdminAnalytics, useAdminUsers, useUpdateDriverStatus, useUpdateDriverVerification, useUpdateHospitalStatus, useUpdateHospitalVerification, useUpdateProviderStatus, useUpdateProviderVerification, useUpdateUserStatus } from '../hooks/useAdminManagement';
+import { useAdminAmbulances, useAdminDrivers, useAdminHospitals, useAdminOverview, useAdminProviders, useAdminReportOverview, useAdminEmergencyReports, useAdminAnalytics, useAdminUsers, useAdminEmergencies, useUpdateAmbulanceStatus, useUpdateAmbulanceVerification, useUpdateDriverStatus, useUpdateDriverVerification, useUpdateHospitalStatus, useUpdateHospitalVerification, useUpdateProviderStatus, useUpdateProviderVerification, useUpdateUserStatus } from '../hooks/useAdminManagement';
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 import { adminApi } from '../services/adminApi';
 
