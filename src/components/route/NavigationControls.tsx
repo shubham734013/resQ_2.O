@@ -2,8 +2,6 @@ import {
   Phone,
   X,
   LocateFixed,
-  FastForward,
-  CheckCircle2,
   Clock,
   Navigation,
 } from 'lucide-react';
@@ -22,7 +20,6 @@ export interface NavigationControlsProps {
   onRecenter: () => void;
   onCallFacility: () => void;
   onEndNavigation: () => void;
-  onSimulateArrival: () => void;
   isEmergency?: boolean;
   className?: string;
 }
@@ -39,7 +36,6 @@ export const NavigationControls = ({
   onRecenter,
   onCallFacility,
   onEndNavigation,
-  onSimulateArrival,
   isEmergency = false,
   className = '',
 }: NavigationControlsProps) => {
@@ -101,7 +97,7 @@ export const NavigationControls = ({
         </div>
       </div>
 
-      {/* Primary Action Controls: End Navigation, Step Simulation, Arrive */}
+      {/* Primary Action Controls */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
         {/* End Navigation Button */}
         <div className="sm:col-span-4">
