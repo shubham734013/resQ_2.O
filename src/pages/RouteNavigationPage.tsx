@@ -73,8 +73,8 @@ export const RouteNavigationPage = () => {
 
   // Compute calculated arrival clock time (e.g. 11 min from session start)
   const etaClockTime = useMemo(() => {
-    const minToAdd = activeRoute?.durationSeconds ? Math.round(activeRoute.durationSeconds / 60) : 10;
-    const arrivalDate = new Date(sessionStartTime + minToAdd * 60 * 1000);
+    if (!activeRoute?.durationSeconds) return null;
+    const arrivalDate = new Date(sessionStartTime + Math.round(activeRoute.durationSeconds / 60) * 60 * 1000);
     return arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }, [activeRoute, sessionStartTime]);
 
@@ -96,10 +96,6 @@ export const RouteNavigationPage = () => {
     } else {
       setCurrentStepIndex((prev) => prev + 1);
     }
-  };
-
-  const handleSimulateArrival = () => {
-    setNavigationMode('arrived');
   };
 
   const handleCallFacility = () => {
@@ -257,9 +253,9 @@ export const RouteNavigationPage = () => {
       {navigationMode === 'navigating' && (
         <div className="absolute bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-auto sm:left-4 sm:right-auto sm:w-[440px] z-40 pointer-events-auto">
           <NavigationControls
-            remainingTime={currentInstruction?.remainingTime || activeRoute?.duration || '10 min'}
-            remainingDistance={currentInstruction?.remainingDistance || activeRoute?.distance || '2.4 km'}
-            etaTime={etaClockTime}
+            remainingTime={currentInstruction?.remainingTime || activeRoute?.duration || 'Unavailable'}
+            remainingDistance={currentInstruction?.remainingDistance || activeRoute?.distance || 'Unavailable'}
+            etaTime={etaClockTime ?? 'Unavailable'}
             facilityName={facility.name}
             facilityPhone={facility.phone}
             currentStepIndex={currentStepIndex}
@@ -268,7 +264,6 @@ export const RouteNavigationPage = () => {
             onRecenter={() => {}}
             onCallFacility={handleCallFacility}
             onEndNavigation={handleEndNavigation}
-            onSimulateArrival={handleSimulateArrival}
             isEmergency={isEmergency}
           />
         </div>
