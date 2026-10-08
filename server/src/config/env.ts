@@ -2,12 +2,14 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
+  NODE_ENV: z.enum(['development','test','production']).default('development'),
   PORT: z.coerce.number().int().positive().default(5000),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
-  JWT_SECRET: z.string().min(1),
-  JWT_REFRESH_SECRET: z.string().min(1),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   RESQ_ADMIN_EMAIL: z.string().email(),
   RESQ_ADMIN_PASSWORD: z.string().min(12),
+  CORS_ORIGINS: z.string().default(''),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
   MICROSOFT_TENANT_ID: z.string().min(1).optional(),
@@ -17,10 +19,8 @@ const envSchema = z.object({
 });
 
 const parsed = envSchema.safeParse(process.env);
-
 if (!parsed.success) {
   const messages = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
   throw new Error(`Invalid environment configuration: ${messages.join('; ')}`);
 }
-
 export const env = parsed.data;
