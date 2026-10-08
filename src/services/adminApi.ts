@@ -2,7 +2,7 @@ import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmb
 import type { EmergencyReports, OperationalAnalytics, ReportOverview } from '../types/adminReports';
 export interface AdminEmergencyListItem { id:string; requestCode:string; userId:string; patientId?:string; situationType:string; reportedAt:string; status:string; statusHistory:Array<{status:string;changedAt:string;actorId?:string;actorRole:string;previousStatus?:string}>; hospital:{id:string;name?:string;latitude?:number;longitude?:number}|null; ambulanceProvider:{id:string;name?:string}|null; ambulance:{id:string;registrationNumber?:string;vehicleNumber?:string;latitude?:number;longitude?:number;locationUpdatedAt?:string}|null; driver:{id:string;name?:string}|null; pickup:{latitude?:number;longitude?:number;label?:string}; etaMinutes?:number; createdAt:string; updatedAt:string; }
 
-const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
+const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
 
 export class AdminApiError extends Error {
   public readonly status: number;
