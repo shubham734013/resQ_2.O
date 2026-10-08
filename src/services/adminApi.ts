@@ -1,5 +1,6 @@
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminList, AdminListParams, AdminOverview, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 import type { EmergencyReports, OperationalAnalytics, ReportOverview } from '../types/adminReports';
+export interface AdminEmergencyListItem { id:string; requestCode:string; userId:string; patientId?:string; situationType:string; reportedAt:string; status:string; statusHistory:Array<{status:string;changedAt:string;actorId?:string;actorRole:string;previousStatus?:string}>; hospital:{id:string;name?:string;latitude?:number;longitude?:number}|null; ambulanceProvider:{id:string;name?:string}|null; ambulance:{id:string;registrationNumber?:string;vehicleNumber?:string;latitude?:number;longitude?:number;locationUpdatedAt?:string}|null; driver:{id:string;name?:string}|null; pickup:{latitude?:number;longitude?:number;label?:string}; etaMinutes?:number; createdAt:string; updatedAt:string; }
 
 const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
 
@@ -59,10 +60,15 @@ export const adminApi = {
   providerStatus: (id: string, status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'>) => request<AdminAmbulanceProvider>(`/admin/ambulance-providers/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   ambulances: (params: AdminListParams) => request<AdminList<AdminAmbulance>>(`/admin/ambulances${query(params)}`),
   ambulance: (id: string) => request<AdminAmbulance>(`/admin/ambulances/${encodeURIComponent(id)}`),
+  ambulanceVerification: (id:string, verificationStatus:AdminVerificationStatus) => request<AdminAmbulance>(`/admin/ambulances/${encodeURIComponent(id)}/verification`, {method:'PATCH',body:JSON.stringify({verificationStatus})}),
+  ambulanceStatus: (id:string, status:Extract<AdminAccountStatus,'ACTIVE'|'SUSPENDED'|'REJECTED'>) => request<AdminAmbulance>(`/admin/ambulances/${encodeURIComponent(id)}/status`, {method:'PATCH',body:JSON.stringify({status})}),
   drivers: (params: AdminListParams) => request<AdminList<AdminAmbulanceDriver>>(`/admin/ambulance-drivers${query(params)}`),
   driver: (id: string) => request<AdminAmbulanceDriver>(`/admin/ambulance-drivers/${encodeURIComponent(id)}`),
   driverVerification: (id: string, verificationStatus: AdminVerificationStatus) => request<AdminAmbulanceDriver>(`/admin/ambulance-drivers/${encodeURIComponent(id)}/verification`, { method: 'PATCH', body: JSON.stringify({ verificationStatus }) }),
   driverStatus: (id: string, status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'>) => request<AdminAmbulanceDriver>(`/admin/ambulance-drivers/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  emergencies: (params: AdminListParams & {hospital?:string;provider?:string;ambulance?:string;driver?:string;situation?:string}) => request<AdminList<AdminEmergencyListItem>>(`/admin/emergencies${query(params)}`),
+  emergency: (id:string) => request<AdminEmergencyListItem>(`/admin/emergencies/${encodeURIComponent(id)}`),
+  emergencySummary: () => request<Record<string,number>>('/admin/emergencies/summary'),
   reportsOverview: (params: { from?: string; to?: string }) => request<ReportOverview>(`/admin/reports/overview${query(params)}`),
   reportsEmergencies: (params: { from?: string; to?: string }) => request<EmergencyReports>(`/admin/reports/emergencies${query(params)}`),
   reportsAnalytics: (params: { from?: string; to?: string }) => request<OperationalAnalytics>(`/admin/reports/analytics${query(params)}`),
