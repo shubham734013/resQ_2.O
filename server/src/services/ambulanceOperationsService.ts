@@ -41,7 +41,31 @@ export const listDrivers=async(pid:string,q:DriverQuery)=>{await operationalProv
 export const getDriver=async(pid:string,id:string)=>{await operationalProvider(pid);const x=await AmbulanceDriverModel.findOne({_id:oid(id,'driver'),providerId:oid(pid,'provider')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
 export const createDriver=async(pid:string,input:z.infer<typeof S.driverCreateSchema>)=>{await operationalProvider(pid);if(await AmbulanceDriverModel.exists({$or:[{email:input.email.toLowerCase()},{licenseNumber:input.licenseNumber}]}))throw new AppError('DRIVER_ALREADY_EXISTS','Driver email or license number already exists',409);const passwordHash=await bcrypt.hash(input.password,12);const x=await AmbulanceDriverModel.create({...input,email:input.email.toLowerCase(),passwordHash,providerId:oid(pid,'provider'),licenseVerificationStatus:'PENDING',accountStatus:'PENDING',availabilityStatus:'OFFLINE'});return driverOut(x.toObject());};
 export const updateDriver=async(pid:string,id:string,input:z.infer<typeof S.driverUpdateSchema>)=>{await operationalProvider(pid);const {password,...profileUpdate}=input;const update:Partial<AmbulanceDriverDocument>={...profileUpdate};if(password)update.passwordHash=await bcrypt.hash(password,12);const x=await AmbulanceDriverModel.findOneAndUpdate({_id:oid(id,'driver'),providerId:oid(pid,'provider')},{$set:update},{new:true,runValidators:true}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
-export const assignDriver=async(pid:string,aid:string,did:string)=>{await operationalProvider(pid);const p=oid(pid,'provider'),aId=oid(aid,'ambulance'),dId=oid(did,'driver');const [a,d]=await Promise.all([AmbulanceModel.findOne({_id:aId,providerId:p}).exec(),AmbulanceDriverModel.findOne({_id:dId,providerId:p}).exec()]);if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);if(!d)throw new AppError('NOT_FOUND','Driver not found',404);active(d.accountStatus);verified(d.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');if(d.assignedAmbulanceId&&String(d.assignedAmbulanceId)!==String(aId))throw new AppError('DRIVER_ALREADY_ASSIGNED','Driver is assigned to another ambulance',409);const current=await AmbulanceDriverModel.findOne({assignedAmbulanceId:aId,_id:{$ne:dId}}).exec();if(current)throw new AppError('AMBULANCE_ALREADY_ASSIGNED','Ambulance already has a driver',409);d.assignedAmbulanceId=aId;await d.save();return driverOut(d.toObject());};
+export const assignDriver=async(pid:string,aid:string,did:string)=>{
+  await operationalProvider(pid);
+  const p=oid(pid,'provider'),aId=oid(aid,'ambulance'),dId=oid(did,'driver');
+  const [a,d]=await Promise.all([AmbulanceModel.findOne({_id:aId,providerId:p}).lean().exec(),AmbulanceDriverModel.findOne({_id:dId,providerId:p}).exec()]);
+  if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);
+  if(!d)throw new AppError('NOT_FOUND','Driver not found',404);
+  active(d.accountStatus);verified(d.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');
+  if(d.assignedAmbulanceId&&String(d.assignedAmbulanceId)!==String(aId))throw new AppError('DRIVER_ALREADY_ASSIGNED','Driver is assigned to another ambulance',409);
+  const existingDriver=await AmbulanceDriverModel.findOne({assignedAmbulanceId:aId,_id:{$ne:dId}}).lean().exec();
+  if(existingDriver)throw new AppError('AMBULANCE_ALREADY_ASSIGNED','Ambulance already has a driver',409);
+  const driverActiveTrip=await TripModel.exists({driverId:d._id,status:{$in:activeTripStatuses}});
+  if(driverActiveTrip)throw new AppError('DRIVER_ON_ACTIVE_TRIP','Driver cannot be reassigned during an active trip',409);
+  const ambulanceActiveTrip=await TripModel.exists({ambulanceId:aId,status:{$in:activeTripStatuses}});
+  if(ambulanceActiveTrip){
+    const pendingTrip=await TripModel.exists({ambulanceId:aId,status:'ASSIGNED',driverId:{$exists:false}});
+    if(!pendingTrip)throw new AppError('AMBULANCE_ON_ACTIVE_TRIP','Ambulance cannot be reassigned during an active trip',409);
+  }
+  const updated=await AmbulanceDriverModel.findOneAndUpdate(
+    {_id:d._id,providerId:p,$or:[{assignedAmbulanceId:{$exists:false}},{assignedAmbulanceId:aId}]},
+    {$set:{assignedAmbulanceId:aId}},
+    {new:true}
+  ).lean().exec();
+  if(!updated)throw new AppError('DRIVER_ASSIGNMENT_CONFLICT','Driver assignment changed before this action could be applied',409);
+  return driverOut(updated);
+};
 export const unassignDriver=async(pid:string,aid:string)=>{
   await operationalProvider(pid);
   const p=oid(pid,'provider');
@@ -120,7 +144,13 @@ export const acceptRequest=async(did:string,id:string)=>{
       throw error;
     }
   }
-  if(String(trip.driverId)!==String(d._id)||String(trip.ambulanceId)!==String(a._id))throw new AppError('TRIP_CONFLICT','Trip ownership does not match the accepted dispatch',409);
+  if(String(trip.driverId)!==String(d._id)||String(trip.ambulanceId)!==String(a._id)){
+  await Promise.all([
+    EmergencyRequestModel.updateOne({_id:request._id,driverId:d._id},{$unset:{driverId:1}}).exec(),
+    AmbulanceDriverModel.updateOne({_id:d._id,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+  ]);
+  throw new AppError('TRIP_CONFLICT','Trip ownership does not match the accepted dispatch',409);
+}
   if(trip.status==='ASSIGNED'){
     const accepted=await TripModel.findOneAndUpdate({_id:trip._id,driverId:d._id,status:'ASSIGNED'},{$set:{status:'ACCEPTED',acceptedAt:new Date()}},{new:true}).exec();
     if(accepted)trip=accepted;
