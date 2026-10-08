@@ -5,6 +5,7 @@ import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
+import { TripModel } from '../models/Trip.js';
 import { AppError } from '../utils/AppError.js';
 import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js';
 import type { AmbulanceStatus } from '../models/Ambulance.js';
@@ -50,7 +51,7 @@ export const updateHospitalStatus=async(id:string,status:Extract<AccountStatus,'
 
 const refOut=(x:Record<string,unknown>|null):AdminRelationshipRef|null=>x?({id:String(x._id),...(typeof x.name==='string'?{name:x.name}:{}),...(typeof x.registrationNumber==='string'?{registrationNumber:x.registrationNumber}:{}),...(typeof x.vehicleNumber==='string'?{vehicleNumber:x.vehicleNumber}:{})}):null;
 const ambulanceOut=(x:Record<string,unknown>,p:Record<string,unknown>|null,d:Record<string,unknown>|null):AdminAmbulance=>({
-  ...(x as AdminAmbulance),id:String(x._id),provider:refOut(p),assignedDriver:refOut(d),
+  ...(x as unknown as AdminAmbulance),id:String(x._id),provider:refOut(p),assignedDriver:refOut(d),
   locationFreshness:getLocationFreshness(typeof x.locationUpdatedAt==='string'||x.locationUpdatedAt instanceof Date||typeof x.locationUpdatedAt==='number'?x.locationUpdatedAt:undefined),
 });
 
