@@ -3,8 +3,6 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
-import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
-import { EmergencyTable, ReportTable } from '../components/admin/AdminTables';
 
 import { Button } from '../components/common/Button';
 import { useAdminAmbulances, useAdminDrivers, useAdminHospitals, useAdminOverview, useAdminProviders, useAdminUsers, useUpdateDriverStatus, useUpdateDriverVerification, useUpdateHospitalStatus, useUpdateHospitalVerification, useUpdateProviderStatus, useUpdateProviderVerification, useUpdateUserStatus } from '../hooks/useAdminManagement';

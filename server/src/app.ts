@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import { env } from './config/env.js';
 import { healthRouter } from './routes/healthRoutes.js';
 import { authRouter } from './routes/authRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
@@ -9,25 +8,36 @@ import { mapsRouter } from './routes/mapsRoutes.js';
 import { geospatialRouter } from './routes/geospatialRoutes.js';
 import { facilityRouter } from './routes/facilityRoutes.js';
 import { geocodingRouter } from './routes/geocodingRoutes.js';
-import { ambulanceProviderRouter,ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
+import { ambulanceProviderRouter, ambulanceDriverRouter } from './routes/ambulanceOperationsRoutes.js';
 import { emergencyRouter } from './routes/emergencyRoutes.js';
+import { userRouter } from './routes/userRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { getAllowedOrigins, mutationOriginGuard, originGuard, securityHeaders } from './middlewares/security.js';
+
 export const app=express();
+const allowedOrigins=getAllowedOrigins();
+
 app.disable('x-powered-by');
-const allowedOrigins = env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(securityHeaders);
+// Handle CORS preflight before origin/CSRF guards.
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) { callback(null, true); return; }
-    callback(new Error('CORS origin not allowed'));
+    if (!origin) { callback(null, true); return; }
+    if (allowedOrigins.includes(origin)) { callback(null, true); return; }
+    callback(new Error('CORS origin is not allowed'));
   },
   credentials:true,
 }));
+app.use(originGuard);
+app.use(mutationOriginGuard);
 app.use(express.urlencoded({extended:false,limit:'100kb'}));
 app.use(express.json({limit:'1mb'}));
+
 app.use('/api/v1/health',healthRouter);
 app.use('/api/v1/auth',authRouter);
 app.use('/api/v1/admin',adminRouter);
 app.use('/api/v1/hospital',hospitalRouter);
+app.use('/api/v1/users',userRouter);
 app.use('/api/v1',geospatialRouter);
 app.use('/api/v1/facilities',facilityRouter);
 app.use('/api/v1/maps',mapsRouter);
