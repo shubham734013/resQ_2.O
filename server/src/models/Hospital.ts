@@ -59,6 +59,15 @@ const hospitalSchema = new Schema<HospitalDocument>({
   accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
 }, { timestamps: true });
 
+hospitalSchema.pre('save', function () {
+  if (typeof this.latitude === 'number' && typeof this.longitude === 'number' && (!this.location || !this.location.coordinates || this.location.coordinates.length !== 2)) {
+    this.location = { type: 'Point', coordinates: [this.longitude, this.latitude] };
+  } else if (this.location?.coordinates && this.location.coordinates.length === 2 && (this.latitude === undefined || this.longitude === undefined)) {
+    this.longitude = this.location.coordinates[0];
+    this.latitude = this.location.coordinates[1];
+  }
+});
+
 hospitalSchema.index({ location: '2dsphere' });
 hospitalSchema.index({ latitude: 1, longitude: 1 });
 

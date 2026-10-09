@@ -64,7 +64,6 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
   const baseFilter: Record<string, unknown> = {
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
-    location: { $exists: true },
   };
   const andFilters: Record<string, unknown>[] = [];
   if (query.emergencyOnly) baseFilter.emergencyAvailability = 'AVAILABLE';
@@ -98,7 +97,7 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
           distanceField: 'distanceMeters',
           spherical: true,
           maxDistance: query.radiusMeters,
-          query: baseFilter,
+          query: { ...baseFilter, location: { $exists: true } },
         },
       },
       {

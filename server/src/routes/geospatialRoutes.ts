@@ -12,6 +12,5 @@ const validateQuery = (schema: z.ZodType) => (req: Request, res: Response, next:
 };
 
 export const geospatialRouter = Router();
-geospatialRouter.use(authenticate);
 geospatialRouter.get('/facilities/nearby', validateQuery(nearbyQuerySchema), nearbyFacilitiesController);
-geospatialRouter.get('/ambulances/nearby', validateQuery(nearbyQuerySchema), nearbyAmbulancesController);
+geospatialRouter.get('/ambulances/nearby', authenticate, validateQuery(nearbyQuerySchema), nearbyAmbulancesController);

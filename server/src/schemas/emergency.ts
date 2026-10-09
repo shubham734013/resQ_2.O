@@ -25,4 +25,6 @@ export const userEmergencyListQuerySchema = z.object({
   message: 'from must be before to',
 });
 
-export const cancelEmergencySchema = z.object({}).strict();
+export const cancelEmergencySchema = z.object({
+  reason: z.string().trim().max(300).optional(),
+}).strict();

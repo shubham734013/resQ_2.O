@@ -134,7 +134,18 @@ export const registerUser=async(input:UserRegistrationInput):Promise<AuthResult>
 };
 export const registerHospital=async(input:HospitalRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await HospitalModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING'}); return identityFromDocument(a,'HOSPITAL');
+  const location = (typeof input.latitude === 'number' && typeof input.longitude === 'number')
+    ? { type: 'Point' as const, coordinates: [input.longitude, input.latitude] as [number, number] }
+    : undefined;
+  const a=await HospitalModel.create({
+    ...input,
+    email:normalizeEmail(input.email),
+    passwordHash,
+    verificationStatus:'PENDING',
+    accountStatus:'PENDING',
+    ...(location ? { location } : {}),
+  });
+  return identityFromDocument(a,'HOSPITAL');
 };
 export const registerAmbulanceProvider=async(input:AmbulanceProviderRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
