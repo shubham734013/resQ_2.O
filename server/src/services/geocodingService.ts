@@ -2,7 +2,7 @@ import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 
 export const geocodeAddress = async (address: string) => {
-  const apiKey = env.GOOGLE_MAPS_SERVER_API_KEY?.trim();
+  const apiKey = (env.GOOGLE_GEOCODING_API_KEY || env.GOOGLE_MAPS_SERVER_API_KEY)?.trim();
   if (!apiKey) throw new AppError('MAPS_API_KEY_MISSING', 'Server-side Google Maps key is not configured', 503);
 
   const endpoint = 'https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(address) + '&key=' + encodeURIComponent(apiKey);
