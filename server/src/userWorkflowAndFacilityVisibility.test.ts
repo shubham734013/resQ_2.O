@@ -1,21 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cancelEmergencySchema, createEmergencyRequestSchema, userEmergencyListQuerySchema } from './schemas/emergency.js';
-import { facilitySearchQuerySchema } from './schemas/facility.js';
-import { routeRequestSchema, nearbyQuerySchema } from './schemas/maps.js';
-import { hospitalToFacility } from './services/facilityService.js';
-import { facilityRouter } from './routes/facilityRoutes.js';
-import { geospatialRouter } from './routes/geospatialRoutes.js';
-import { mapsRouter } from './routes/mapsRoutes.js';
-import { geocodingRouter } from './routes/geocodingRoutes.js';
-import { placesRouter } from './routes/placesRoutes.js';
-import { authenticate } from './middlewares/authenticate.js';
-import { authorizeRole } from './middlewares/authorizeRole.js';
 import { Types } from 'mongoose';
 
-// Router imports transitively load server configuration. Keep this contract test
-// self-contained in CI by supplying valid non-production values before imports
-// that depend on the validated environment module are evaluated.
+// Router modules transitively import the validated server environment. Initialize
+// non-production test defaults before those modules load. Dynamic imports below
+// ensure env.ts sees these values when it is first evaluated.
 process.env.NODE_ENV ??= 'test';
 process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
 process.env.JWT_SECRET ??= 'test-only-jwt-secret-000000000000000000000000';
