@@ -14,34 +14,46 @@ import { userRouter } from './routes/userRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { getAllowedOrigins, mutationOriginGuard, originGuard, securityHeaders } from './middlewares/security.js';
 
-export const app=express();
-const allowedOrigins=getAllowedOrigins();
+export const app = express();
+const allowedOrigins = getAllowedOrigins();
 
 app.disable('x-powered-by');
 app.use(securityHeaders);
-app.use(originGuard);
+
+// Handle browser preflight requests before origin guards. Otherwise an OPTIONS
+// request can be rejected before CORS headers are attached to the response.
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) { callback(null, true); return; }
-    if (allowedOrigins.includes(origin)) { callback(null, true); return; }
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
     callback(new Error('CORS origin is not allowed'));
   },
-  credentials:true,
+  credentials: true,
 }));
-app.use(mutationOriginGuard);
-app.use(express.json({limit:'1mb'}));
 
-app.use('/api/v1/health',healthRouter);
-app.use('/api/v1/auth',authRouter);
-app.use('/api/v1/admin',adminRouter);
-app.use('/api/v1/hospital',hospitalRouter);
-app.use('/api/v1/users',userRouter);
-app.use('/api/v1',geospatialRouter);
-app.use('/api/v1/facilities',facilityRouter);
-app.use('/api/v1/maps',mapsRouter);
-app.use('/api/v1/geocoding',geocodingRouter);
-app.use('/api/v1/ambulance-provider',ambulanceProviderRouter);
-app.use('/api/v1/ambulance-driver',ambulanceDriverRouter);
-app.use('/api/v1/emergencies',emergencyRouter);
-app.use((_req,res)=>{res.status(404).json({success:false,error:{code:'NOT_FOUND',message:'Route not found'}});});
+app.use(originGuard);
+app.use(mutationOriginGuard);
+app.use(express.json({ limit: '1mb' }));
+
+app.use('/api/v1/health', healthRouter);
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/hospital', hospitalRouter);
+app.use('/api/v1/users', userRouter);
+app.use('/api/v1', geospatialRouter);
+app.use('/api/v1/facilities', facilityRouter);
+app.use('/api/v1/maps', mapsRouter);
+app.use('/api/v1/geocoding', geocodingRouter);
+app.use('/api/v1/ambulance-provider', ambulanceProviderRouter);
+app.use('/api/v1/ambulance-driver', ambulanceDriverRouter);
+app.use('/api/v1/emergencies', emergencyRouter);
+app.use((_req, res) => {
+  res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
+});
 app.use(errorHandler);
