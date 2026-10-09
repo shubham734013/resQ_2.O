@@ -35,6 +35,9 @@ export const SearchPage = () => {
     setSelectedFacilityId,
     isLoading,
     isSearching,
+    isError,
+    error,
+    refetch,
     activeQuery,
   } = useFacilities({
     searchQuery,
@@ -146,6 +149,8 @@ export const SearchPage = () => {
               onSelectFacility={(facility: Facility) => setSelectedFacilityId(facility.id)}
               isLoading={isLoading}
               isSearching={isSearching}
+              errorMessage={isError ? error.message : undefined}
+              onRetry={() => void refetch()}
               activeQuery={activeQuery}
               onClearSearch={handleClear}
               onSelectQuerySuggestion={setSearchQuery}
