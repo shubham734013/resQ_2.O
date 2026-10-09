@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "seed:admin": "tsx src/scripts/seedAdmin.ts"
+    "seed:admin": "tsx src/scripts/seedAdmin.ts",
+    "audit:db": "tsx src/scripts/auditDatabase.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -26,6 +26,11 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req: Request, 
     return;
   }
 
+  if (error instanceof mongoose.Error.CastError) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_IDENTIFIER', message: 'Invalid identifier format' } });
+    return;
+  }
+
   if (isMongoDuplicateKeyError(error)) {
     const mongoErr = error as { keyPattern?: Record<string, unknown>; keyValue?: Record<string, unknown> };
     const keys = Object.keys(mongoErr.keyPattern || mongoErr.keyValue || {});
