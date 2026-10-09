@@ -18,6 +18,10 @@ const envSchema = z.object({
   MICROSOFT_AUTHORITY: z.string().url().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
   MICROSOFT_REDIRECT_URI: z.string().optional(),
+  // Prefer dedicated server-side keys; retain the legacy key as a migration fallback.
+  GOOGLE_GEOCODING_API_KEY: z.string().trim().optional(),
+  GOOGLE_ROUTES_API_KEY: z.string().trim().optional(),
+  GOOGLE_PLACES_API_KEY: z.string().trim().optional(),
   GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
 });
 
