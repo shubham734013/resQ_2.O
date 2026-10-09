@@ -91,6 +91,28 @@ export const MapView = ({
     mapRef.current.setCenter(toGoogle(fallbackCenter.latitude, fallbackCenter.longitude));
   }, [fallbackCenter.latitude, fallbackCenter.longitude, status]);
 
+  // Desktop layouts can resize the map after its initial construction (for example,
+  // when a sidebar opens). Observe the actual map element and re-apply its center.
+  useEffect(() => {
+    const element = containerRef.current;
+    const map = mapRef.current;
+    if (!element || !map || status !== 'ready') return;
+
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        map.setCenter(toGoogle(fallbackCenter.latitude, fallbackCenter.longitude));
+      });
+    });
+
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, [fallbackCenter.latitude, fallbackCenter.longitude, status]);
+
   useEffect(() => {
     let cancelled = false;
     const renderOverlays = async () => {
@@ -189,7 +211,7 @@ export const MapView = ({
   };
 
   return (
-    <div className={`relative w-full h-full min-h-[16rem] overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google Maps">
+    <div className={`relative w-full min-w-0 h-[320px] sm:h-[400px] lg:h-[520px] overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google Maps">
       <div ref={containerRef} className="absolute inset-0" />
       {status === 'loading' && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 z-10">
