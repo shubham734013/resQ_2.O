@@ -5,7 +5,8 @@ export type SocialProvider='GOOGLE'|'MICROSOFT';
 export interface AuthUser { id:string; email:string; name?:string; role:UserRole; accountStatus:AccountStatus; verificationStatus?:VerificationStatus; profileCompletionStatus?:'INCOMPLETE'|'COMPLETE'; licenseVerificationStatus?:VerificationStatus; }
 export interface AuthResponse { success:true; data:{user:AuthUser}; }
 export interface CurrentUserResponse { success:true; data:AuthUser; }
-export interface LoginRequest { email:string; password:string; }
+export type LoginRoleHint='USER'|'HOSPITAL'|'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER';
+export interface LoginRequest { email:string; password:string; roleHint?:LoginRoleHint; }
 export interface SocialAuthRequest { credential:string; roleHint?:'USER'|'AMBULANCE_PROVIDER'; }
 export interface UserRegistrationRequest extends LoginRequest { name:string; phone:string; address?:string; city?:string; state?:string; country?:string; latitude?:number; longitude?:number; }
 export interface HospitalRegistrationRequest extends LoginRequest { name:string; phone:string; registrationNumber:string; hospitalType:string; services:string[]; capabilities:string[]; address?:string; city?:string; state?:string; country?:string; latitude?:number; longitude?:number; }
