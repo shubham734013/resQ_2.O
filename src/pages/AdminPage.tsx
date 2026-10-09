@@ -1,12 +1,32 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react';
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
-
+import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
+import { EmergencyTable } from '../components/admin/AdminTables';
 import { Button } from '../components/common/Button';
-import { useAdminAmbulances, useAdminDrivers, useAdminHospitals, useAdminOverview, useAdminProviders, useAdminUsers, useUpdateDriverStatus, useUpdateDriverVerification, useUpdateHospitalStatus, useUpdateHospitalVerification, useUpdateProviderStatus, useUpdateProviderVerification, useUpdateUserStatus } from '../hooks/useAdminManagement';
+import {
+  useAdminAmbulances,
+  useAdminDrivers,
+  useAdminEmergencies,
+  useAdminHospitals,
+  useAdminOverview,
+  useAdminProviders,
+  useAdminReportOverview,
+  useAdminEmergencyReports,
+  useAdminAnalytics,
+  useAdminUsers,
+  useUpdateDriverStatus,
+  useUpdateDriverVerification,
+  useUpdateHospitalStatus,
+  useUpdateHospitalVerification,
+  useUpdateProviderStatus,
+  useUpdateProviderVerification,
+  useUpdateUserStatus,
+} from '../hooks/useAdminManagement';
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
+import { adminApi } from '../services/adminApi';
 
 const Section = ({ children }: { children: ReactNode }) => <AdminLayout>{children}</AdminLayout>;
 const ErrorBox = ({ message, retry }: { message: string; retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{message}</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Retry</Button></div>;
@@ -56,8 +76,178 @@ export const AdminProvidersPage = () => { const [search,setSearch]=useState('');
 
 export const AdminDriversPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminDrivers({page,limit:20,search}); const v=useUpdateDriverVerification(); const s=useUpdateDriverStatus(); return <Section><AdminPage title="Ambulance drivers" description="Review driver verification, registered location and fleet assignment."><Panel title="Drivers"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Name, email, phone or license"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No drivers found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Driver</th><th>Provider</th><th>Ambulance</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((d:AdminAmbulanceDriver)=><tr key={d.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{d.fullName}</b><div className="text-xs text-slate-500">{d.email} · {d.licenseNumber}</div></td><td>{d.provider?.name??'Unassigned'}</td><td>{d.assignedAmbulance?.registrationNumber??'Unassigned'}</td><td>{d.city??'—'}, {d.state??'—'}</td><td><Status value={d.licenseVerificationStatus}/><div className="mt-1"><Status value={d.accountStatus}/></div></td><td><ApprovalActions id={d.id} verification={d.licenseVerificationStatus} accountStatus={d.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
 
-export const AdminEmergenciesPage = () => <Section><AdminPage title="Emergency monitor" description="Live emergency records are now served by the backend."><Panel title="Emergency requests"><Empty label="Use the live emergency API to populate this operational view. No mock records are rendered." /></Panel></AdminPage></Section>;
-export const AdminReportsPage = () => <Section><AdminPage title="Reports" description="Operational reports must come from persisted backend records."><Panel title="Reported problems"><Empty label="No persisted report-management API is currently wired to this page." /></Panel></AdminPage></Section>;
-export const AdminAnalyticsPage = () => <Section><AdminPage title="Analytics" description="Analytics are shown only when backed by live persisted records."><Panel title="Analytics"><Empty label="Live emergency analytics API is not yet wired to this page." /></Panel></AdminPage></Section>;
+export const AdminEmergenciesPage = () => {
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const q = useAdminEmergencies({ page, limit: 20, search: search || undefined, status: status || undefined });
+  if (q.isLoading) return <Section><AdminPage title="Emergency monitor"><Loading /></AdminPage></Section>;
+  if (q.isError || !q.data) return <Section><AdminPage title="Emergency monitor"><ErrorBox message={message(q.error)} retry={() => void q.refetch()} /></AdminPage></Section>;
+  const rows = q.data.items.map((x) => ({
+    id: x.requestCode,
+    category: x.situationType,
+    hospital: x.hospital?.name ?? '—',
+    ambulance: x.ambulance?.registrationNumber ?? 'Unassigned',
+    eta: x.etaMinutes !== undefined ? `${x.etaMinutes} min` : 'Unavailable',
+    status: x.status,
+    area: x.pickup.label ?? 'Location unavailable',
+  }));
+  return (
+    <Section>
+      <AdminPage title="Emergency monitor" description="Live MongoDB-backed emergency requests with operational relationships.">
+        <Panel title="Emergency requests">
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4">
+            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Request code, situation or object id" />
+            <Select value={status} onChange={(v) => { setStatus(v); setPage(1); }}>
+              <option value="">All statuses</option>
+              <option>RECEIVED</option>
+              <option>REVIEWING</option>
+              <option>PREPARING</option>
+              <option>AMBULANCE_COORDINATION</option>
+              <option>RESOLVED</option>
+              <option>CANCELLED</option>
+            </Select>
+            <Button size="sm" variant="secondary" onClick={() => void q.refetch()} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
+          </div>
+          {!q.data.items.length ? (
+            <Empty label="No emergency requests match these filters." />
+          ) : (
+            <>
+              <EmergencyTable data={rows} />
+              <Pager {...q.data.pagination} onPage={setPage} />
+            </>
+          )}
+        </Panel>
+      </AdminPage>
+    </Section>
+  );
+};
+
+const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 29);
+  const [preset, setPreset] = useState<'TODAY' | '7D' | '30D' | '90D' | 'CUSTOM'>('30D');
+  const [from, setFrom] = useState(start.toISOString().slice(0, 10));
+  const [to, setTo] = useState(end.toISOString().slice(0, 10));
+  const params = useMemo(() => ({
+    from: from ? new Date(from + 'T00:00:00.000Z').toISOString() : undefined,
+    to: to ? new Date(to + 'T23:59:59.999Z').toISOString() : undefined,
+  }), [from, to]);
+  const overview = useAdminReportOverview(params);
+  const emergencies = useAdminEmergencyReports(params);
+  const operational = useAdminAnalytics(params);
+  const refresh = () => {
+    void overview.refetch();
+    void emergencies.refetch();
+    void operational.refetch();
+  };
+  const apply = (p: 'TODAY' | '7D' | '30D' | '90D') => {
+    const e = new Date();
+    const s = new Date(e);
+    s.setUTCDate(s.getUTCDate() - (p === 'TODAY' ? 0 : p === '7D' ? 6 : p === '30D' ? 29 : 89));
+    setPreset(p);
+    setFrom(s.toISOString().slice(0, 10));
+    setTo(e.toISOString().slice(0, 10));
+  };
+  const exportCsv = async () => {
+    try {
+      const blob = await adminApi.exportReports(params);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'resq-emergency-report.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      window.alert(message(e));
+    }
+  };
+  if (overview.isLoading || emergencies.isLoading || operational.isLoading) {
+    return <Section><AdminPage title={analytics ? 'Analytics' : 'Reports'}><Loading /></AdminPage></Section>;
+  }
+  if (overview.isError || emergencies.isError || operational.isError) {
+    return <Section><AdminPage title={analytics ? 'Analytics' : 'Reports'}><ErrorBox message={message(overview.error || emergencies.error || operational.error)} retry={refresh} /></AdminPage></Section>;
+  }
+  if (!overview.data || !emergencies.data || !operational.data) {
+    return <Section><AdminPage title={analytics ? 'Analytics' : 'Reports'}><Empty label="No operational data available for this period." /></AdminPage></Section>;
+  }
+  const d = overview.data;
+  const hospitalData = emergencies.data.hospitals.map((x) => ({ label: x.name, value: x.value }));
+  return (
+    <Section>
+      <AdminPage
+        title={analytics ? 'Analytics' : 'Reports'}
+        description="Real MongoDB-backed operational reporting."
+        action={
+          <div className="flex gap-2 print:hidden">
+            <Button size="sm" variant="secondary" onClick={() => window.print()}>Print</Button>
+            <Button size="sm" variant="secondary" onClick={refresh} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
+            <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Export CSV</Button>
+          </div>
+        }
+      >
+        <Panel title="Date range">
+          <div className="flex flex-wrap items-center gap-2 p-4">
+            {(['TODAY', '7D', '30D', '90D', 'CUSTOM'] as const).map((p) => (
+              <Button key={p} size="sm" variant={preset === p ? 'primary' : 'secondary'} onClick={() => p === 'CUSTOM' ? setPreset('CUSTOM') : apply(p)}>
+                {p === 'TODAY' ? 'Today' : p === '7D' ? 'Last 7 days' : p === '30D' ? 'Last 30 days' : p === '90D' ? 'Last 90 days' : 'Custom'}
+              </Button>
+            ))}
+            {preset === 'CUSTOM' && (
+              <>
+                <label className="text-xs text-slate-500">From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="ml-1 h-9 rounded-md border border-slate-200 px-2 text-sm" /></label>
+                <label className="text-xs text-slate-500">To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="ml-1 h-9 rounded-md border border-slate-200 px-2 text-sm" /></label>
+              </>
+            )}
+            <Button size="sm" variant="secondary" onClick={refresh} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
+            <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Export CSV</Button>
+          </div>
+          <div className="px-4 pb-4 text-xs text-slate-500">Selected range: {from} to {to} (UTC). Last updated: {new Date(d.generatedAt).toLocaleString()}.</div>
+        </Panel>
+        <div className="mt-6">
+          <MetricGrid metrics={[
+            { label: 'Emergency requests', value: String(d.emergencies.totalRequests), detail: 'Selected period' },
+            { label: 'Active emergencies', value: String(d.emergencies.activeRequests), detail: 'Selected period' },
+            { label: 'Resolved', value: String(d.emergencies.resolved), detail: 'Selected period' },
+            { label: 'Cancelled', value: String(d.emergencies.cancelled), detail: 'Selected period' },
+            { label: 'Hospitals in network', value: String(d.hospitals.total), detail: `${d.hospitals.verified} verified` },
+            { label: 'Ambulances in fleet', value: String(d.ambulances.total), detail: `${d.ambulances.available} available now` },
+            { label: 'Drivers', value: String(d.drivers.total), detail: `${d.drivers.online} online` },
+          ]} />
+        </div>
+        {d.emergencies.totalRequests === 0 ? (
+          <div className="mt-6"><Panel title="Emergency analytics"><Empty label="No emergency requests in selected period." /></Panel></div>
+        ) : (
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <TrendChart title="Daily emergency volume" description="Requests grouped by UTC date." data={emergencies.data.trend.map((x) => ({ label: x._id, value: x.value }))} />
+            <CategoryChart title="Emergency status distribution" data={emergencies.data.status.map((x) => ({ label: x._id, value: x.value }))} />
+            <CategoryChart title="Situation distribution" data={emergencies.data.situations.map((x) => ({ label: x._id, value: x.value }))} />
+            <CategoryChart title="Hospital distribution" data={hospitalData} />
+            <Panel title="Ambulance operations">
+              <div className="grid grid-cols-2 gap-3 p-5 text-sm">
+                {operational.data.ambulanceStatus.map((x) => (
+                  <div key={x.label} className="flex justify-between"><span>{x.label}</span><b>{x.value}</b></div>
+                ))}
+              </div>
+            </Panel>
+            {analytics && (
+              <Panel title="Resolution and response">
+                <div className="space-y-3 p-5 text-sm">
+                  <div className="flex justify-between"><span>Resolution ratio</span><b>{operational.data.resolutionRatio === null ? 'Unavailable' : `${(operational.data.resolutionRatio * 100).toFixed(1)}%`}</b></div>
+                  <div className="flex justify-between"><span>Average RECEIVED → REVIEWING</span><b>{operational.data.responseToReview.averageMinutes === null ? 'Unavailable' : `${operational.data.responseToReview.averageMinutes.toFixed(1)} min`}</b></div>
+                  <div className="flex justify-between"><span>Samples</span><b>{operational.data.responseToReview.samples}</b></div>
+                </div>
+              </Panel>
+            )}
+          </div>
+        )}
+      </AdminPage>
+    </Section>
+  );
+};
+
+export const AdminReportsPage = () => <ReportDashboard />;
+export const AdminAnalyticsPage = () => <ReportDashboard analytics />;
 export const AdminSettingsPage = () => <Section><AdminPage title="Settings" description="Operational settings are not part of this management API scope."><Panel title="Status"><div className="p-5 text-sm text-slate-600">Admin authentication and authorization remain enforced by the backend. No settings are persisted by this feature.</div></Panel></AdminPage></Section>;
 export default AdminOverviewPage;

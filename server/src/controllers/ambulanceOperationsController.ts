@@ -30,7 +30,7 @@ export const driverProfile=async(req:Request,res:Response)=>sendSuccess(res,awai
 export const driverProfileUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverProfile(authId(req,'AMBULANCE_DRIVER'),req.body));
 export const driverStatus=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverStatus(authId(req,'AMBULANCE_DRIVER')));
 export const driverStatusUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverStatus(authId(req,'AMBULANCE_DRIVER'),req.body.status));
-export const driverLocationUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverLocation(authId(req,'AMBULANCE_DRIVER'),res.locals.validatedBody));
+export const driverLocationUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverLocation(authId(req,'AMBULANCE_DRIVER'),(res.locals.validatedBody ?? req.body)));
 export const driverRequests=async(req:Request,res:Response)=>sendSuccess(res,await service.listDriverRequests(authId(req,'AMBULANCE_DRIVER'),q(res)));
 export const driverRequest=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const driverAccept=async(req:Request,res:Response)=>sendSuccess(res,await service.acceptRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));

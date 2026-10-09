@@ -15,7 +15,7 @@ const paramId=(req:Request):string=>{
 };
 const query=<T>(res:Response)=>res.locals.validatedQuery as T;
 
-export const createEmergency=async(req:Request,res:Response)=>sendSuccess(res,await service.createEmergencyRequest(userId(req),res.locals.validatedBody),201);
+export const createEmergency=async(req:Request,res:Response)=>sendSuccess(res,await service.createEmergencyRequest(userId(req),(res.locals.validatedBody ?? req.body)),201);
 export const listEmergencies=async(req:Request,res:Response)=>sendSuccess(res,await service.listUserEmergencyRequests(userId(req),query(res)));
 export const getEmergency=async(req:Request,res:Response)=>sendSuccess(res,await service.getUserEmergencyRequest(userId(req),paramId(req)));
 export const cancelEmergency=async(req:Request,res:Response)=>sendSuccess(res,await service.cancelUserEmergencyRequest(userId(req),paramId(req)));
