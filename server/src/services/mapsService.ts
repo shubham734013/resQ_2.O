@@ -72,7 +72,7 @@ const maneuver = (value?: string): 'straight' | 'turn-right' | 'turn-left' | 'sl
 };
 
 export const calculateGoogleRoutes = async (input: RouteInput) => {
-  const apiKey = env.GOOGLE_MAPS_SERVER_API_KEY?.trim();
+  const apiKey = (env.GOOGLE_ROUTES_API_KEY || env.GOOGLE_MAPS_SERVER_API_KEY)?.trim();
   if (!apiKey) throw new AppError('MAPS_API_KEY_MISSING', 'Server-side Google Maps key is not configured', 503);
 
   const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
