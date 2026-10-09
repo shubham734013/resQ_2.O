@@ -11,17 +11,32 @@ process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-0000000000000000000
 process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
 process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-admin-password';
 
-const { cancelEmergencySchema, createEmergencyRequestSchema, userEmergencyListQuerySchema } = await import('./schemas/emergency.js');
-const { facilitySearchQuerySchema } = await import('./schemas/facility.js');
-const { routeRequestSchema, nearbyQuerySchema } = await import('./schemas/maps.js');
-const { hospitalToFacility } = await import('./services/facilityService.js');
-const { facilityRouter } = await import('./routes/facilityRoutes.js');
-const { geospatialRouter } = await import('./routes/geospatialRoutes.js');
-const { mapsRouter } = await import('./routes/mapsRoutes.js');
-const { geocodingRouter } = await import('./routes/geocodingRoutes.js');
-const { placesRouter } = await import('./routes/placesRoutes.js');
-const { authenticate } = await import('./middlewares/authenticate.js');
-const { authorizeRole } = await import('./middlewares/authorizeRole.js');
+
+type EmergencySchemasModule = typeof import('./schemas/emergency.js');
+type FacilitySchemasModule = typeof import('./schemas/facility.js');
+type MapsSchemasModule = typeof import('./schemas/maps.js');
+type FacilityServiceModule = typeof import('./services/facilityService.js');
+type FacilityRoutesModule = typeof import('./routes/facilityRoutes.js');
+type GeospatialRoutesModule = typeof import('./routes/geospatialRoutes.js');
+type MapsRoutesModule = typeof import('./routes/mapsRoutes.js');
+type GeocodingRoutesModule = typeof import('./routes/geocodingRoutes.js');
+type PlacesRoutesModule = typeof import('./routes/placesRoutes.js');
+type AuthenticateModule = typeof import('./middlewares/authenticate.js');
+type AuthorizeRoleModule = typeof import('./middlewares/authorizeRole.js');
+
+const {
+  cancelEmergencySchema, createEmergencyRequestSchema, userEmergencyListQuerySchema,
+}: EmergencySchemasModule = await import('./schemas/emergency.js');
+const { facilitySearchQuerySchema }: FacilitySchemasModule = await import('./schemas/facility.js');
+const { routeRequestSchema, nearbyQuerySchema }: MapsSchemasModule = await import('./schemas/maps.js');
+const { hospitalToFacility }: FacilityServiceModule = await import('./services/facilityService.js');
+const { facilityRouter }: FacilityRoutesModule = await import('./routes/facilityRoutes.js');
+const { geospatialRouter }: GeospatialRoutesModule = await import('./routes/geospatialRoutes.js');
+const { mapsRouter }: MapsRoutesModule = await import('./routes/mapsRoutes.js');
+const { geocodingRouter }: GeocodingRoutesModule = await import('./routes/geocodingRoutes.js');
+const { placesRouter }: PlacesRoutesModule = await import('./routes/placesRoutes.js');
+const { authenticate }: AuthenticateModule = await import('./middlewares/authenticate.js');
+const { authorizeRole }: AuthorizeRoleModule = await import('./middlewares/authorizeRole.js');
 
 test('cancelEmergencySchema accepts optional reason and empty payload', () => {
   assert.equal(cancelEmergencySchema.safeParse({}).success, true);
