@@ -71,4 +71,4 @@ hospitalSchema.pre('save', function () {
 hospitalSchema.index({ location: '2dsphere' });
 hospitalSchema.index({ latitude: 1, longitude: 1 });
 
-export const HospitalModel = model<HospitalDocument>('Hospital', hospitalSchema);
+export const HospitalModel = model<HospitalDocument>('Hospital', hospitalSchema, 'Hospitals_data');
