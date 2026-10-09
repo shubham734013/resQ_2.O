@@ -25,8 +25,10 @@ const errorMessage=(error:unknown)=>{
 };
 
 export const LoginPage=({admin=false}:{admin?:boolean})=>{
-  const {login,refreshUser}=useAuth();const navigate=useNavigate();const location=useLocation();
-  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [roleHint,setRoleHint]=useState<LoginRoleHint>('USER');const [error,setError]=useState('');const [isSubmitting,setIsSubmitting]=useState(false);
+  const {login,refreshUser,logout}=useAuth();const navigate=useNavigate();const location=useLocation();
+  const requestedPath=(location.state as {from?:string}|null)?.from??'';
+  const initialRoleHint:LoginRoleHint=requestedPath.startsWith('/ambulance-provider')||requestedPath==='/ambulance/provider'?'AMBULANCE_PROVIDER':requestedPath.startsWith('/ambulance')?'AMBULANCE_DRIVER':requestedPath.startsWith('/hospital')?'HOSPITAL':'USER';
+  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [roleHint,setRoleHint]=useState<LoginRoleHint>(initialRoleHint);const [error,setError]=useState('');const [isSubmitting,setIsSubmitting]=useState(false);
   const finishLogin=useCallback((user:{role:UserRole})=>{
     const from=(location.state as {from?:string}|null)?.from;
     const isTargetMatch=Boolean(from&&(
@@ -40,7 +42,7 @@ export const LoginPage=({admin=false}:{admin?:boolean})=>{
   },[location.state,navigate]);
   const handleSubmit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();setError('');if(!email.trim()||!password){setError('Enter your email and password.');return;}setIsSubmitting(true);try{
     if(admin){const user=(await authApi.adminLogin({email,password})).data.user;if(user.role!=='ADMIN'){setError('This account is not an administrator account.');return;}const authenticated=await refreshUser();if(!authenticated){setError('Your session could not be established. Please try again.');return;}finishLogin(authenticated);}
-    else finishLogin(await login({email,password,roleHint}));
+    else {const user=await login({email,password,roleHint});if(user.role!==roleHint){await logout();setError(`Wrong account type. You selected ${roleHint.replaceAll('_',' ').toLowerCase()}, but this account is ${user.role.replaceAll('_',' ').toLowerCase()}. Select the correct account type and try again.`);return;}finishLogin(user);}
   }catch(error){setError(errorMessage(error));}finally{setIsSubmitting(false);}};
   return <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10"><section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
     <div className="flex items-center gap-3 mb-8"><div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center"><Compass className="h-5 w-5"/></div><div><p className="font-bold text-slate-950">ResQ</p><p className="text-xs text-slate-500">{admin?'Operations access':'Healthcare Navigation'}</p></div></div>
