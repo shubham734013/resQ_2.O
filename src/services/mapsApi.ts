@@ -54,38 +54,6 @@ export const mapsApi = {
       '/geocoding',
       { method: 'POST', body: JSON.stringify({ address }) },
     ),
-  placeSearch: async (query: string): Promise<PlaceSearchResult[]> => {
-    const { loadGoogleMaps } = await import('./googleMapsLoader');
-    const googleMaps = await loadGoogleMaps();
-    const places = await googleMaps.maps.importLibrary('places');
-    const suggestionApi = places.AutocompleteSuggestion as unknown as {
-      fetchAutocompleteSuggestions: (request: { input: string; includedRegionCodes?: string[] }) => Promise<{
-        suggestions: Array<{
-          placePrediction?: {
-            placeId: string;
-            text?: { toString(): string };
-            toPlace(): {
-              fetchFields(options: { fields: string[] }): Promise<void>;
-              displayName?: string;
-              formattedAddress?: string;
-              location?: { lat(): number; lng(): number };
-            };
-          };
-        }>;
-      }>;
-    };
-    const response = await suggestionApi.fetchAutocompleteSuggestions({ input: query });
-    return Promise.all(response.suggestions.filter((s) => s.placePrediction).slice(0, 8).map(async (s) => {
-      const prediction = s.placePrediction;
-      if (!prediction) return { id: '', displayName: '' };
-      const place = prediction.toPlace();
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
-      return {
-        id: prediction.placeId,
-        displayName: place.displayName ?? prediction.text?.toString() ?? 'Place',
-        formattedAddress: place.formattedAddress,
-        location: place.location ? { latitude: place.location.lat(), longitude: place.location.lng() } : undefined,
-      };
-    }));
-  },
+  placeSearch: (query: string): Promise<PlaceSearchResult[]> =>
+    request<PlaceSearchResult[]>('/places/search', { method: 'POST', body: JSON.stringify({ query }) }),
 };

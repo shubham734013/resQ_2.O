@@ -149,7 +149,20 @@ export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInpu
   const a=await AmbulanceDriverModel.create({...input,email:normalizeEmail(input.email),passwordHash,licenseVerificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'}); return identityFromDocument(a,'AMBULANCE_DRIVER');
 };
 
-export const login=async(input:LoginInput)=>{const a=await findAccountByEmail(input.email);if(!a||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
+export const login=async(input:LoginInput)=>{
+  // If the sign-in form selected a role, authenticate against that account collection
+  // rather than silently taking a same-email account from another role.
+  const a = input.roleHint ? await ({
+    USER: findUserAccountByEmail,
+    HOSPITAL: findHospitalAccountByEmail,
+    AMBULANCE_PROVIDER: findProviderAccountByEmail,
+    AMBULANCE_DRIVER: findDriverAccountByEmail,
+  }[input.roleHint])(normalizeEmail(input.email)) : await findAccountByEmail(input.email);
+  if(!a||!a.passwordHash)throw INVALID_CREDENTIALS;
+  if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;
+  assertLoginAllowed(a.accountStatus);
+  return createAuthResult(a);
+};
 export const adminLogin=async(input:LoginInput)=>{if(normalizeEmail(input.email)!==normalizeEmail(env.RESQ_ADMIN_EMAIL))throw INVALID_CREDENTIALS;const a=await findUserAccountByEmail(input.email);if(!a||a.role!=='ADMIN'||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
 
 const createSocialAccount = async (identity: VerifiedSocialIdentity, role: 'USER' | 'AMBULANCE_PROVIDER'): Promise<AccountWithPassword> => {

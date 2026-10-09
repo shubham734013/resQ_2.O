@@ -90,3 +90,27 @@ export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
     </section><style>{`.label{display:block;font-size:.875rem;font-weight:500;color:#334155;margin-bottom:.375rem}.input{width:100%;height:2.75rem;border:1px solid #cbd5e1;border-radius:.5rem;padding:0 .75rem;outline:none}.input:focus{border-color:#64748b;box-shadow:0 0 0 2px rgb(15 23 42 / .08)}`}</style></main>
   );
 };
+
+
+export const RegistrationRoleSelect = () => (
+  <main className="min-h-screen bg-slate-50 px-4 py-10 flex items-center justify-center">
+    <section className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <Link to="/login" className="text-sm font-semibold text-slate-600 hover:text-slate-950">← Back to sign in</Link>
+      <h1 className="mt-6 text-2xl font-bold text-slate-950">Choose your ResQ account type</h1>
+      <p className="mt-2 text-sm text-slate-500">Choose the account you need. Ambulance provider and driver registrations are separate from patient/user accounts.</p>
+      <div className="mt-6 grid gap-3">
+        {[
+          { title: 'Patient / User', description: 'Find healthcare facilities and request emergency help.', to: '/register/user' },
+          { title: 'Ambulance Provider', description: 'Register a fleet or ambulance service provider.', to: '/ambulance-provider/register' },
+          { title: 'Ambulance Driver', description: 'Register as a driver linked to an approved provider.', to: '/ambulance-driver/register' },
+          { title: 'Hospital', description: 'Register a hospital for operational verification.', to: '/hospital/register' },
+        ].map((item) => (
+          <Link key={item.to} to={item.to} className="rounded-xl border border-slate-200 p-4 hover:border-slate-400 hover:bg-slate-50">
+            <span className="block font-semibold text-slate-900">{item.title}</span>
+            <span className="mt-1 block text-sm text-slate-500">{item.description}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  </main>
+);
