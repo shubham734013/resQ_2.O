@@ -25,4 +25,4 @@ const userSchema = new Schema<UserDocument>({
 userSchema.index({ authProvider: 1, providerSubject: 1 }, { unique: true, partialFilterExpression: { providerSubject: { $type: 'string' } } });
 userSchema.index({ latitude: 1, longitude: 1 });
 userSchema.index({ savedFacilityIds: 1 });
-export const UserModel = model<UserDocument>('User', userSchema);
+export const UserModel = model<UserDocument>('User', userSchema, 'User_Data');
