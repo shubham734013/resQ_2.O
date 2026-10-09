@@ -3,9 +3,8 @@ import { authenticate } from '../middlewares/authenticate.js';
 import { authorizeRole } from '../middlewares/authorizeRole.js';
 import { validateBody } from '../middlewares/validate.js';
 import { z } from 'zod';
-import { locationUpdateSchema } from '../schemas/location.js';
 import {
- providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,
+ providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,ambulanceLocationUpdateSchema,
  providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,
 } from '../schemas/ambulance.js';
 import * as c from '../controllers/ambulanceOperationsController.js';
@@ -35,11 +34,11 @@ provider.get('/trips/:id',c.providerTrip);
 
 const driver=Router();
 driver.use(authenticate,authorizeRole('AMBULANCE_DRIVER'));
-driver.patch('/location',validateBody(locationUpdateSchema),c.driverLocationUpdate);
 driver.get('/profile',c.driverProfile);
 driver.patch('/profile',validateBody(driverUpdateSchema.omit({password:true})),c.driverProfileUpdate);
 driver.get('/status',c.driverStatus);
 driver.patch('/status',validateBody(driverStatusSchema),c.driverStatusUpdate);
+driver.patch('/location',validateBody(ambulanceLocationUpdateSchema),c.driverLocationUpdate);
 driver.get('/requests',validateQuery(driverRequestQuerySchema),c.driverRequests);
 driver.get('/requests/:id',c.driverRequest);
 driver.post('/requests/:id/accept',c.driverAccept);

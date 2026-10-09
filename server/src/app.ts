@@ -19,7 +19,7 @@ const allowedOrigins=getAllowedOrigins();
 
 app.disable('x-powered-by');
 app.use(securityHeaders);
-app.use(originGuard);
+// Handle CORS preflight before origin/CSRF guards.
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) { callback(null, true); return; }
@@ -28,7 +28,9 @@ app.use(cors({
   },
   credentials:true,
 }));
+app.use(originGuard);
 app.use(mutationOriginGuard);
+app.use(express.urlencoded({extended:false,limit:'100kb'}));
 app.use(express.json({limit:'1mb'}));
 
 app.use('/api/v1/health',healthRouter);
