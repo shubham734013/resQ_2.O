@@ -52,7 +52,7 @@ export const LoginPage=({admin=false}:{admin?:boolean})=>{
       {error&&<p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700" role="alert">{error}</p>}
       <button type="submit" disabled={isSubmitting} className="w-full h-11 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-60 inline-flex items-center justify-center gap-2">{isSubmitting&&<Loader2 className="h-4 w-4 animate-spin"/>}{isSubmitting?'Signing in…':'Sign in'}</button>
     </form>
-    {!admin&&<SocialAuthButtons roleHint={roleHint} onSuccess={finishLogin} onError={setError}/>}
+    {!admin&&<SocialAuthButtons roleHint={roleHint === 'AMBULANCE_PROVIDER' ? 'AMBULANCE_PROVIDER' : 'USER'} onSuccess={finishLogin} onError={setError}/>}
     {!admin&&<p className="mt-6 text-center text-sm text-slate-500">New to ResQ? <Link className="font-semibold text-slate-900 hover:underline" to="/register">Create an account</Link></p>}
     {admin&&<p className="mt-6 text-center text-sm"><Link className="text-slate-600 hover:text-slate-950" to="/login">Back to standard sign in</Link></p>}
   </section></main>;
