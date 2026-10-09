@@ -1,5 +1,4 @@
 import { Schema, model, Types } from 'mongoose';
-import type { Role } from '../types/roles.js';
 
 export const EMERGENCY_HISTORY_ACTOR_ROLES = ['USER','HOSPITAL','AMBULANCE_PROVIDER','AMBULANCE_DRIVER','ADMIN','SYSTEM'] as const;
 export type EmergencyHistoryActorRole = (typeof EMERGENCY_HISTORY_ACTOR_ROLES)[number];
