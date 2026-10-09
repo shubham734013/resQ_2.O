@@ -13,6 +13,16 @@ import { authenticate } from './middlewares/authenticate.js';
 import { authorizeRole } from './middlewares/authorizeRole.js';
 import { Types } from 'mongoose';
 
+// Router imports transitively load server configuration. Keep this contract test
+// self-contained in CI by supplying valid non-production values before imports
+// that depend on the validated environment module are evaluated.
+process.env.NODE_ENV ??= 'test';
+process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
+process.env.JWT_SECRET ??= 'test-only-jwt-secret-000000000000000000000000';
+process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-00000000000000000000';
+process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
+process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-admin-password';
+
 test('cancelEmergencySchema accepts optional reason and empty payload', () => {
   assert.equal(cancelEmergencySchema.safeParse({}).success, true);
   assert.equal(cancelEmergencySchema.safeParse({ reason: 'Patient already en route' }).success, true);
