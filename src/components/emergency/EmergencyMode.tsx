@@ -19,8 +19,8 @@ export const EmergencyMode = ({
   children,
   className = '',
 }: EmergencyModeProps) => {
-  const handleCall911 = () => {
-    window.location.href = 'tel:911';
+  const handleCallEmergencyServices = () => {
+    window.location.href = 'tel:112';
   };
 
   return (
@@ -74,11 +74,11 @@ export const EmergencyMode = ({
               variant="emergency"
               size="sm"
               icon={<Phone className="w-3.5 h-3.5 text-white" aria-hidden="true" />}
-              onClick={handleCall911}
-              aria-label="Call emergency dispatch 911 immediately"
+              onClick={handleCallEmergencyServices}
+              aria-label="Call emergency services at 112"
               className="tracking-tight text-xs font-semibold py-1.5 px-3"
             >
-              <span>Call 911</span>
+              <span>Call 112</span>
             </Button>
           </div>
         </div>
