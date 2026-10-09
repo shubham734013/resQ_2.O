@@ -39,12 +39,18 @@ export const AppHeader = ({ userLocation, isUpdatingLocation = false, onRefreshL
           {navigation.map(({ path, label }) => <NavLink key={path} to={path} className={({ isActive }) => `px-3 py-1.5 rounded-md transition-colors ${isActive ? 'bg-slate-100 text-slate-950 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}>{label}</NavLink>)}
         </nav>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="hidden lg:block max-w-36 truncate text-xs text-slate-500" title={user?.email}>{user?.email}</span>
-          <button type="button" onClick={() => void handleLogout()} className="hidden sm:inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50" aria-label="Log out"><LogOut className="h-3.5 w-3.5" />Logout</button>
+          {user ? (
+            <>
+              <span className="hidden lg:block max-w-36 truncate text-xs text-slate-500" title={user.email}>{user.email}</span>
+              <button type="button" onClick={() => void handleLogout()} className="hidden sm:inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50" aria-label="Log out"><LogOut className="h-3.5 w-3.5" />Logout</button>
+            </>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => navigate('/login')} className="hidden sm:inline-flex">Sign In</Button>
+          )}
           <Button variant="emergency" size="sm" icon={<ShieldAlert className="w-4 h-4 text-white" aria-hidden="true" />} onClick={() => navigate('/sos')} aria-label="Access Emergency SOS coordination" className="tracking-tight px-3 py-1.5 text-xs sm:text-sm font-semibold"><span className="hidden sm:inline">Emergency SOS</span><span className="sm:hidden">SOS</span></Button>
         </div>
       </div>
-      <div className="sm:hidden px-4 py-1.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between"><LocationIndicator location={userLocation} isUpdating={isUpdatingLocation} onRefresh={onRefreshLocation} compact className="border-none bg-transparent shadow-none p-0 text-[11px]" /><button type="button" onClick={() => void handleLogout()} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" aria-label="Log out"><LogOut className="h-3.5 w-3.5" />Logout</button></div>
+      <div className="sm:hidden px-4 py-1.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between"><LocationIndicator location={userLocation} isUpdating={isUpdatingLocation} onRefresh={onRefreshLocation} compact className="border-none bg-transparent shadow-none p-0 text-[11px]" />{user ? <button type="button" onClick={() => void handleLogout()} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" aria-label="Log out"><LogOut className="h-3.5 w-3.5" />Logout</button> : <button type="button" onClick={() => navigate('/login')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700">Sign In</button>}</div>
     </header>
   );
 };

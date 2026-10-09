@@ -56,11 +56,15 @@ export const listHospitals=async(o:HospitalFilters)=>{const filter:Record<string
 export const getHospital=async(id:string)=>{safeId(id);const x=await HospitalModel.findById(id).select('-passwordHash').lean().exec();if(!x)throw new AppError('NOT_FOUND','Hospital not found',404);return hospitalOut(x as unknown as Record<string,unknown>)};
 export const updateHospitalVerification=async(id:string,verificationStatus:VerificationStatus,actorId?:string)=>{
   safeId(id);
-  const prev=await HospitalModel.findById(id).select('verificationStatus').lean().exec();
+  const prev=await HospitalModel.findById(id).select('verificationStatus accountStatus').lean().exec();
   if(!prev)throw new AppError('NOT_FOUND','Hospital not found',404);
-  const x=await HospitalModel.findByIdAndUpdate(id,{verificationStatus},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
+  const updateDoc: Record<string, unknown> = { verificationStatus };
+  if (verificationStatus === 'VERIFIED' && prev.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'ACTIVE';
+  }
+  const x=await HospitalModel.findByIdAndUpdate(id,{$set:updateDoc},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Hospital not found',404);
-  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_HOSPITAL_VERIFICATION',entityType:'HOSPITAL',entityId:id,previousState:{verificationStatus:prev.verificationStatus},newState:{verificationStatus}});
+  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_HOSPITAL_VERIFICATION',entityType:'HOSPITAL',entityId:id,previousState:{verificationStatus:prev.verificationStatus,accountStatus:prev.accountStatus},newState:{verificationStatus,accountStatus:x.accountStatus as AccountStatus}});
   return hospitalOut(x as unknown as Record<string,unknown>);
 };
 export const updateHospitalStatus=async(id:string,status:Extract<AccountStatus,'ACTIVE'|'SUSPENDED'|'REJECTED'>,actorId?:string)=>{
@@ -83,11 +87,15 @@ export const listProviders=async(o:ProviderFilters)=>{const filter:Record<string
 export const getProvider=async(id:string)=>{safeId(id);const x=await AmbulanceProviderModel.findById(id).select('-passwordHash').lean().exec();if(!x)throw new AppError('NOT_FOUND','Ambulance provider not found',404);const ambulanceCount=await AmbulanceModel.countDocuments({providerId:x._id});return {...x,id:String(x._id),ambulanceCount} as unknown as AdminAmbulanceProvider};
 export const updateProviderVerification=async(id:string,verificationStatus:VerificationStatus,actorId?:string)=>{
   safeId(id);
-  const prev=await AmbulanceProviderModel.findById(id).select('verificationStatus').lean().exec();
+  const prev=await AmbulanceProviderModel.findById(id).select('verificationStatus accountStatus').lean().exec();
   if(!prev)throw new AppError('NOT_FOUND','Ambulance provider not found',404);
-  const x=await AmbulanceProviderModel.findByIdAndUpdate(id,{verificationStatus},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
+  const updateDoc: Record<string, unknown> = { verificationStatus };
+  if (verificationStatus === 'VERIFIED' && prev.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'ACTIVE';
+  }
+  const x=await AmbulanceProviderModel.findByIdAndUpdate(id,{$set:updateDoc},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Ambulance provider not found',404);
-  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_PROVIDER_VERIFICATION',entityType:'AMBULANCE_PROVIDER',entityId:id,previousState:{verificationStatus:prev.verificationStatus},newState:{verificationStatus}});
+  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_PROVIDER_VERIFICATION',entityType:'AMBULANCE_PROVIDER',entityId:id,previousState:{verificationStatus:prev.verificationStatus,accountStatus:prev.accountStatus},newState:{verificationStatus,accountStatus:x.accountStatus as AccountStatus}});
   return {...x,id:String(x._id),ambulanceCount:await AmbulanceModel.countDocuments({providerId:x._id})} as unknown as AdminAmbulanceProvider;
 };
 export const updateProviderStatus=async(id:string,status:Extract<AccountStatus,'ACTIVE'|'SUSPENDED'|'REJECTED'>,actorId?:string)=>{
@@ -118,8 +126,13 @@ export const updateAmbulanceVerification=async(id:string,verificationStatus:Veri
   const x=await AmbulanceModel.findById(id).lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Ambulance not found',404);
   if(verificationStatus==='VERIFIED'){const provider=await AmbulanceProviderModel.findOne({_id:x.providerId,accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).select('_id').lean().exec();if(!provider)throw new AppError('PROVIDER_NOT_OPERATIONAL','Ambulance provider must be active and verified before ambulance verification',409);if(!x.registrationNumber||!x.vehicleNumber||!x.ambulanceType)throw new AppError('AMBULANCE_INVALID','Required ambulance registration data is incomplete',409);}
-  await AmbulanceModel.updateOne({_id:x._id},{$set:{verificationStatus}}).exec();
-  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_AMBULANCE_VERIFICATION',entityType:'AMBULANCE',entityId:id,previousState:{verificationStatus:x.verificationStatus},newState:{verificationStatus}});
+  const updateDoc: Record<string, unknown> = { verificationStatus };
+  if (verificationStatus === 'VERIFIED' && x.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'ACTIVE';
+    updateDoc.currentStatus = 'AVAILABLE';
+  }
+  await AmbulanceModel.updateOne({_id:x._id},{$set:updateDoc}).exec();
+  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_AMBULANCE_VERIFICATION',entityType:'AMBULANCE',entityId:id,previousState:{verificationStatus:x.verificationStatus,accountStatus:x.accountStatus},newState:{verificationStatus,accountStatus:(updateDoc.accountStatus ?? x.accountStatus) as AccountStatus}});
   return getAmbulance(id);
 };
 export const updateAmbulanceStatus=async(id:string,status:Extract<AccountStatus,'ACTIVE'|'SUSPENDED'|'REJECTED'>,actorId?:string)=>{
@@ -140,8 +153,12 @@ export const updateDriverVerification=async(id:string,verificationStatus:Verific
   safeId(id);
   const d=await AmbulanceDriverModel.findById(id).lean().exec();
   if(!d)throw new AppError('NOT_FOUND','Ambulance driver not found',404);
-  await AmbulanceDriverModel.updateOne({_id:id},{$set:{licenseVerificationStatus:verificationStatus}}).exec();
-  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_DRIVER_VERIFICATION',entityType:'AMBULANCE_DRIVER',entityId:id,previousState:{licenseVerificationStatus:d.licenseVerificationStatus},newState:{licenseVerificationStatus:verificationStatus}});
+  const updateDoc: Record<string, unknown> = { licenseVerificationStatus: verificationStatus };
+  if (verificationStatus === 'VERIFIED' && d.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'ACTIVE';
+  }
+  await AmbulanceDriverModel.updateOne({_id:id},{$set:updateDoc}).exec();
+  await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_DRIVER_VERIFICATION',entityType:'AMBULANCE_DRIVER',entityId:id,previousState:{licenseVerificationStatus:d.licenseVerificationStatus,accountStatus:d.accountStatus},newState:{licenseVerificationStatus:verificationStatus,accountStatus:(updateDoc.accountStatus ?? d.accountStatus) as AccountStatus}});
   return getDriver(id);
 };
 export const updateDriverStatus=async(id:string,status:Extract<AccountStatus,'ACTIVE'|'SUSPENDED'|'REJECTED'>,actorId?:string)=>{

@@ -97,7 +97,7 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
           distanceField: 'distanceMeters',
           spherical: true,
           maxDistance: query.radiusMeters,
-          query: baseFilter,
+          query: { ...baseFilter, location: { $exists: true } },
         },
       },
       {
