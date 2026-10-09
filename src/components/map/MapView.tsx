@@ -48,7 +48,8 @@ export const MapView = ({
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(zoom);
 
-  const fallbackCenter = center ?? (userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : destination ?? { latitude: 0, longitude: 0 });
+  // Keep the map useful before geolocation or a destination has been selected.
+  const fallbackCenter = center ?? (userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : destination ?? { latitude: 22.9734, longitude: 78.6569 });
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +189,7 @@ export const MapView = ({
   };
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google Maps">
+    <div className={`relative w-full h-full min-h-[16rem] overflow-hidden bg-slate-100 ${className}`} role="region" aria-label="Google Maps">
       <div ref={containerRef} className="absolute inset-0" />
       {status === 'loading' && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 z-10">
@@ -199,7 +200,7 @@ export const MapView = ({
         <div className="absolute inset-0 flex items-center justify-center p-6 bg-slate-100 z-10">
           <div className="max-w-sm rounded-xl border border-rose-200 bg-white p-5 shadow-sm text-center">
             <p className="font-semibold text-slate-900">Map unavailable</p>
-            <p className="mt-1 text-xs text-slate-500">{error === 'MAPS_API_KEY_MISSING' ? 'Google Maps is not configured. Add VITE_GOOGLE_MAPS_API_KEY to the frontend environment.' : 'Google Maps could not be loaded.'}</p>
+            <p className="mt-1 text-xs text-slate-500">{error === 'MAPS_API_KEY_MISSING' ? 'Google Maps is not configured. Add VITE_GOOGLE_MAPS_API_KEY to the frontend environment and restart Vite.' : error === 'MAPS_API_AUTH_FAILURE' ? 'Google rejected the Maps key. Check Maps JavaScript API enablement, billing, and website referrer restrictions in Google Cloud Console.' : error === 'MAPS_API_LOAD_TIMEOUT' ? 'Google Maps did not respond in time. Check your network, browser extensions, and API key restrictions, then retry.' : 'Google Maps could not be loaded. Check the browser Console for the Google Maps JavaScript API error.'}</p>
             <button type="button" onClick={() => window.location.reload()} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"><RefreshCw className="h-3.5 w-3.5" /> Retry</button>
           </div>
         </div>
