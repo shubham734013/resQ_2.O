@@ -3,14 +3,25 @@ import assert from 'node:assert/strict';
 import { Types } from 'mongoose';
 
 // Router modules transitively import the validated server environment. Initialize
-// non-production test defaults before those modules load. Dynamic imports below
-// ensure env.ts sees these values when it is first evaluated.
+// non-production test defaults before loading modules that depend on env.ts.
 process.env.NODE_ENV ??= 'test';
 process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
 process.env.JWT_SECRET ??= 'test-only-jwt-secret-000000000000000000000000';
 process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-00000000000000000000';
 process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
 process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-admin-password';
+
+const { cancelEmergencySchema, createEmergencyRequestSchema, userEmergencyListQuerySchema } = await import('./schemas/emergency.js');
+const { facilitySearchQuerySchema } = await import('./schemas/facility.js');
+const { routeRequestSchema, nearbyQuerySchema } = await import('./schemas/maps.js');
+const { hospitalToFacility } = await import('./services/facilityService.js');
+const { facilityRouter } = await import('./routes/facilityRoutes.js');
+const { geospatialRouter } = await import('./routes/geospatialRoutes.js');
+const { mapsRouter } = await import('./routes/mapsRoutes.js');
+const { geocodingRouter } = await import('./routes/geocodingRoutes.js');
+const { placesRouter } = await import('./routes/placesRoutes.js');
+const { authenticate } = await import('./middlewares/authenticate.js');
+const { authorizeRole } = await import('./middlewares/authorizeRole.js');
 
 test('cancelEmergencySchema accepts optional reason and empty payload', () => {
   assert.equal(cancelEmergencySchema.safeParse({}).success, true);
