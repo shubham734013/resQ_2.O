@@ -42,6 +42,7 @@ export const ambulanceDriverRegistrationSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
+  roleHint: z.enum(['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER']).optional(),
 });
 export const socialAuthSchema = z.object({
   credential: z.string().min(20).max(10000),
