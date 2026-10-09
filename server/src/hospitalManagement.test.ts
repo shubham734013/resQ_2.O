@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hospitalProfileUpdateSchema, hospitalEmergencyStatusUpdateSchema, hospitalResourcesUpdateSchema } from './schemas/hospital.js';
-import { hospitalOwnershipFilter } from './services/hospitalService.js';
+import { hospitalProfileUpdateSchema, hospitalEmergencyStatusUpdateSchema, hospitalResourcesUpdateSchema, hospitalEmergencyListQuerySchema } from './schemas/hospital.js';
+import { allowedEmergencyTransition, hospitalOwnershipFilter } from './services/hospitalService.js';
 
 test('hospital profile rejects admin-owned fields', () => {
   const result = hospitalProfileUpdateSchema.safeParse({ accountStatus: 'ACTIVE' });
@@ -24,4 +24,20 @@ test('hospital ownership filter is derived from authenticated hospital identity'
   assert.notEqual(String(first.hospitalId), String(second.hospitalId));
   assert.equal(String(first.hospitalId), '507f1f77bcf86cd799439011');
   assert.throws(() => hospitalOwnershipFilter('not-an-id'));
+});
+
+test('emergency transition rules allow only the operational state machine', () => {
+  assert.deepEqual(allowedEmergencyTransition.RECEIVED, ['REVIEWING', 'CANCELLED']);
+  assert.deepEqual(allowedEmergencyTransition.REVIEWING, ['PREPARING', 'CANCELLED']);
+  assert.deepEqual(allowedEmergencyTransition.PREPARING, ['AMBULANCE_COORDINATION', 'RESOLVED', 'CANCELLED']);
+  assert.deepEqual(allowedEmergencyTransition.AMBULANCE_COORDINATION, ['RESOLVED', 'CANCELLED']);
+  assert.deepEqual(allowedEmergencyTransition.RESOLVED, []);
+  assert.deepEqual(allowedEmergencyTransition.CANCELLED, []);
+  assert.equal(allowedEmergencyTransition.RECEIVED.includes('PREPARING'), false);
+});
+
+test('emergency queue query validates search and bounded pagination', () => {
+  assert.equal(hospitalEmergencyListQuerySchema.safeParse({ search: 'RSQ-ABC123', page: 1, limit: 50 }).success, true);
+  assert.equal(hospitalEmergencyListQuerySchema.safeParse({ page: 0 }).success, false);
+  assert.equal(hospitalEmergencyListQuerySchema.safeParse({ limit: 101 }).success, false);
 });

@@ -2,8 +2,6 @@ import {
   Phone,
   X,
   LocateFixed,
-  FastForward,
-  CheckCircle2,
   Clock,
   Navigation,
 } from 'lucide-react';
@@ -22,7 +20,6 @@ export interface NavigationControlsProps {
   onRecenter: () => void;
   onCallFacility: () => void;
   onEndNavigation: () => void;
-  onSimulateArrival: () => void;
   isEmergency?: boolean;
   className?: string;
 }
@@ -39,7 +36,6 @@ export const NavigationControls = ({
   onRecenter,
   onCallFacility,
   onEndNavigation,
-  onSimulateArrival,
   isEmergency = false,
   className = '',
 }: NavigationControlsProps) => {
@@ -101,9 +97,8 @@ export const NavigationControls = ({
         </div>
       </div>
 
-      {/* Primary Action Controls: End Navigation, Step Simulation, Arrive */}
+      {/* Operational navigation controls */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
-        {/* End Navigation Button */}
         <div className="sm:col-span-4">
           <Button
             variant="outline"
@@ -111,39 +106,23 @@ export const NavigationControls = ({
             fullWidth
             icon={<X className="w-4 h-4 text-rose-600" />}
             onClick={onEndNavigation}
-            aria-label="End Navigation"
+            aria-label="End navigation"
             className="text-rose-700 hover:text-rose-800 hover:border-rose-300 font-semibold"
           >
-            End Trip
+            End navigation
           </Button>
         </div>
 
-        {/* Prototype Step Simulation / Advance Turn */}
-        <div className="sm:col-span-4">
+        <div className="sm:col-span-8">
           <Button
             variant="secondary"
             size="md"
             fullWidth
-            icon={<FastForward className="w-4 h-4" />}
             onClick={onNextStep}
-            aria-label="Advance next turn in simulation"
+            aria-label="Advance to next navigation instruction"
+            disabled={currentStepIndex + 1 >= totalSteps}
           >
-            Next Turn
-          </Button>
-        </div>
-
-        {/* Direct Arrive Trigger */}
-        <div className="sm:col-span-4">
-          <Button
-            variant="primary"
-            size="md"
-            fullWidth
-            icon={<CheckCircle2 className="w-4 h-4" />}
-            onClick={onSimulateArrival}
-            aria-label="Trigger destination arrival"
-            className="font-bold"
-          >
-            Arrived
+            Next instruction
           </Button>
         </div>
       </div>

@@ -4,9 +4,10 @@ import type {
   HospitalPatient,
   HospitalProfile,
   HospitalPagination,
+  HospitalEmergencySummary,
 } from '../types/hospitalManagement';
 
-const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:5001/api/v1');
+const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
 
 export class HospitalApiError extends Error {
   public readonly status: number;
@@ -21,7 +22,7 @@ export class HospitalApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
@@ -56,6 +57,7 @@ export interface HospitalListParams {
   page?: number;
   limit?: number;
   status?: string;
+  search?: string;
   from?: string;
   to?: string;
   situationType?: string;
@@ -80,6 +82,7 @@ export const hospitalApi = {
   getResources: () => request<{ resourceSummary: Record<string, number>; updatedAt: string }>('/hospital/resources'),
   updateResources: (resourceSummary: Record<string, number>) => request<{ resourceSummary: Record<string, number>; updatedAt: string }>('/hospital/resources', { method: 'PATCH', body: JSON.stringify({ resourceSummary }) }),
 
+  getEmergencySummary: () => request<HospitalEmergencySummary>('/hospital/emergencies/summary'),
   getEmergencies: (params: HospitalListParams = {}) =>
     request<{ items: HospitalEmergency[]; pagination: HospitalPagination }>(`/hospital/emergencies${query(params)}`),
   getEmergency: (id: string) => request<HospitalEmergency>(`/hospital/emergencies/${encodeURIComponent(id)}`),

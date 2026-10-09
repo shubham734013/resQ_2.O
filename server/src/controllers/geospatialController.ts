@@ -7,7 +7,7 @@ export const nearbyFacilitiesController = async (_req: AuthenticatedRequest, res
   res.json({ success: true, data });
 };
 
-export const nearbyAmbulancesController = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const data = await listNearbyAmbulances(res.locals.validatedQuery);
+export const nearbyAmbulancesController = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const data = await listNearbyAmbulances(res.locals.validatedQuery, req.auth);
   res.json({ success: true, data });
 };

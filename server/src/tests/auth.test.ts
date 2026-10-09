@@ -1,15 +1,30 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { userRegistrationSchema, hospitalRegistrationSchema, ambulanceProviderRegistrationSchema, ambulanceDriverRegistrationSchema, loginSchema } from '../schemas/auth.js';
-import { authorizeRole } from '../middlewares/authorizeRole.js';
 
 process.env.MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/resq-test';
-process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'unit-test-access-secret';
-process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'unit-test-refresh-secret';
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'unit-test-access-secret-32-chars-ok!';
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'unit-test-refresh-secret-32-chars-ok!';
 process.env.RESQ_ADMIN_EMAIL = process.env.RESQ_ADMIN_EMAIL ?? 'admin@example.com';
 process.env.RESQ_ADMIN_PASSWORD = process.env.RESQ_ADMIN_PASSWORD ?? 'UnitTestAdminPassword123!';
 
-const { assertLoginAllowed } = await import('../services/authService.js');
+const [
+  { userRegistrationSchema, hospitalRegistrationSchema, ambulanceProviderRegistrationSchema, ambulanceDriverRegistrationSchema, loginSchema, socialAuthSchema },
+  { authorizeRole },
+  { verifySocialCredential, setSocialCredentialVerifierForTest, resetSocialCredentialVerifierForTest },
+  { errorHandler },
+  { getCookie, setAuthCookies, clearAuthCookies, ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE },
+  { assertLoginAllowed },
+  bcryptModule,
+] = await Promise.all([
+  import('../schemas/auth.js'),
+  import('../middlewares/authorizeRole.js'),
+  import('../providers/socialIdentity.js'),
+  import('../middlewares/errorHandler.js'),
+  import('../utils/cookies.js'),
+  import('../services/authService.js'),
+  import('bcrypt'),
+]);
+const bcrypt = bcryptModule.default;
 
 const validBase = {
   name: 'Test User',
@@ -104,5 +119,155 @@ describe('account status policy', () => {
 
   it('rejects PENDING accounts with an operational approval response', () => {
     assert.throws(() => assertLoginAllowed('PENDING'), { code: 'ACCOUNT_PENDING' });
+  });
+});
+
+describe('social authentication validation', () => {
+  it('validates a valid social credential payload', () => {
+    const parsed = socialAuthSchema.parse({ credential: 'mock-google-id-token-with-sufficient-length', roleHint: 'USER' });
+    assert.equal(parsed.roleHint, 'USER');
+    assert.equal(parsed.credential, 'mock-google-id-token-with-sufficient-length');
+  });
+
+  it('rejects short credentials', () => {
+    assert.throws(() => socialAuthSchema.parse({ credential: 'too-short' }));
+  });
+
+  it('allows ambulance provider roleHint', () => {
+    const parsed = socialAuthSchema.parse({ credential: 'mock-microsoft-id-token-sufficient-length', roleHint: 'AMBULANCE_PROVIDER' });
+    assert.equal(parsed.roleHint, 'AMBULANCE_PROVIDER');
+  });
+});
+
+describe('social credential verification provider hook', () => {
+  it('verifies Google credentials via provider hook', async () => {
+    setSocialCredentialVerifierForTest(async (provider, credential) => {
+      assert.equal(provider, 'GOOGLE');
+      assert.equal(credential, 'test-google-token');
+      return {
+        provider: 'GOOGLE',
+        providerSubject: 'g-sub-12345',
+        email: 'google.user@example.com',
+        name: 'Google User',
+        emailVerified: true,
+      };
+    });
+
+    const result = await verifySocialCredential('GOOGLE', 'test-google-token');
+    assert.equal(result.provider, 'GOOGLE');
+    assert.equal(result.email, 'google.user@example.com');
+    assert.equal(result.emailVerified, true);
+    resetSocialCredentialVerifierForTest();
+  });
+
+  it('verifies Microsoft credentials via provider hook', async () => {
+    setSocialCredentialVerifierForTest(async (provider, credential) => {
+      assert.equal(provider, 'MICROSOFT');
+      assert.equal(credential, 'test-ms-token');
+      return {
+        provider: 'MICROSOFT',
+        providerSubject: 'ms-oid-67890',
+        email: 'ms.user@example.com',
+        name: 'Microsoft User',
+        emailVerified: true,
+      };
+    });
+
+    const result = await verifySocialCredential('MICROSOFT', 'test-ms-token');
+    assert.equal(result.provider, 'MICROSOFT');
+    assert.equal(result.email, 'ms.user@example.com');
+    assert.equal(result.emailVerified, true);
+    resetSocialCredentialVerifierForTest();
+  });
+});
+
+describe('database duplicate key error handling', () => {
+  const createMockRes = () => {
+    const res: { statusCode: number; jsonBody: Record<string, unknown>; status: (code: number) => typeof res; json: (body: unknown) => typeof res } = {
+      statusCode: 200,
+      jsonBody: {},
+      status(code: number) { this.statusCode = code; return this; },
+      json(body: unknown) { this.jsonBody = body as Record<string, unknown>; return this; },
+    };
+    return res;
+  };
+
+  it('maps email duplicate key error to EMAIL_ALREADY_EXISTS', () => {
+    const res = createMockRes();
+    const error = { code: 11000, keyPattern: { email: 1 } };
+    errorHandler(error, { method: 'POST', path: '/auth/register' } as never, res as never, () => {});
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(res.jsonBody, {
+      success: false,
+      error: { code: 'EMAIL_ALREADY_EXISTS', message: 'An account with this email already exists' },
+    });
+  });
+
+  it('maps phone duplicate key error to PHONE_ALREADY_EXISTS', () => {
+    const res = createMockRes();
+    const error = { code: 11000, keyPattern: { phone: 1 } };
+    errorHandler(error, { method: 'POST', path: '/auth/register' } as never, res as never, () => {});
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(res.jsonBody, {
+      success: false,
+      error: { code: 'PHONE_ALREADY_EXISTS', message: 'An account with this phone number already exists' },
+    });
+  });
+
+  it('maps registrationNumber duplicate key error to REGISTRATION_NUMBER_ALREADY_EXISTS', () => {
+    const res = createMockRes();
+    const error = { code: 11000, keyPattern: { registrationNumber: 1 } };
+    errorHandler(error, { method: 'POST', path: '/auth/register/hospital' } as never, res as never, () => {});
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(res.jsonBody, {
+      success: false,
+      error: { code: 'REGISTRATION_NUMBER_ALREADY_EXISTS', message: 'Registration number is already in use' },
+    });
+  });
+
+  it('maps licenseNumber duplicate key error to LICENSE_NUMBER_ALREADY_EXISTS', () => {
+    const res = createMockRes();
+    const error = { code: 11000, keyPattern: { licenseNumber: 1 } };
+    errorHandler(error, { method: 'POST', path: '/auth/register/driver' } as never, res as never, () => {});
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(res.jsonBody, {
+      success: false,
+      error: { code: 'LICENSE_NUMBER_ALREADY_EXISTS', message: 'License number is already in use' },
+    });
+  });
+});
+
+describe('cookie session utilities', () => {
+  it('extracts cookies from header', () => {
+    const req = { headers: { cookie: `${ACCESS_TOKEN_COOKIE}=test-access; ${REFRESH_TOKEN_COOKIE}=test-refresh` } };
+    assert.equal(getCookie(req as never, ACCESS_TOKEN_COOKIE), 'test-access');
+    assert.equal(getCookie(req as never, REFRESH_TOKEN_COOKIE), 'test-refresh');
+    assert.equal(getCookie(req as never, 'non_existent'), undefined);
+  });
+
+  it('sets and clears authentication cookies', () => {
+    const cookiesSet: Record<string, unknown> = {};
+    const cookiesCleared: string[] = [];
+    const res = {
+      cookie(name: string, value: string, options: unknown) { cookiesSet[name] = { value, options }; },
+      clearCookie(name: string) { cookiesCleared.push(name); },
+    };
+    setAuthCookies(res as never, 'token-a', 'token-r');
+    assert.equal(ACCESS_TOKEN_COOKIE in cookiesSet, true);
+    assert.equal(REFRESH_TOKEN_COOKIE in cookiesSet, true);
+
+    clearAuthCookies(res as never);
+    assert.equal(cookiesCleared.includes(ACCESS_TOKEN_COOKIE), true);
+    assert.equal(cookiesCleared.includes(REFRESH_TOKEN_COOKIE), true);
+  });
+});
+
+describe('password hashing and verification', () => {
+  it('hashes and verifies passwords securely using bcrypt', async () => {
+    const raw = 'SecureSecretPassword123!';
+    const hashed = await bcrypt.hash(raw, 10);
+    assert.notEqual(raw, hashed);
+    assert.equal(await bcrypt.compare(raw, hashed), true);
+    assert.equal(await bcrypt.compare('WrongSecretPassword!', hashed), false);
   });
 });

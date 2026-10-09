@@ -39,8 +39,11 @@ export interface HospitalEmergency {
   longitude?: number;
   status: HospitalEmergencyStatus;
   ambulanceId?: string;
+  ambulanceProviderId?: string;
+  driverId?: string;
   patientId?: string;
   etaMinutes?: number;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -71,4 +74,13 @@ export interface HospitalAmbulance {
   emergencyId?: string;
   etaMinutes?: number;
   updatedAt: string;
+}
+
+export interface HospitalEmergencySummary {
+  RECEIVED: number;
+  REVIEWING: number;
+  PREPARING: number;
+  AMBULANCE_COORDINATION: number;
+  RESOLVED: number;
+  CANCELLED: number;
 }

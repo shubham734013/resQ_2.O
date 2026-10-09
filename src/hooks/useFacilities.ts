@@ -7,10 +7,13 @@ export interface UseFacilitiesFilter {
   searchQuery?: string;
   category?: FacilityCategory;
   emergencyOnly?: boolean;
+  latitude?: number;
+  longitude?: number;
+  radiusMeters?: number;
 }
 
 export function useFacilities(filters: UseFacilitiesFilter = {}) {
-  const { searchQuery = '', category = 'all', emergencyOnly = false } = filters;
+  const { searchQuery = '', category = 'all', emergencyOnly = false, latitude, longitude, radiusMeters = 50000 } = filters;
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
 
@@ -20,8 +23,8 @@ export function useFacilities(filters: UseFacilitiesFilter = {}) {
   }, [searchQuery]);
 
   const query = useQuery({
-    queryKey: ['facilities', debouncedQuery, category, emergencyOnly],
-    queryFn: () => facilityApi.search({ searchQuery: debouncedQuery, category, emergencyOnly }),
+    queryKey: ['facilities', debouncedQuery, category, emergencyOnly, latitude, longitude, radiusMeters],
+    queryFn: () => facilityApi.search({ searchQuery: debouncedQuery, category, emergencyOnly, latitude, longitude, radiusMeters }),
     staleTime: 60_000,
   });
 

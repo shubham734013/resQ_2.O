@@ -24,6 +24,10 @@ export const SearchPage = () => {
   const [emergencyOnly, setEmergencyOnly] = useState(false);
   const [mobileView, setMobileView] = useState<'map' | 'list'>('map');
 
+  const hasLocation = Number.isFinite(currentLocation.latitude)
+    && Number.isFinite(currentLocation.longitude)
+    && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
+
   const {
     facilities,
     selectedFacility,
@@ -36,11 +40,10 @@ export const SearchPage = () => {
     searchQuery,
     category,
     emergencyOnly,
+    latitude: hasLocation ? currentLocation.latitude : undefined,
+    longitude: hasLocation ? currentLocation.longitude : undefined,
+    radiusMeters: 50000,
   });
-
-  const hasLocation = Number.isFinite(currentLocation.latitude)
-    && Number.isFinite(currentLocation.longitude)
-    && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
 
   const handleClear = () => {
     setSearchQuery('');
@@ -48,25 +51,26 @@ export const SearchPage = () => {
     setEmergencyOnly(false);
   };
 
+  const locatedFacilities = facilities.filter((facility): facility is Facility & { latitude: number; longitude: number } =>
+    typeof facility.latitude === 'number' && typeof facility.longitude === 'number'
+  );
   const mapMarkers = useMemo(
-    () => facilities
-      .filter((facility) => Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude))
-      .map((facility) => ({
-        id: facility.id,
-        latitude: facility.latitude,
-        longitude: facility.longitude,
-        title: facility.name,
-        subtitle: facility.openStatus,
-        isEmergency: facility.emergencyAvailable,
-        onClick: () => setSelectedFacilityId(facility.id),
-      })),
-    [facilities, setSelectedFacilityId],
+    () => locatedFacilities.map((facility) => ({
+      id: facility.id,
+      latitude: facility.latitude,
+      longitude: facility.longitude,
+      title: facility.name,
+      subtitle: facility.openStatus,
+      isEmergency: facility.emergencyAvailable,
+      onClick: () => setSelectedFacilityId(facility.id),
+    })),
+    [locatedFacilities, setSelectedFacilityId],
   );
 
   const mapCenter = hasLocation
     ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
-    : facilities[0]
-      ? { latitude: facilities[0].latitude, longitude: facilities[0].longitude }
+    : locatedFacilities[0]
+      ? { latitude: locatedFacilities[0].latitude, longitude: locatedFacilities[0].longitude }
       : undefined;
 
   return (

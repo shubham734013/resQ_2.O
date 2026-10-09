@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthApiError } from '../services/authApi';
@@ -9,10 +9,10 @@ import type { AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationR
 type RegistrationKind = 'user' | 'hospital' | 'ambulance-provider' | 'ambulance-driver';
 interface RegistrationPageProps { kind: RegistrationKind }
 interface FormState {
-  name: string; fullName: string; email: string; phone: string; password: string; address: string; city: string; state: string; country: string;
+  name: string; fullName: string; email: string; phone: string; password: string; confirmPassword: string; address: string; city: string; state: string; country: string;
   registrationNumber: string; hospitalType: string; services: string; capabilities: string; serviceType: string; licenseNumber: string; providerId: string; assignedAmbulanceId: string;
 }
-const initialForm: FormState = { name: '', fullName: '', email: '', phone: '', password: '', address: '', city: '', state: '', country: '', registrationNumber: '', hospitalType: '', services: '', capabilities: '', serviceType: '', licenseNumber: '', providerId: '', assignedAmbulanceId: '' };
+const initialForm: FormState = { name: '', fullName: '', email: '', phone: '', password: '', confirmPassword: '', address: '', city: '', state: '', country: '', registrationNumber: '', hospitalType: '', services: '', capabilities: '', serviceType: '', licenseNumber: '', providerId: '', assignedAmbulanceId: '' };
 const titles: Record<RegistrationKind, { title: string; description: string }> = {
   user: { title: 'Create your ResQ account', description: 'Register for healthcare navigation and emergency coordination.' },
   hospital: { title: 'Register your hospital', description: 'Hospital accounts remain pending until operational verification.' },
@@ -24,6 +24,8 @@ const getErrorMessage = (error: unknown): string => {
   if (error instanceof AuthApiError) {
     if (error.code === 'EMAIL_ALREADY_EXISTS') return 'An account with this email already exists.';
     if (error.code === 'PHONE_ALREADY_EXISTS') return 'An account with this phone number already exists.';
+    if (error.code === 'REGISTRATION_NUMBER_ALREADY_EXISTS') return 'This registration number is already in use.';
+    if (error.code === 'LICENSE_NUMBER_ALREADY_EXISTS') return 'This license number is already in use.';
     if (error.status === 409 || error.status === 422) return error.message;
     if (error.status >= 500) return 'ResQ is temporarily unavailable. Please try again.';
   }
@@ -36,6 +38,7 @@ const buildDriverPayload = (form: FormState): AmbulanceDriverRegistrationRequest
 
 export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
   const { register } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(initialForm);
   const [error, setError] = useState('');
   const [createdUser, setCreatedUser] = useState<AuthUser | null>(null);
@@ -45,12 +48,17 @@ export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(''); setCreatedUser(null);
-    if (form.password.length < 12) { setError('Password must contain at least 12 characters.'); return; }
+    if (form.password.length < 8) { setError('Password must contain at least 8 characters.'); return; }
+    if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
     setIsSubmitting(true);
     try {
+      if (kind === 'user') {
+        await register.user(buildUserPayload(form));
+        navigate('/', { replace: true });
+        return;
+      }
       let user: AuthUser;
-      if (kind === 'user') user = await register.user(buildUserPayload(form));
-      else if (kind === 'hospital') user = await register.hospital(buildHospitalPayload(form));
+      if (kind === 'hospital') user = await register.hospital(buildHospitalPayload(form));
       else if (kind === 'ambulance-provider') user = await register.ambulanceProvider(buildProviderPayload(form));
       else user = await register.ambulanceDriver(buildDriverPayload(form));
       setCreatedUser(user); setForm(initialForm);
@@ -69,7 +77,8 @@ export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
         <label className="sm:col-span-2"><span className="label">{nameLabel}</span><input required value={form[nameField]} onChange={(event) => update(nameField, event.target.value)} className="input" /></label>
         <label><span className="label">Email</span><input required type="email" value={form.email} onChange={(event) => update('email', event.target.value)} className="input" autoComplete="email" /></label>
         <label><span className="label">Phone</span><input required value={form.phone} onChange={(event) => update('phone', event.target.value)} className="input" /></label>
-        <label className="sm:col-span-2"><span className="label">Password</span><input required minLength={12} type="password" value={form.password} onChange={(event) => update('password', event.target.value)} className="input" autoComplete="new-password" /></label>
+        <label><span className="label">Password</span><input required minLength={8} type="password" value={form.password} onChange={(event) => update('password', event.target.value)} className="input" autoComplete="new-password" /></label>
+        <label><span className="label">Confirm password</span><input required minLength={8} type="password" value={form.confirmPassword} onChange={(event) => update('confirmPassword', event.target.value)} className="input" autoComplete="new-password" /></label>
         {kind === 'hospital' && <><label><span className="label">Registration number</span><input required value={form.registrationNumber} onChange={(event) => update('registrationNumber', event.target.value)} className="input" /></label><label><span className="label">Hospital type</span><input required value={form.hospitalType} onChange={(event) => update('hospitalType', event.target.value)} className="input" /></label><label><span className="label">Services</span><input value={form.services} onChange={(event) => update('services', event.target.value)} className="input" placeholder="Emergency, ICU" /></label><label><span className="label">Capabilities</span><input value={form.capabilities} onChange={(event) => update('capabilities', event.target.value)} className="input" placeholder="Trauma, Cardiac" /></label></>}
         {kind === 'ambulance-provider' && <><label><span className="label">Registration number</span><input required value={form.registrationNumber} onChange={(event) => update('registrationNumber', event.target.value)} className="input" /></label><label><span className="label">Service type</span><input required value={form.serviceType} onChange={(event) => update('serviceType', event.target.value)} className="input" placeholder="Private / NGO / Fleet" /></label></>}
         {kind === 'ambulance-driver' && <><label><span className="label">License number</span><input required value={form.licenseNumber} onChange={(event) => update('licenseNumber', event.target.value)} className="input" /></label><label><span className="label">Provider ID</span><input required value={form.providerId} onChange={(event) => update('providerId', event.target.value)} className="input" placeholder="MongoDB provider ID" /></label><label className="sm:col-span-2"><span className="label">Assigned ambulance ID (optional)</span><input value={form.assignedAmbulanceId} onChange={(event) => update('assignedAmbulanceId', event.target.value)} className="input" /></label></>}

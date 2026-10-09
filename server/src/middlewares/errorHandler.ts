@@ -2,7 +2,11 @@ import { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 
-export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request, res: Response, next: NextFunction): void => {
+const writeLog = (payload: Record<string, unknown>): void => {
+  process.stderr.write(JSON.stringify({ timestamp: new Date().toISOString(), service: 'resq-api', ...payload }) + '\n');
+};
+
+export const errorHandler: ErrorRequestHandler = (error: unknown, req: Request, res: Response, next: NextFunction): void => {
   void next;
 
   if (error instanceof z.ZodError) {
@@ -23,6 +27,24 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request,
   }
 
   if (isMongoDuplicateKeyError(error)) {
+    const mongoErr = error as { keyPattern?: Record<string, unknown>; keyValue?: Record<string, unknown> };
+    const keys = Object.keys(mongoErr.keyPattern || mongoErr.keyValue || {});
+    if (keys.includes('email')) {
+      res.status(409).json({ success: false, error: { code: 'EMAIL_ALREADY_EXISTS', message: 'An account with this email already exists' } });
+      return;
+    }
+    if (keys.includes('phone')) {
+      res.status(409).json({ success: false, error: { code: 'PHONE_ALREADY_EXISTS', message: 'An account with this phone number already exists' } });
+      return;
+    }
+    if (keys.includes('registrationNumber')) {
+      res.status(409).json({ success: false, error: { code: 'REGISTRATION_NUMBER_ALREADY_EXISTS', message: 'Registration number is already in use' } });
+      return;
+    }
+    if (keys.includes('licenseNumber')) {
+      res.status(409).json({ success: false, error: { code: 'LICENSE_NUMBER_ALREADY_EXISTS', message: 'License number is already in use' } });
+      return;
+    }
     res.status(409).json({ success: false, error: { code: 'DUPLICATE_RESOURCE', message: 'A resource with the same unique value already exists' } });
     return;
   }
@@ -33,8 +55,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req: Request,
   const message = statusCode >= 500 ? 'Internal server error' : err.message;
   const details = 'details' in err ? err.details : undefined;
 
-  if (statusCode >= 500) console.error(error);
-  else console.warn(`${code}: ${message}`);
+  writeLog({ level: statusCode >= 500 ? 'error' : 'warn', code, statusCode, method: req.method, path: req.path });
 
   res.status(statusCode).json({
     success: false,

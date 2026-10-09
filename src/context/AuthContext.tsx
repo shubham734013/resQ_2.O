@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authApi, AuthApiError } from '../services/authApi';
 import type { AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationRequest, AuthState, AuthUser, HospitalRegistrationRequest, LoginRequest, SocialAuthRequest, UserRegistrationRequest, UserRole } from '../types/auth';
 
@@ -14,23 +15,80 @@ const AuthContext=createContext<AuthContextValue|null>(null);
 const getUserFromResponse=(response:{data:{user:AuthUser}}):AuthUser=>response.data.user;
 
 export const AuthProvider=({children}:{children:ReactNode})=>{
+  const queryClient = useQueryClient();
   const [state,setState]=useState<AuthState>({user:null,isAuthenticated:false,isLoading:true});
+  // A late startup /auth/me response must not overwrite a newer successful login.
+  const authOperationVersion=useRef(0);
   const setAuthenticatedUser=useCallback((user:AuthUser|null)=>setState({user,isAuthenticated:user!==null,isLoading:false}),[]);
   const refreshUser=useCallback(async():Promise<AuthUser|null>=>{
-    try{const user=(await authApi.me()).data;setAuthenticatedUser(user);return user;}
-    catch(error){
-      if(!(error instanceof AuthApiError)||error.status!==401){setAuthenticatedUser(null);throw error;}
-      try{const user=getUserFromResponse(await authApi.refresh());setAuthenticatedUser(user);return user;}
-      catch(refreshError){setAuthenticatedUser(null);if(refreshError instanceof AuthApiError&&refreshError.status===401)return null;throw refreshError;}
+    const operationVersion=++authOperationVersion.current;
+    try{
+      const user=(await authApi.me()).data;
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
+      return user;
+    }catch(error){
+      if(!(error instanceof AuthApiError)||error.status!==401){
+        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+        throw error;
+      }
+      try{
+        const user=getUserFromResponse(await authApi.refresh());
+        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
+        return user;
+      }catch(refreshError){
+        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+        if(refreshError instanceof AuthApiError&&refreshError.status===401)return null;
+        throw refreshError;
+      }
     }
   },[setAuthenticatedUser]);
   /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(()=>{void refreshUser().catch(()=>setAuthenticatedUser(null));},[refreshUser,setAuthenticatedUser]);
+  useEffect(()=>{void refreshUser().catch(()=>undefined);},[refreshUser]);
   /* eslint-enable react-hooks/set-state-in-effect */
-  const login=useCallback(async(input:LoginRequest)=>{const user=getUserFromResponse(await authApi.login(input));setAuthenticatedUser(user);return user;},[setAuthenticatedUser]);
-  const socialLogin=useCallback(async(provider:'google'|'microsoft',input:SocialAuthRequest)=>{const user=getUserFromResponse(await authApi.socialLogin(provider,input));setAuthenticatedUser(user);return user;},[setAuthenticatedUser]);
-  const logout=useCallback(async()=>{try{await authApi.logout();}finally{setAuthenticatedUser(null);}},[setAuthenticatedUser]);
-  const registerUser=useCallback(async(input:UserRegistrationRequest)=>(await authApi.registerUser(input)).data,[]);
+  const login=useCallback(async(input:LoginRequest)=>{
+    const operationVersion=++authOperationVersion.current;
+    try{
+      const user=getUserFromResponse(await authApi.login(input));
+      queryClient.clear();
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
+      return user;
+    }catch(error){
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+      throw error;
+    }
+  },[queryClient,setAuthenticatedUser]);
+  const socialLogin=useCallback(async(provider:'google'|'microsoft',input:SocialAuthRequest)=>{
+    const operationVersion=++authOperationVersion.current;
+    try{
+      const user=getUserFromResponse(await authApi.socialLogin(provider,input));
+      queryClient.clear();
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
+      return user;
+    }catch(error){
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+      throw error;
+    }
+  },[queryClient,setAuthenticatedUser]);
+  const logout=useCallback(async()=>{
+    const operationVersion=++authOperationVersion.current;
+    try{await authApi.logout();}
+    finally{
+      if(operationVersion===authOperationVersion.current){queryClient.clear();setAuthenticatedUser(null);}
+    }
+  },[queryClient,setAuthenticatedUser]);
+  const registerUser=useCallback(async(input:UserRegistrationRequest)=>{
+    const operationVersion=++authOperationVersion.current;
+    try{
+      const res=await authApi.registerUser(input);
+      const user=(res.data as AuthUser & {user?:AuthUser}).user??res.data;
+      queryClient.clear();
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
+      return user;
+    }catch(error){
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+      throw error;
+    }
+  },[queryClient,setAuthenticatedUser]);
   const registerHospital=useCallback(async(input:HospitalRegistrationRequest)=>(await authApi.registerHospital(input)).data,[]);
   const registerAmbulanceProvider=useCallback(async(input:AmbulanceProviderRegistrationRequest)=>(await authApi.registerAmbulanceProvider(input)).data,[]);
   const registerAmbulanceDriver=useCallback(async(input:AmbulanceDriverRegistrationRequest)=>(await authApi.registerAmbulanceDriver(input)).data,[]);
