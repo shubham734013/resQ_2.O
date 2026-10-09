@@ -38,11 +38,11 @@ const schema = new Schema<AmbulanceDocument>({
   },
   locationUpdatedAt: Date,
   serviceArea: String,
-  verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' },
+  verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING', index: true },
   accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
 }, { timestamps: true });
 
 schema.index({ location: '2dsphere' });
 schema.index({ currentLatitude: 1, currentLongitude: 1 });
 
-export const AmbulanceModel = model<AmbulanceDocument>('Ambulance', schema);
+export const AmbulanceModel = model<AmbulanceDocument>('Ambulance', schema, 'Ambulance_Data');
