@@ -5,7 +5,7 @@ import { validateBody } from '../middlewares/validate.js';
 import { z } from 'zod';
 import {
  providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,ambulanceLocationUpdateSchema,
- providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,ambulanceLocationUpdateSchema,
+ providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,
 } from '../schemas/ambulance.js';
 import * as c from '../controllers/ambulanceOperationsController.js';
 
