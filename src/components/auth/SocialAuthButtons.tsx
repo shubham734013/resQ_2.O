@@ -37,16 +37,27 @@ export const SocialAuthButtons=({roleHint,onSuccess,onError}:Props)=>{
   const microsoftClientId=import.meta.env.VITE_MICROSOFT_CLIENT_ID as string|undefined;
   const microsoftAuthority=(import.meta.env.VITE_MICROSOFT_AUTHORITY as string|undefined)??'https://login.microsoftonline.com/common';
 
+  // Keep callback data fresh without re-initializing Google Identity Services on
+  // every role or callback change. GSI's initialize() should be called once.
+  const latestGoogleConfig=useRef({roleHint,onSuccess,onError,socialLogin});
+  latestGoogleConfig.current={roleHint,onSuccess,onError,socialLogin};
+
   useEffect(()=>{
     if(!googleClientId||!googleContainer.current)return; let active=true;
     void loadScript('https://accounts.google.com/gsi/client').then(()=>{
       if(!active||!googleContainer.current||!window.google)return;
       window.google.accounts.id.initialize({client_id:googleClientId,ux_mode:'popup',callback:async({credential})=>{
-        setLoading('google');try{onSuccess(await socialLogin('google',{credential,roleHint}));}catch(error){onError(messageFor(error));}finally{setLoading(null);}
+        const latest=latestGoogleConfig.current;
+        setLoading('google');
+        try{latest.onSuccess(await latest.socialLogin('google',{credential,roleHint:latest.roleHint}));}
+        catch(error){latest.onError(messageFor(error));}
+        finally{setLoading(null);}
       }});
-      googleContainer.current.innerHTML='';window.google.accounts.id.renderButton(googleContainer.current,{theme:'outline',size:'large',width:360,text:'continue_with',shape:'rectangular'});
-    }).catch(onError); return()=>{active=false;};
-  },[googleClientId,roleHint,socialLogin,onSuccess,onError]);
+      googleContainer.current.innerHTML='';
+      window.google.accounts.id.renderButton(googleContainer.current,{theme:'outline',size:'large',width:360,text:'continue_with',shape:'rectangular'});
+    }).catch(error=>{if(active)latestGoogleConfig.current.onError(messageFor(error));});
+    return()=>{active=false;};
+  },[googleClientId]);
 
   const handleMicrosoft=async()=>{
     if(!microsoftClientId){onError('Microsoft sign-in requires VITE_MICROSOFT_CLIENT_ID in your environment.');return;}
