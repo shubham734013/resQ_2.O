@@ -16,4 +16,4 @@ const schema = new Schema<AmbulanceProviderDocument>({
 }, { timestamps: true });
 schema.index({ authProvider: 1, providerSubject: 1 }, { unique: true, partialFilterExpression: { providerSubject: { $type: 'string' } } });
 schema.index({ latitude: 1, longitude: 1 });
-export const AmbulanceProviderModel = model<AmbulanceProviderDocument>('AmbulanceProvider', schema);
+export const AmbulanceProviderModel = model<AmbulanceProviderDocument>('AmbulanceProvider', schema, 'Providers_Data');
