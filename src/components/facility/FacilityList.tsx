@@ -13,6 +13,8 @@ export interface FacilityListProps {
   onClearSearch?: () => void;
   onSelectQuerySuggestion?: (query: string) => void;
   className?: string;
+  errorMessage?: string;
+  onRetry?: () => void;
 }
 
 const COMMON_SUGGESTIONS = [
@@ -33,6 +35,8 @@ export const FacilityList = ({
   onClearSearch,
   onSelectQuerySuggestion,
   className = '',
+  errorMessage,
+  onRetry,
 }: FacilityListProps) => {
   // Searching / Loading State
   if (isLoading || isSearching) {
@@ -48,6 +52,17 @@ export const FacilityList = ({
             className="h-24 bg-slate-100 rounded-lg animate-pulse border border-slate-200/60"
           />
         ))}
+      </div>
+    );
+  }
+
+  // Distinguish API failures from a successful search with no matches.
+  if (errorMessage) {
+    return (
+      <div role="alert" className={`p-6 sm:p-8 text-center bg-rose-50 border border-rose-200 rounded-xl space-y-3 ${className}`}>
+        <h4 className="font-semibold text-rose-900 text-sm">Unable to load healthcare facilities</h4>
+        <p className="text-xs text-rose-800">{errorMessage}</p>
+        {onRetry && <Button variant="outline" size="sm" onClick={onRetry}>Retry</Button>}
       </div>
     );
   }

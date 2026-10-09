@@ -42,6 +42,9 @@ export const HomePage = () => {
     setSelectedFacilityId,
     isLoading,
     isSearching,
+    isError,
+    error,
+    refetch,
     activeQuery,
   } = useFacilities({
     searchQuery,
@@ -180,6 +183,8 @@ export const HomePage = () => {
                 onSelectFacility={handleSelectFacility}
                 isLoading={isLoading}
                 isSearching={isSearching}
+                errorMessage={isError ? error.message : undefined}
+                onRetry={() => void refetch()}
                 activeQuery={activeQuery}
                 onClearSearch={handleClearSearch}
                 onSelectQuerySuggestion={handleSuggestionClick}
@@ -335,6 +340,8 @@ export const HomePage = () => {
               }}
               isLoading={isLoading}
               isSearching={isSearching}
+              errorMessage={isError ? error.message : undefined}
+              onRetry={() => void refetch()}
               activeQuery={activeQuery}
               onClearSearch={handleClearSearch}
               onSelectQuerySuggestion={handleSuggestionClick}
