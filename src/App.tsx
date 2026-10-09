@@ -15,7 +15,7 @@ import { HospitalPage } from './pages/HospitalPage';
 import { AmbulancePage } from './pages/AmbulancePage';
 import { AdminLoginPage, UnauthorizedPage } from './pages/AuthPages';
 import { LoginPage } from './pages/LoginPage';
-import { RegistrationPage } from './pages/RegistrationPage';
+import { RegistrationPage, RegistrationRoleSelect } from './pages/RegistrationPage';
 import { AmbulanceProviderDashboardPage } from './pages/AmbulanceProviderDashboardPage';
 import { AdminOverviewPage, AdminEmergenciesPage, AdminReportsPage, AdminAnalyticsPage, AdminSettingsPage } from './pages/AdminPage';
 import { AdminUsersManagementPage, AdminHospitalsManagementPage, AdminProvidersManagementPage, AdminAmbulancesManagementPage, AdminDriversManagementPage } from './pages/AdminManagementPages';
@@ -27,7 +27,8 @@ export function App() {
   return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/admin/login" element={<AdminLoginPage />} />
-    <Route path="/register" element={<RegistrationPage kind="user" />} />
+    <Route path="/register" element={<RegistrationRoleSelect />} />
+    <Route path="/register/user" element={<RegistrationPage kind="user" />} />
     <Route path="/hospital/register" element={<RegistrationPage kind="hospital" />} />
     <Route path="/ambulance-provider/register" element={<RegistrationPage kind="ambulance-provider" />} />
     <Route path="/ambulance-driver/register" element={<RegistrationPage kind="ambulance-driver" />} />
