@@ -1,11 +1,5 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { userRegistrationSchema, hospitalRegistrationSchema, ambulanceProviderRegistrationSchema, ambulanceDriverRegistrationSchema, loginSchema, socialAuthSchema } from '../schemas/auth.js';
-import { authorizeRole } from '../middlewares/authorizeRole.js';
-import { verifySocialCredential, setSocialCredentialVerifierForTest, resetSocialCredentialVerifierForTest } from '../providers/socialIdentity.js';
-import { errorHandler } from '../middlewares/errorHandler.js';
-import { getCookie, setAuthCookies, clearAuthCookies, ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '../utils/cookies.js';
-import bcrypt from 'bcrypt';
 
 process.env.MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/resq-test';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'unit-test-access-secret-32-chars-ok!';
@@ -13,7 +7,24 @@ process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'unit-test-re
 process.env.RESQ_ADMIN_EMAIL = process.env.RESQ_ADMIN_EMAIL ?? 'admin@example.com';
 process.env.RESQ_ADMIN_PASSWORD = process.env.RESQ_ADMIN_PASSWORD ?? 'UnitTestAdminPassword123!';
 
-const { assertLoginAllowed } = await import('../services/authService.js');
+const [
+  { userRegistrationSchema, hospitalRegistrationSchema, ambulanceProviderRegistrationSchema, ambulanceDriverRegistrationSchema, loginSchema, socialAuthSchema },
+  { authorizeRole },
+  { verifySocialCredential, setSocialCredentialVerifierForTest, resetSocialCredentialVerifierForTest },
+  { errorHandler },
+  { getCookie, setAuthCookies, clearAuthCookies, ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE },
+  { assertLoginAllowed },
+  bcryptModule,
+] = await Promise.all([
+  import('../schemas/auth.js'),
+  import('../middlewares/authorizeRole.js'),
+  import('../providers/socialIdentity.js'),
+  import('../middlewares/errorHandler.js'),
+  import('../utils/cookies.js'),
+  import('../services/authService.js'),
+  import('bcrypt'),
+]);
+const bcrypt = bcryptModule.default;
 
 const validBase = {
   name: 'Test User',
