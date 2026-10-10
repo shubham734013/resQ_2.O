@@ -28,6 +28,9 @@ class ResQWebsiteE2ETests(unittest.TestCase):
     def setUpClass(cls) -> None:
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         options = webdriver.ChromeOptions()
+        chrome_binary = os.environ.get("CHROME_BIN")
+        if chrome_binary:
+            options.binary_location = chrome_binary
         options.page_load_strategy = "eager"
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
