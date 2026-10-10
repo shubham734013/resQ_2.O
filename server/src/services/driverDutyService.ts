@@ -170,12 +170,12 @@ export const startDriverDuty = async (driverId: string, input: LocationInput) =>
 export const endDriverDuty = async (driverId: string) => {
   const did = oid(driverId, 'driver');
   const session = await startSession();
-  let result: { ambulanceId: Types.ObjectId; status: string; dutyState: string; alreadyOffDuty?: boolean } | null = null;
+  let result: { ambulanceId?: Types.ObjectId; status: string; dutyState: string; alreadyOffDuty?: boolean } | null = null;
   try {
     await session.withTransaction(async () => {
       const driver = await operationalDriver(driverId, session);
       if (!driver.assignedAmbulanceId) {
-        if (driver.availabilityStatus === 'OFFLINE') { result = { ambulanceId: new Types.ObjectId(), status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true }; return; }
+        if (driver.availabilityStatus === 'OFFLINE') { result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true }; return; }
         throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED', 'No assigned ambulance is available to end duty safely.', 409);
       }
       if (driver.availabilityStatus === 'OFFLINE') {
@@ -202,7 +202,7 @@ export const endDriverDuty = async (driverId: string) => {
     await session.endSession();
   }
   if (!result) throw new AppError('DUTY_END_FAILED', 'Duty could not be ended. Retry after refreshing status.', 409);
-  if (String(result.ambulanceId).length === 24) publishDuty(did, result.ambulanceId, { status: result.status, dutyState: result.dutyState, freshness: 'STALE' });
+  if (result.ambulanceId) publishDuty(did, result.ambulanceId, { status: result.status, dutyState: result.dutyState, freshness: 'STALE' });
   return { status: result.status, dutyState: result.dutyState, alreadyOffDuty: Boolean(result.alreadyOffDuty), updatedAt: new Date() };
 };
 
