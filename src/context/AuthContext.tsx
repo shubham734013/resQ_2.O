@@ -30,6 +30,13 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
   },[]);
   const refreshUser=useCallback(async():Promise<AuthUser|null>=>{
     const operationVersion=++authOperationVersion.current;
+    const hasPriorSession = (() => {
+      try { return localStorage.getItem(HAS_SESSION_KEY) === 'true'; } catch { return false; }
+    })();
+    if (!hasPriorSession) {
+      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+      return null;
+    }
     try{
       const user=(await authApi.me()).data;
       if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
@@ -38,13 +45,6 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
       if(!(error instanceof AuthApiError)||error.status!==401){
         if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
         throw error;
-      }
-      const hasPriorSession = (() => {
-        try { return localStorage.getItem(HAS_SESSION_KEY) === 'true'; } catch { return false; }
-      })();
-      if (!hasPriorSession) {
-        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
-        return null;
       }
       try{
         const user=getUserFromResponse(await authApi.refresh());
