@@ -146,11 +146,10 @@ export const AmbulancePage=()=>{
  };
  useEffect(()=>{
    const dutyStatus=status.data?.status;
-   if(dutyStatus!=='ONLINE'&&dutyStatus!=='BUSY'){setLocationHealth('PAUSED');return;}
-   if(!navigator.geolocation){setLocationHealth('ERROR');setLocationError('This browser does not support GPS. Live tracking is unavailable.');return;}
-   const intervalMs=Math.min(5000,Math.max(3000,status.data?.trackingIntervalMs??4000));
    let disposed=false;
-   let timer:number|undefined;
+   if(dutyStatus!=='ONLINE'&&dutyStatus!=='BUSY')return;
+   if(!navigator.geolocation){queueMicrotask(()=>{if(!disposed){setLocationHealth('ERROR');setLocationError('This browser does not support GPS. Live tracking is unavailable.');}});return()=>{disposed=true;};}
+   const intervalMs=Math.min(5000,Math.max(3000,status.data?.trackingIntervalMs??4000));
    let permissionFailureHandled=false;
    const requestFix=()=>{
      if(disposed||locationRequestInFlightRef.current)return;
@@ -166,16 +165,16 @@ export const AmbulancePage=()=>{
      },error=>{
        locationRequestInFlightRef.current=false;
        if(error.code===error.PERMISSION_DENIED){
-         if(timer!==undefined)window.clearInterval(timer);
+         window.clearInterval(timer);
          setGpsPermissionDenied(true);setLocationHealth('ERROR');setLocationError(geolocationErrorMessage(error));
          if(!permissionFailureHandled&&dutyStatus==='ONLINE'){permissionFailureHandled=true;void ambulanceDriverApi.endDuty().then(()=>invalidate()).catch(()=>setLocationError('Location permission was revoked. Duty could not be ended automatically; end duty manually when safe.'));}
        }else{setLocationHealth('RETRYING');setLocationError(geolocationErrorMessage(error));}
      },{enableHighAccuracy:true,maximumAge:0,timeout:12000});
    };
-   setLocationHealth('RETRYING');
+   const timer=window.setInterval(requestFix,intervalMs);
+   queueMicrotask(()=>{if(!disposed)setLocationHealth('RETRYING');});
    requestFix();
-   timer=window.setInterval(requestFix,intervalMs);
-   return()=>{disposed=true;if(timer!==undefined)window.clearInterval(timer);locationRequestInFlightRef.current=false;};
+   return()=>{disposed=true;window.clearInterval(timer);locationRequestInFlightRef.current=false;};
  },[status.data?.status,status.data?.trackingIntervalMs,invalidate,trackingRestartToken]);
  const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance/navigation');}});
  const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance');}});
