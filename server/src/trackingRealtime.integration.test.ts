@@ -126,6 +126,16 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     assert.equal(denied.ok, false, 'unrelated user must not join the emergency room');
     assert.equal((await subscribe(userSocket, { type: '*', id: '*' })).ok, false, 'wildcard room subscription must be rejected');
 
+    await TripModel.updateOne({ _id: tripId }, { $set: { status: 'ASSIGNED' }, $unset: { acceptedAt: 1 } });
+    const preAcceptanceResponse = await fetch(url + '/api/v1/tracking/emergencies/' + emergencyId, { headers: { Cookie: 'resq_access_token=' + encodeURIComponent(userToken) } });
+    assert.equal(preAcceptanceResponse.status, 200);
+    const preAcceptance = (await preAcceptanceResponse.json() as { data: { trip: { status: string }; ambulance: unknown; location: unknown; trackingActive: boolean } }).data;
+    assert.equal(preAcceptance.trip.status, 'ASSIGNED');
+    assert.equal(preAcceptance.ambulance, null, 'vehicle identity must remain hidden before driver acceptance');
+    assert.equal(preAcceptance.location, null, 'GPS must remain hidden before driver acceptance');
+    assert.equal(preAcceptance.trackingActive, false);
+
+    await TripModel.updateOne({ _id: tripId }, { $set: { status: 'ACCEPTED', acceptedAt: new Date() } });
     const userSnapshotResponse = await fetch(url + '/api/v1/tracking/emergencies/' + emergencyId, { headers: { Cookie: 'resq_access_token=' + encodeURIComponent(userToken) } });
     const hospitalSnapshotResponse = await fetch(url + '/api/v1/tracking/emergencies/' + emergencyId, { headers: { Cookie: 'resq_access_token=' + encodeURIComponent(hospitalToken) } });
     assert.equal(userSnapshotResponse.status, 200);
