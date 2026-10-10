@@ -48,6 +48,7 @@ const output = (request: EmergencyRecord) => ({
   driverId: request.driverId ? String(request.driverId) : undefined,
   patientId: request.patientId ? String(request.patientId) : undefined,
   etaMinutes: request.etaMinutes,
+  routeDistanceMeters: request.routeDistanceMeters,
   createdAt: request.createdAt,
   updatedAt: request.updatedAt,
 });
@@ -251,6 +252,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
         latitude: input.latitude,
         longitude: input.longitude,
         etaMinutes: route?.etaMinutes,
+        routeDistanceMeters: route?.distanceMeters,
         status: 'RECEIVED',
         statusHistory: [{ status: 'RECEIVED', changedAt: now, actorId: userObjectId, actorRole: 'USER' }],
       });
