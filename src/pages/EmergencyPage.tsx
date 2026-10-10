@@ -264,7 +264,14 @@ export const EmergencyPage = () => {
         setCoordinationError('This hospital is no longer eligible for this emergency. Choose another verified destination.');
         return;
       }
-      const refreshedFacility = toFacility(current);
+      const refreshedFacility = {
+        ...toFacility(current),
+        distance: selectedFacility.distance,
+        distanceMeters: selectedFacility.distanceMeters,
+        distanceType: selectedFacility.distanceType,
+        estimatedTime: selectedFacility.estimatedTime,
+        routeSummary: selectedFacility.routeSummary,
+      };
       setSelectedFacility(refreshedFacility);
       const key = idempotencyKeyRef.current ?? (globalThis.crypto?.randomUUID?.() ?? `resq-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       idempotencyKeyRef.current = key;
