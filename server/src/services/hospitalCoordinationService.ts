@@ -190,7 +190,17 @@ export const acknowledgeHospitalCoordinationNotification = async (hospitalId: st
   const notificationObjectId = idOf(notificationId, 'notification');
   const actorObjectId = idOf(actorId, 'hospital actor');
   const updated = await HospitalCoordinationNotificationModel.findOneAndUpdate({ _id: notificationObjectId, hospitalId: hospitalObjectId, state: 'UNREAD' }, { $set: { state: 'ACKNOWLEDGED', acknowledgedAt: new Date(), acknowledgedBy: actorObjectId } }, { new: true }).lean().exec();
-  if (updated) return copy(updated as unknown as Record<string, unknown> & { _id: Types.ObjectId });
+  if (updated) {
+    try {
+      broadcastEvent(`hospital:${hospitalObjectId}`, 'hospital:coordination-notification-acknowledged', {
+        id: String(updated._id), hospitalId: String(hospitalObjectId), emergencyId: String(updated.emergencyId),
+        state: 'ACKNOWLEDGED', acknowledgedAt: updated.acknowledgedAt,
+      });
+    } catch {
+      // Acknowledgement is already persisted; other sessions recover it through the inbox endpoint.
+    }
+    return copy(updated as unknown as Record<string, unknown> & { _id: Types.ObjectId });
+  }
   const existing = await HospitalCoordinationNotificationModel.findOne({ _id: notificationObjectId, hospitalId: hospitalObjectId }).lean().exec();
   if (!existing) throw new AppError('NOT_FOUND', 'Coordination notification not found.', 404);
   return copy(existing as unknown as Record<string, unknown> & { _id: Types.ObjectId });
