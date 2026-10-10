@@ -10,6 +10,7 @@ import { MapView } from '../components/map/MapView';
 import { ambulanceDriverApi } from '../services/ambulanceDriverApi';
 import { useAmbulanceRoute } from '../hooks/useAmbulanceRoute';
 import { trackingApi, trackingRouteOption } from '../services/trackingApi';
+import { useLocationState } from '../hooks/useLocationState';
 import type { UserLocation } from '../types/facility';
 import type { RouteOptionItem } from '../types/route';
 
@@ -99,7 +100,12 @@ export const AmbulancePage=()=>{
  const navigate=useNavigate();
  const {pathname}=useLocation();
  const qc=useQueryClient();
- const {currentLocation,location,permissionState,refreshLocation}=useOutletContext<LayoutContext>();
+ const outletContext = useOutletContext<LayoutContext | undefined>();
+ const fallbackLocationState = useLocationState();
+ const currentLocation = outletContext?.currentLocation ?? fallbackLocationState.currentLocation;
+ const location = outletContext?.location ?? fallbackLocationState.location;
+ const permissionState = outletContext?.permissionState ?? fallbackLocationState.permissionState;
+ const refreshLocation = outletContext?.refreshLocation ?? fallbackLocationState.refreshLocation;
  const routeMode=pathname.replace('/ambulance','').replace(/^\//,'');
  const profile=useQuery({queryKey:['ambulance-driver','profile'],queryFn:ambulanceDriverApi.getProfile});
  const status=useQuery({queryKey:['ambulance-driver','status'],queryFn:ambulanceDriverApi.getStatus,refetchInterval:5000,refetchOnWindowFocus:true});
