@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '../types/auth.js';
 import { AppError } from '../utils/AppError.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import * as dispatch from '../services/dispatchService.js';
+import type { DispatchJobStatus } from '../models/DispatchJob.js';
 
 const actorId = (req: Request, role: 'ADMIN' | 'AMBULANCE_DRIVER') => {
   const auth = (req as AuthenticatedRequest).auth;
@@ -19,7 +20,7 @@ export const driverOffers = async (req: Request, res: Response) => sendSuccess(r
 export const driverAcceptOffer = async (req: Request, res: Response) => sendSuccess(res, await dispatch.acceptDispatchOffer(actorId(req, 'AMBULANCE_DRIVER'), paramId(req)));
 export const driverRejectOffer = async (req: Request, res: Response) => sendSuccess(res, await dispatch.rejectDispatchOffer(actorId(req, 'AMBULANCE_DRIVER'), paramId(req)));
 
-const query = (res: Response) => res.locals.validatedQuery as { status?: string; limit: number };
+const query = (res: Response) => res.locals.validatedQuery as { status?: DispatchJobStatus; limit: number };
 export const adminDispatchJobs = async (_req: Request, res: Response) => sendSuccess(res, await dispatch.listDispatchJobs(query(res)));
 export const adminRetryDispatch = async (req: Request, res: Response) => sendSuccess(res, await dispatch.retryDispatchJob(actorId(req, 'ADMIN'), paramId(req)));
 export const adminManualAssignDispatch = async (req: Request, res: Response) => {
