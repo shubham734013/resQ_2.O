@@ -115,7 +115,9 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
   const apiKey = (env.GOOGLE_ROUTES_API_KEY || env.GOOGLE_MAPS_SERVER_API_KEY)?.trim();
   if (!apiKey) throw new AppError('MAPS_API_KEY_MISSING', 'Server-side Google Maps key is not configured', 503);
 
-  let response: Response;\n  try {\n    response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+  let response: Response;
+  try {
+    response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -134,7 +136,10 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
   });
 
   const payload = await response.json().catch(() => null) as GoogleRoutesResponse | null;
-  if (!response.ok) throw new AppError('ROUTE_REQUEST_FAILED', 'Google could not calculate a route right now', 502);
+  if (!response.ok) {
+    const failure = describeGoogleRoutesFailure(response.status, payload);
+    throw new AppError(failure.code, failure.message, failure.statusCode);
+  }
   if (!payload?.routes?.length) throw new AppError('ROUTE_NOT_FOUND', 'No route was found between the selected locations', 404);
 
   const routes = payload.routes.map((route, index) => {
