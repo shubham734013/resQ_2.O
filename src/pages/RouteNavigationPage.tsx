@@ -40,7 +40,7 @@ export const RouteNavigationPage = () => {
 
   const { currentLocation, location, permissionState, refreshLocation } = useOutletContext<LayoutContext>();
   const { facility, isLoading, isNotFound } = useFacility(facilityId);
-  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, refetch: refetchRoute } = useMapRoute(facility, location ? currentLocation : null);
+  const { routes: availableRoutes, isLoading: isRouteLoading, isError: isRouteError, error: routeError, refetch: refetchRoute } = useMapRoute(facility, location ? currentLocation : null);
   useEffect(() => {
     if (permissionState === 'prompt') refreshLocation();
   }, [permissionState, refreshLocation]);
