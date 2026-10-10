@@ -108,8 +108,21 @@ const hospitalCoordinate = (hospital: Pick<EmergencyHospitalCandidate, 'location
       typeof longitude !== 'number' || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
   return { latitude, longitude };
 };
+export const categoryIdForSituation = (situationType: string) => {
+  const known = situationIdForLabel[situationType] ?? situationType;
+  if (situationTerms[known]) return known;
+  const text = situationType.toLowerCase();
+  if (/chest|cardiac|heart|cardio/.test(text)) return 'chest_pain';
+  if (/stroke|neurolog|neuro|brain|speech difficulty/.test(text)) return 'stroke_symptoms';
+  if (/breath|respirat|asthma|chok/.test(text)) return 'breathing_difficulty';
+  if (/bleed|hemorrhag/.test(text)) return 'severe_bleeding';
+  if (/burn/.test(text)) return 'burn';
+  if (/accident|injur|trauma|fracture/.test(text)) return 'accident_injury';
+  if (/unconscious|unresponsive|faint/.test(text)) return 'unconscious_person';
+  return 'other';
+};
 export const hospitalMatchesSituation = (hospital: Pick<EmergencyHospitalCandidate, 'hospitalType' | 'services' | 'capabilities'>, situationType: string) => {
-  const terms = situationTerms[situationIdForLabel[situationType] ?? situationType] ?? /emergency|critical|urgent|icu/i;
+  const terms = situationTerms[categoryIdForSituation(situationType)] ?? /emergency|critical|urgent|icu/i;
   return [hospital.hospitalType, ...(hospital.services ?? []), ...(hospital.capabilities ?? [])].some((value) => terms.test(value));
 };
 const haversineMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
