@@ -109,7 +109,7 @@ const hospitalCoordinate = (hospital: Pick<EmergencyHospitalCandidate, 'location
   return { latitude, longitude };
 };
 export const hospitalMatchesSituation = (hospital: Pick<EmergencyHospitalCandidate, 'hospitalType' | 'services' | 'capabilities'>, situationType: string) => {
-  const terms = situationTerms[situationIdForLabel[situationType] ?? situationType] ?? situationTerms.other;
+  const terms = situationTerms[situationIdForLabel[situationType] ?? situationType] ?? /emergency|critical|urgent|icu/i;
   return [hospital.hospitalType, ...(hospital.services ?? []), ...(hospital.capabilities ?? [])].some((value) => terms.test(value));
 };
 const haversineMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
@@ -135,9 +135,9 @@ export const discoverEmergencyHospitals = async (userId: string, query: Emergenc
   assertId(userId, 'user');
   const terms = situationTerms[query.category] ?? situationTerms.other;
   const filter = {
-    accountStatus: 'ACTIVE',
-    verificationStatus: 'VERIFIED',
-    emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+    accountStatus: 'ACTIVE' as const,
+    verificationStatus: 'VERIFIED' as const,
+    emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] as const },
     $or: [{ hospitalType: terms }, { services: terms }, { capabilities: terms }],
   };
   const origin = { latitude: query.latitude, longitude: query.longitude };
