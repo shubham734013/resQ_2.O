@@ -1,3 +1,4 @@
+import { LiveAmbulanceTracking } from '../LiveAmbulanceTracking';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -151,6 +152,28 @@ export const CoordinationStatus = ({
             <p className="mt-1 text-[11px] text-emerald-800">Request ID: {data?.id ?? emergencyRequestId}</p>
           </div>
         )}
+        {data?.dispatch && (
+          <div role="status" className={`rounded-xl border p-4 ${data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED' ? 'border-amber-300 bg-amber-50' : 'border-sky-200 bg-sky-50'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">Ambulance dispatch</p>
+            <p className="mt-1 text-sm font-bold text-slate-950">
+              {data.dispatch.status === 'OFFERED' ? 'A driver is being offered this request' :
+                data.dispatch.status === 'ACCEPTED' ? 'A driver accepted the request' :
+                  data.dispatch.status === 'EXHAUSTED' ? 'No eligible driver is currently available' :
+                    data.dispatch.status === 'ESCALATED' ? 'Dispatch escalated for manual intervention' :
+                      data.dispatch.status === 'CANCELLED' ? 'Dispatch cancelled' :
+                        data.dispatch.status === 'SEARCHING' ? 'Searching eligible drivers and ambulances' : 'Dispatch queued'}
+            </p>
+            <p className="mt-1 text-xs text-slate-700">{data.dispatch.message ?? `Dispatch attempts: ${data.dispatch.attemptCount}`}</p>
+            {(data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED') && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button variant="emergency" size="sm" onClick={() => { window.location.href = 'tel:112'; }} icon={<Phone className="h-3.5 w-3.5" />}>Call 112</Button>
+                <span className="text-[11px] text-amber-900">Keep your phone available. Hospital selection remains unchanged.</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {emergencyRequestId && <LiveAmbulanceTracking emergencyRequestId={emergencyRequestId} />}
 
         {error && (
           <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-2 text-xs text-amber-900">

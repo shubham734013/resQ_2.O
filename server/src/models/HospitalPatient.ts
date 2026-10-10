@@ -1,6 +1,6 @@
 import { Schema, model, Types } from 'mongoose';
 
-export const HOSPITAL_PATIENT_STATUSES = ['INCOMING', 'HOSPITAL_NOTIFIED', 'AT_HOSPITAL', 'RESOLVED', 'CANCELLED'] as const;
+export const HOSPITAL_PATIENT_STATUSES = ['INCOMING', 'HOSPITAL_NOTIFIED', 'AT_HOSPITAL', 'RESOLVED', 'CANCELLED', 'REASSIGNMENT_REQUIRED'] as const;
 export type HospitalPatientStatus = (typeof HOSPITAL_PATIENT_STATUSES)[number];
 
 export interface HospitalPatientDocument {

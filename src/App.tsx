@@ -21,8 +21,9 @@ import { AdminOverviewPage, AdminEmergenciesPage, AdminReportsPage, AdminAnalyti
 import { AdminUsersManagementPage, AdminHospitalsManagementPage, AdminProvidersManagementPage, AdminAmbulancesManagementPage, AdminDriversManagementPage } from './pages/AdminManagementPages';
 import { AdminUserDetailPage, AdminHospitalDetailPage, AdminProviderDetailPage, AdminAmbulanceDetailPage, AdminDriverDetailPage } from './pages/AdminDetailPages';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { NetworkStatusBanner } from './components/common/NetworkStatusBanner';
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false, retry: 1 } } });
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: true, refetchOnReconnect: true, retry: 1 } } });
 
 export function App() {
   return (
@@ -30,6 +31,7 @@ export function App() {
       <BrowserRouter>
         <AuthProvider>
           <ErrorBoundary>
+            <NetworkStatusBanner />
             <Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/admin/login" element={<AdminLoginPage />} />

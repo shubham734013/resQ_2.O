@@ -14,6 +14,8 @@ import {
   reportOverviewController, emergencyReportsController, analyticsReportsController, exportReportsController,
 } from '../controllers/adminController.js';
 import { adminEmergenciesController, adminEmergencyController, adminEmergencySummaryController } from '../controllers/adminEmergencyController.js';
+import * as dispatch from '../controllers/dispatchController.js';
+import { dispatchAdminQuerySchema, dispatchManualAssignSchema, dispatchEscalateSchema } from '../schemas/dispatch.js';
 import type { z } from 'zod';
 
 const validateQuery = (schema:z.ZodType) => (req:Request,res:Response,next:NextFunction):void => {
@@ -24,6 +26,10 @@ const validateQuery = (schema:z.ZodType) => (req:Request,res:Response,next:NextF
 
 export const adminRouter=Router();
 adminRouter.use(authenticate,authorizeRole('ADMIN'));
+adminRouter.get('/dispatch-jobs',validateQuery(dispatchAdminQuerySchema),dispatch.adminDispatchJobs);
+adminRouter.post('/dispatch-jobs/:id/retry',dispatch.adminRetryDispatch);
+adminRouter.post('/dispatch-jobs/:id/manual-assign',validateBody(dispatchManualAssignSchema),dispatch.adminManualAssignDispatch);
+adminRouter.post('/dispatch-jobs/:id/escalate',validateBody(dispatchEscalateSchema),dispatch.adminEscalateDispatch);
 adminRouter.get('/overview',overviewController);
 adminRouter.get('/users',validateQuery(userListQuerySchema),usersController);
 adminRouter.get('/users/:id',userController);

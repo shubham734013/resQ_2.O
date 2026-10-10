@@ -2,6 +2,13 @@ import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmb
 import type { EmergencyReports, OperationalAnalytics, ReportOverview } from '../types/adminReports';
 export interface AdminEmergencyListItem { id:string; requestCode:string; userId:string; patientId?:string; situationType:string; reportedAt:string; status:string; statusHistory:Array<{status:string;changedAt:string;actorId?:string;actorRole:string;previousStatus?:string}>; hospital:{id:string;name?:string;latitude?:number;longitude?:number}|null; ambulanceProvider:{id:string;name?:string}|null; ambulance:{id:string;registrationNumber?:string;vehicleNumber?:string;latitude?:number;longitude?:number;locationUpdatedAt?:string}|null; driver:{id:string;name?:string}|null; pickup:{latitude?:number;longitude?:number;label?:string}; etaMinutes?:number; createdAt:string; updatedAt:string; }
 
+export interface AdminDispatchJob {
+  id: string; emergencyRequestId: string; requestCode?: string; situationType?: string; emergencyStatus?: string;
+  hospitalId: string; category: string; status: 'PENDING'|'SEARCHING'|'OFFERED'|'ACCEPTED'|'EXHAUSTED'|'CANCELLED'|'ESCALATED';
+  generation: number; attempts: Array<{attemptNumber:number;generation:number;providerId:string;ambulanceId:string;driverId:string;status:string;offeredAt:string;deadlineAt:string;respondedAt?:string;routeSource:string;routeDistanceMeters:number;etaSeconds?:number;reason?:string}>;
+  deadlineAt?: string; exhaustedAt?: string; escalatedAt?: string; escalationReason?: string;
+  events: Array<{event:string;at:string;actorRole:string;reason?:string;attemptId?:string}>; updatedAt:string;
+}
 const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
 
 export class AdminApiError extends Error {
@@ -69,6 +76,10 @@ export const adminApi = {
   emergencies: (params: Omit<AdminListParams, 'status'> & { status?: string; hospital?: string; provider?: string; ambulance?: string; driver?: string; situation?: string }) => request<AdminList<AdminEmergencyListItem>>(`/admin/emergencies${query(params as unknown as AdminListParams)}`),
   emergency: (id:string) => request<AdminEmergencyListItem>(`/admin/emergencies/${encodeURIComponent(id)}`),
   emergencySummary: () => request<Record<string,number>>('/admin/emergencies/summary'),
+  dispatchJobs: (params: { status?: AdminDispatchJob['status']; limit?: number } = {}) => { const search = new URLSearchParams(); if (params.status) search.set('status', params.status); if (params.limit !== undefined) search.set('limit', String(params.limit)); const suffix = search.toString(); return request<AdminDispatchJob[]>(`/admin/dispatch-jobs${suffix ? '?' + suffix : ''}`); },
+  retryDispatchJob: (id: string) => request<{id:string;status:string;generation:number;queued:boolean}>(`/admin/dispatch-jobs/${encodeURIComponent(id)}/retry`, {method:'POST'}),
+  manualAssignDispatchJob: (id: string, driverId: string) => request<{dispatchJobId:string;driverId:string;status:string;deadlineAt:string}>(`/admin/dispatch-jobs/${encodeURIComponent(id)}/manual-assign`, {method:'POST',body:JSON.stringify({driverId})}),
+  escalateDispatchJob: (id: string, reason: string) => request<{dispatchJobId:string;emergencyRequestId:string;status:string;reason:string;emergencyCallNumber:string}>(`/admin/dispatch-jobs/${encodeURIComponent(id)}/escalate`, {method:'POST',body:JSON.stringify({reason})}),
   reportsOverview: (params: { from?: string; to?: string }) => request<ReportOverview>(`/admin/reports/overview${query(params)}`),
   reportsEmergencies: (params: { from?: string; to?: string }) => request<EmergencyReports>(`/admin/reports/emergencies${query(params)}`),
   reportsAnalytics: (params: { from?: string; to?: string }) => request<OperationalAnalytics>(`/admin/reports/analytics${query(params)}`),
