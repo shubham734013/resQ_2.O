@@ -247,6 +247,23 @@ export const updateDriverLocation=async(did:string,input:z.infer<typeof S.ambula
   };
   broadcastEvent('operations', 'tracking:location:update', telemetry);
   broadcastEvent(`driver:${did}`, 'tracking:location:update', telemetry);
+
+  // Fan out only to the active trip's authorized emergency and destination
+  // hospital channels. The realtime route independently checks channel access.
+  const activeTrip = await TripModel.findOne({
+    driverId: d._id,
+    status: { $in: ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] },
+  }).select('emergencyRequestId destinationHospitalId status').lean().exec();
+  if (activeTrip) {
+    const tripTelemetry = {
+      ...telemetry,
+      emergencyRequestId: String(activeTrip.emergencyRequestId),
+      destinationHospitalId: String(activeTrip.destinationHospitalId),
+      tripStatus: activeTrip.status,
+    };
+    broadcastEvent(`emergency:${activeTrip.emergencyRequestId}`, 'tracking:location:update', tripTelemetry);
+    broadcastEvent(`hospital:${activeTrip.destinationHospitalId}`, 'tracking:location:update', tripTelemetry);
+  }
   return telemetry;
 };
 export const getDriverStatus=async(id:string)=>{const d=await AmbulanceDriverModel.findById(oid(id,'driver')).lean().exec();if(!d)throw new AppError('NOT_FOUND','Driver not found',404);return {status:d.availabilityStatus,updatedAt:d.updatedAt};};
