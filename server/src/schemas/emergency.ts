@@ -2,14 +2,24 @@ import { z } from 'zod';
 import { HOSPITAL_EMERGENCY_STATUSES } from '../models/EmergencyRequest.js';
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
+export const EMERGENCY_CATEGORY_IDS = ['accident_injury', 'severe_bleeding', 'breathing_difficulty', 'chest_pain', 'stroke_symptoms', 'unconscious_person', 'burn', 'other'] as const;
+export const EMERGENCY_SITUATION_LABELS = ['Accident / Injury', 'Severe Bleeding', 'Breathing Difficulty', 'Chest Pain', 'Stroke-like Symptoms', 'Unconscious Person', 'Burn', 'Other Acute Situation'] as const;
 const date = z.string().datetime().transform((value) => new Date(value));
 
 export const createEmergencyRequestSchema = z.object({
   hospitalId: objectId,
-  situationType: z.string().trim().min(2).max(120),
-  location: z.string().trim().max(300).optional(),
-  latitude: z.number().finite().min(-90).max(90).optional(),
-  longitude: z.number().finite().min(-180).max(180).optional(),
+  situationType: z.enum(EMERGENCY_SITUATION_LABELS),
+  location: z.string().trim().min(2).max(300).optional(),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+}).strict();
+
+export const emergencyDiscoveryQuerySchema = z.object({
+  latitude: z.coerce.number().finite().min(-90).max(90),
+  longitude: z.coerce.number().finite().min(-180).max(180),
+  category: z.enum(EMERGENCY_CATEGORY_IDS),
+  radiusMeters: z.coerce.number().int().min(100).max(100000).default(30000),
+  limit: z.coerce.number().int().min(1).max(10).default(10),
 }).strict();
 
 export const userEmergencyListQuerySchema = z.object({
