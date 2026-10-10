@@ -148,26 +148,31 @@ export const AmbulancePage=()=>{
    if(dutyStatus!=='ONLINE'&&dutyStatus!=='BUSY'){setLocationHealth('PAUSED');return;}
    if(!navigator.geolocation){setLocationHealth('ERROR');setLocationError('This browser does not support GPS. Live tracking is unavailable.');return;}
    const intervalMs=Math.min(5000,Math.max(3000,status.data?.trackingIntervalMs??4000));
-   let watchId:number|undefined;
+   let disposed=false;
    let permissionFailureHandled=false;
-   setLocationHealth('RETRYING');
-   watchId=navigator.geolocation.watchPosition(position=>{
-     setGpsPermissionDenied(false);
-     const now=Date.now();
-     if(now-lastGpsSentAtRef.current<intervalMs||locationRequestInFlightRef.current)return;
-     lastGpsSentAtRef.current=now;
+   const requestFix=()=>{
+     if(disposed||locationRequestInFlightRef.current)return;
      locationRequestInFlightRef.current=true;
-     void ambulanceDriverApi.updateLocation({latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy,timestamp:position.timestamp})
-       .then(()=>{setLastLocationSentAt(Date.now());setLocationError('');setLocationHealth('TRACKING');})
-       .catch(error=>{setLocationError(error instanceof Error?error.message:'GPS update failed. ResQ will retry.');setLocationHealth('RETRYING');lastGpsSentAtRef.current=0;})
-       .finally(()=>{locationRequestInFlightRef.current=false;});
-   },error=>{
-     if(error.code===error.PERMISSION_DENIED){
-       setGpsPermissionDenied(true);setLocationHealth('ERROR');setLocationError(geolocationErrorMessage(error));
-       if(!permissionFailureHandled&&dutyStatus==='ONLINE'){permissionFailureHandled=true;void ambulanceDriverApi.endDuty().then(()=>invalidate()).catch(()=>setLocationError('Location permission was revoked. Duty could not be ended automatically; end duty manually when safe.'));}
-     }else{setLocationHealth('RETRYING');setLocationError(geolocationErrorMessage(error));}
-   },{enableHighAccuracy:true,maximumAge:0,timeout:12000});
-   return()=>{if(watchId!==undefined)navigator.geolocation.clearWatch(watchId);};
+     navigator.geolocation.getCurrentPosition(position=>{
+       if(disposed){locationRequestInFlightRef.current=false;return;}
+       setGpsPermissionDenied(false);
+       lastGpsSentAtRef.current=Date.now();
+       void ambulanceDriverApi.updateLocation({latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy,timestamp:position.timestamp})
+         .then(()=>{setLastLocationSentAt(Date.now());setLocationError('');setLocationHealth('TRACKING');})
+         .catch(error=>{setLocationError(error instanceof Error?error.message:'GPS update failed. ResQ will retry.');setLocationHealth('RETRYING');})
+         .finally(()=>{locationRequestInFlightRef.current=false;});
+     },error=>{
+       locationRequestInFlightRef.current=false;
+       if(error.code===error.PERMISSION_DENIED){
+         setGpsPermissionDenied(true);setLocationHealth('ERROR');setLocationError(geolocationErrorMessage(error));
+         if(!permissionFailureHandled&&dutyStatus==='ONLINE'){permissionFailureHandled=true;void ambulanceDriverApi.endDuty().then(()=>invalidate()).catch(()=>setLocationError('Location permission was revoked. Duty could not be ended automatically; end duty manually when safe.'));}
+       }else{setLocationHealth('RETRYING');setLocationError(geolocationErrorMessage(error));}
+     },{enableHighAccuracy:true,maximumAge:0,timeout:12000});
+   };
+   setLocationHealth('RETRYING');
+   requestFix();
+   const timer=window.setInterval(requestFix,intervalMs);
+   return()=>{disposed=true;window.clearInterval(timer);locationRequestInFlightRef.current=false;};
  },[status.data?.status,status.data?.trackingIntervalMs,invalidate]);
  const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance/navigation');}});
  const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance');}});
