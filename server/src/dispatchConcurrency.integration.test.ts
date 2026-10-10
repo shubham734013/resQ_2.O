@@ -109,7 +109,7 @@ test('concurrent reservations and duplicate acceptances create one active trip',
     await processDispatchTick();
     const timedOutJob = await DispatchJobModel.findById(timedOutOffer._id).lean().exec();
     assert.ok(['EXHAUSTED', 'PENDING'].includes(timedOutJob?.status ?? ''), 'expired offer must be persisted and released before retry');
-    await assert.rejects(() => acceptDispatchOffer(String(driverId), String(timedOutOffer._id)), 'expired offer must not be accepted later');
+    await assert.rejects(() => acceptDispatchOffer(String(driverId), String(timedOutOffer._id)), /offer is no longer active|deadline has passed/i);
     assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.dispatchReservationId, undefined);
     assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.dispatchReservationId, undefined);
 
@@ -141,7 +141,7 @@ test('concurrent reservations and duplicate acceptances create one active trip',
     assert.equal(savedDriver?.dispatchReservationId, undefined);
     await assert.rejects(
       () => cancelUserEmergencyRequest(String(new Types.ObjectId()), String(timedOutOffer.emergencyRequestId)),
-      'a different user must not cancel this emergency',
+      /Emergency request not found/i,
     );
     const cancelled = await cancelUserEmergencyRequest(String(userId), String(timedOutOffer.emergencyRequestId));
     assert.equal(cancelled.status, 'CANCELLED');
