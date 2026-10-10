@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { LocateFixed, Minus, Plus, RefreshCw, Layers, Compass } from 'lucide-react';
 import type { MapViewProps } from '../../types/route';
-import type { GoogleAdvancedMarker, GoogleMapInstance, GooglePolyline, GoogleTrafficLayer } from '../../types/googleMaps';
+import type { GoogleMapInstance, GoogleMarkerOverlay, GooglePolyline, GoogleTrafficLayer } from '../../types/googleMaps';
 import { loadGoogleMaps } from '../../services/googleMapsLoader';
 
 interface AdvancedMarkerConstructor {
-  new (options: { map: GoogleMapInstance; position: { lat: number; lng: number }; title?: string; content?: HTMLElement; gmpClickable?: boolean }): GoogleAdvancedMarker;
+  new (options: { map: GoogleMapInstance; position: { lat: number; lng: number }; title?: string; content?: HTMLElement; gmpClickable?: boolean }): GoogleMarkerOverlay;
 }
 
 interface MapLibrary {
@@ -94,6 +94,70 @@ const createDefaultMarkerElement = (title: string, subtitle?: string, isEmergenc
   return container;
 };
 
+const createOverlayMarker = (
+  googleMaps: any,
+  map: GoogleMapInstance,
+  position: { lat: number; lng: number },
+  content: HTMLElement,
+  onClick?: () => void
+): GoogleMarkerOverlay | null => {
+  const OverlayConstructor = googleMaps?.maps?.OverlayView;
+  if (!OverlayConstructor) {
+    const MarkerConstructor = googleMaps?.maps?.Marker;
+    if (MarkerConstructor) {
+      const marker = new MarkerConstructor({
+        map,
+        position,
+        title: content.textContent || '',
+      });
+      if (onClick && marker.addListener) marker.addListener('click', onClick);
+      return marker;
+    }
+    return null;
+  }
+
+  const overlay = new OverlayConstructor();
+  const el = content;
+
+  if (onClick) {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      onClick();
+    });
+  }
+
+  overlay.onAdd = function () {
+    const panes = this.getPanes?.();
+    if (panes?.overlayMouseTarget) {
+      panes.overlayMouseTarget.appendChild(el);
+      el.style.position = 'absolute';
+      el.style.zIndex = '35';
+    }
+  };
+
+  overlay.draw = function () {
+    const projection = this.getProjection?.();
+    if (!projection) return;
+    const gMaps = (window as unknown as { google?: { maps: { LatLng: new (lat: number, lng: number) => unknown } } })?.google?.maps;
+    const latLng = gMaps?.LatLng ? new gMaps.LatLng(position.lat, position.lng) : position;
+    const point = projection.fromLatLngToDivPixel(latLng);
+    if (point) {
+      el.style.left = `${Math.round(point.x)}px`;
+      el.style.top = `${Math.round(point.y)}px`;
+    }
+  };
+
+  overlay.onRemove = function () {
+    if (el.parentNode) {
+      el.parentNode.removeChild(el);
+    }
+  };
+
+  overlay.setMap(map);
+  return overlay;
+};
+
 export const MapView = ({
   center,
   zoom = 14,
@@ -112,9 +176,13 @@ export const MapView = ({
 }: MapViewProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
-  const markersRef = useRef<GoogleAdvancedMarker[]>([]);
+  const markersRef = useRef<GoogleMarkerOverlay[]>([]);
   const polylinesRef = useRef<GooglePolyline[]>([]);
   const trafficLayerRef = useRef<GoogleTrafficLayer | null>(null);
+
+  const rawMapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim();
+  const hasValidMapId = Boolean(rawMapId && rawMapId !== 'DEMO_MAP_ID' && !rawMapId.startsWith('DEMO_'));
+  const validMapId = hasValidMapId ? rawMapId : undefined;
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -133,11 +201,10 @@ export const MapView = ({
         const googleMaps = await loadGoogleMaps();
         if (cancelled || !containerRef.current) return;
         const maps = await googleMaps.maps.importLibrary('maps') as unknown as MapLibrary;
-        const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || 'DEMO_MAP_ID';
         mapRef.current = new maps.Map(containerRef.current, {
           center: toGoogle(fallbackCenter.latitude, fallbackCenter.longitude),
           zoom,
-          ...(mapId ? { mapId } : {}),
+          ...(validMapId ? { mapId: validMapId } : {}),
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
@@ -229,7 +296,13 @@ export const MapView = ({
         const AdvancedMarkerElement = (markerLibrary as unknown as { AdvancedMarkerElement?: AdvancedMarkerConstructor })?.AdvancedMarkerElement;
 
         markersRef.current.forEach((marker) => {
-          try { marker.map = null; } catch { /* ignore */ }
+          try {
+            if (typeof marker.setMap === 'function') {
+              marker.setMap(null);
+            } else {
+              marker.map = null;
+            }
+          } catch { /* ignore */ }
         });
         markersRef.current = [];
         polylinesRef.current.forEach((line) => {
@@ -239,30 +312,45 @@ export const MapView = ({
 
         const allPoints: Array<{ lat: number; lng: number }> = [];
 
-        const addAdvancedMarker = (lat: number, lng: number, title: string, content: HTMLElement, onClick?: () => void) => {
+        const addMarker = (lat: number, lng: number, title: string, content: HTMLElement, onClick?: () => void) => {
           if (!mapRef.current || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
           const pos = toGoogle(lat, lng);
           allPoints.push(pos);
-          try {
-            if (AdvancedMarkerElement) {
-              const marker = new AdvancedMarkerElement({
+
+          let createdMarker: GoogleMarkerOverlay | null = null;
+
+          if (validMapId && AdvancedMarkerElement) {
+            try {
+              const adv = new AdvancedMarkerElement({
                 map: mapRef.current,
                 position: pos,
                 title,
                 content,
                 gmpClickable: Boolean(onClick),
               });
-              if (onClick) marker.addListener('click', onClick);
-              markersRef.current.push(marker);
+              if (onClick && adv.addListener) adv.addListener('click', onClick);
+              createdMarker = adv;
+            } catch {
+              // AdvancedMarkerElement failed on map; fallback seamlessly to OverlayView
             }
-          } catch (markerErr) {
-            console.warn('AdvancedMarkerElement failed to instantiate:', markerErr);
+          }
+
+          if (!createdMarker) {
+            try {
+              createdMarker = createOverlayMarker(googleMaps, mapRef.current, pos, content, onClick);
+            } catch {
+              // Best-effort overlay fallback
+            }
+          }
+
+          if (createdMarker) {
+            markersRef.current.push(createdMarker);
           }
         };
 
         // 1. User Location Beacon (Uber User Dot with live pulse)
         if (userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)) {
-          addAdvancedMarker(userLocation.latitude, userLocation.longitude, 'Your Location', createUserMarkerElement());
+          addMarker(userLocation.latitude, userLocation.longitude, 'Your Location', createUserMarkerElement());
         }
 
         // 2. Specific Markers (Ambulance, Hospital, Pickups)
@@ -280,7 +368,7 @@ export const MapView = ({
             } else {
               el = createDefaultMarkerElement(item.title, item.subtitle, item.isEmergency ?? false);
             }
-            addAdvancedMarker(item.latitude, item.longitude, item.title, el, item.onClick);
+            addMarker(item.latitude, item.longitude, item.title, el, item.onClick);
           }
         }
 
@@ -290,7 +378,7 @@ export const MapView = ({
           const el = isHosp
             ? createHospitalMarkerElement(destination.name, destination.isEmergency ?? true)
             : createDefaultMarkerElement(destination.name, destination.address, destination.isEmergency ?? false);
-          addAdvancedMarker(destination.latitude, destination.longitude, destination.name, el);
+          addMarker(destination.latitude, destination.longitude, destination.name, el);
         }
 
         // 4. Primary Active Route (Uber-Style layered casing + vibrant polyline)

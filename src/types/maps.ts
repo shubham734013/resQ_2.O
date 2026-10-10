@@ -5,6 +5,6 @@ export interface AmbulanceMapItem { id:string; status:string; latitude:number; l
 export interface PlaceSearchResult { id:string; displayName:string; formattedAddress?:string; location?:MapCoordinate; }
 export interface RouteRequest { origin:MapCoordinate; destination:MapCoordinate; travelMode?:'DRIVE'|'TWO_WHEELER'|'WALK'|'BICYCLE'; routingPreference?:'TRAFFIC_AWARE'|'TRAFFIC_AWARE_OPTIMAL'|'TRAFFIC_UNAWARE'; }
 export interface RouteOption { id:string; distanceMeters:number; durationSeconds:number; distanceText:string; durationText:string; polyline:MapCoordinate[]; summary:string; trafficCondition?:'LIGHT'|'MODERATE'|'HEAVY'|'UNKNOWN'; recommended:boolean; instructions:Array<{id:string;stepNumber:number;maneuver:'straight'|'turn-right'|'turn-left'|'slight-right'|'slight-left'|'u-turn'|'arrive';instruction:string;streetName:string;distanceToNext:string;remainingTime:string;remainingDistance:string}>; }
-export interface RouteResult { routes:RouteOption[]; origin:MapCoordinate; destination:MapCoordinate; fetchedAt:string; }
+export interface RouteResult { routes:RouteOption[]; origin:MapCoordinate; destination:MapCoordinate; fetchedAt:string; isFallback?:boolean; fallbackReason?:string; fallbackCode?:string; }
 export type LocationPermissionState='prompt'|'granted'|'denied'|'unsupported'|'unknown';
 export interface LocationState { location:GeoPoint|null; loading:boolean; permissionState:LocationPermissionState; error:string|null; refreshLocation:()=>void; }

@@ -112,39 +112,128 @@ const maneuver = (value?: string): 'straight' | 'turn-right' | 'turn-left' | 'sl
   return 'straight';
 };
 
+const buildFallbackRoute = (
+  input: RouteInput,
+  reason: string,
+  errorCode = 'ROUTES_API_QUOTA_EXCEEDED'
+) => {
+  const R = 6371e3; // meters
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const phi1 = toRad(input.origin.latitude);
+  const phi2 = toRad(input.destination.latitude);
+  const deltaPhi = toRad(input.destination.latitude - input.origin.latitude);
+  const deltaLambda = toRad(input.destination.longitude - input.origin.longitude);
+  const a = Math.sin(deltaPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
+  const crowDistanceMeters = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+  const distanceMeters = Math.max(150, Math.round(crowDistanceMeters * 1.35));
+  const durationSeconds = Math.max(60, Math.round(distanceMeters / 8.33));
+
+  const waypointsCount = Math.min(10, Math.max(3, Math.round(distanceMeters / 400)));
+  const polyline: Array<{ latitude: number; longitude: number }> = [];
+  for (let i = 0; i <= waypointsCount; i++) {
+    const fraction = i / waypointsCount;
+    const lat = input.origin.latitude + (input.destination.latitude - input.origin.latitude) * fraction;
+    const lng = input.origin.longitude + (input.destination.longitude - input.origin.longitude) * fraction;
+    polyline.push({ latitude: Number(lat.toFixed(6)), longitude: Number(lng.toFixed(6)) });
+  }
+
+  const instructions = [
+    {
+      id: 'fallback-step-1',
+      stepNumber: 1,
+      maneuver: 'straight' as const,
+      instruction: 'Head toward destination along main arterial corridor',
+      streetName: 'Main road',
+      distanceToNext: formatDistance(Math.round(distanceMeters * 0.4)),
+      remainingTime: formatDuration(durationSeconds),
+      remainingDistance: formatDistance(distanceMeters),
+    },
+    {
+      id: 'fallback-step-2',
+      stepNumber: 2,
+      maneuver: 'straight' as const,
+      instruction: 'Continue toward destination along main corridor',
+      streetName: 'Arterial corridor',
+      distanceToNext: formatDistance(Math.round(distanceMeters * 0.6)),
+      remainingTime: formatDuration(Math.round(durationSeconds * 0.6)),
+      remainingDistance: formatDistance(Math.round(distanceMeters * 0.6)),
+    },
+    {
+      id: 'fallback-step-3',
+      stepNumber: 3,
+      maneuver: 'arrive' as const,
+      instruction: 'Arrive at destination',
+      streetName: 'Destination entrance',
+      distanceToNext: '0 m',
+      remainingTime: '0 min',
+      remainingDistance: '0 m',
+    },
+  ];
+
+  return {
+    routes: [
+      {
+        id: 'route-fallback-estimate',
+        distanceMeters,
+        durationSeconds,
+        distanceText: formatDistance(distanceMeters),
+        durationText: formatDuration(durationSeconds),
+        polyline,
+        summary: 'Direct arterial route (Estimated)',
+        trafficCondition: 'UNKNOWN' as const,
+        recommended: true,
+        instructions,
+      },
+    ],
+    origin: input.origin,
+    destination: input.destination,
+    fetchedAt: new Date().toISOString(),
+    isFallback: true,
+    fallbackReason: reason,
+    fallbackCode: errorCode,
+  };
+};
+
 export const calculateGoogleRoutes = async (input: RouteInput) => {
   const apiKey = (env.GOOGLE_ROUTES_API_KEY || env.GOOGLE_MAPS_SERVER_API_KEY)?.trim();
-  if (!apiKey) throw new AppError('MAPS_API_KEY_MISSING', 'Server-side Google Maps key is not configured', 503);
+  if (!apiKey) {
+    return buildFallbackRoute(input, 'Server-side Google Maps key is not configured', 'MAPS_API_KEY_MISSING');
+  }
 
   let response: Response;
   try {
     response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.staticDuration,routes.description,routes.polyline.encodedPolyline,routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues',
-    },
-    body: JSON.stringify({
-      origin: { location: { latLng: { latitude: input.origin.latitude, longitude: input.origin.longitude } } },
-      destination: { location: { latLng: { latitude: input.destination.latitude, longitude: input.destination.longitude } } },
-      travelMode: input.travelMode,
-      routingPreference: input.travelMode === 'DRIVE' || input.travelMode === 'TWO_WHEELER' ? input.routingPreference : undefined,
-      computeAlternativeRoutes: true,
-      languageCode: 'en-US',
-      units: 'METRIC',
-    }),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.staticDuration,routes.description,routes.polyline.encodedPolyline,routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues',
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: { latitude: input.origin.latitude, longitude: input.origin.longitude } } },
+        destination: { location: { latLng: { latitude: input.destination.latitude, longitude: input.destination.longitude } } },
+        travelMode: input.travelMode,
+        routingPreference: input.travelMode === 'DRIVE' || input.travelMode === 'TWO_WHEELER' ? input.routingPreference : undefined,
+        computeAlternativeRoutes: true,
+        languageCode: 'en-US',
+        units: 'METRIC',
+      }),
     });
   } catch {
-    throw new AppError('ROUTE_PROVIDER_UNAVAILABLE', 'Google Routes could not be reached. Check backend internet access and retry.', 502);
+    return buildFallbackRoute(input, 'Google Routes could not be reached. Estimated route provided.', 'ROUTE_PROVIDER_UNAVAILABLE');
   }
 
   const payload = await response.json().catch(() => null) as GoogleRoutesResponse | null;
   if (!response.ok) {
     const failure = describeGoogleRoutesFailure(response.status, payload);
-    throw new AppError(failure.code, failure.message, failure.statusCode);
+    if (failure.statusCode === 400) {
+      throw new AppError(failure.code, failure.message, failure.statusCode);
+    }
+    return buildFallbackRoute(input, failure.message, failure.code);
   }
-  if (!payload?.routes?.length) throw new AppError('ROUTE_NOT_FOUND', 'No route was found between the selected locations', 404);
+  if (!payload?.routes?.length) {
+    return buildFallbackRoute(input, 'No Google road route found. Estimated direct route provided.', 'ROUTE_NOT_FOUND');
+  }
 
   const routes = payload.routes.map((route, index) => {
     const distanceMeters = route.distanceMeters ?? 0;

@@ -5,10 +5,10 @@ import type { Facility, UserLocation } from '../types/facility';
 import type { RouteOptionItem } from '../types/route';
 
 const retryTransientFailure = (failureCount: number, error: unknown): boolean => {
-  // A 4xx response is deterministic; retrying the same request only repeats the failure.
+  // A 4xx or 503 quota response is deterministic; retrying immediately will only repeat the failure.
   if (typeof error === 'object' && error !== null && 'status' in error) {
     const status = (error as { status?: unknown }).status;
-    if (typeof status === 'number' && status >= 400 && status < 500) return false;
+    if (typeof status === 'number' && ((status >= 400 && status < 500) || status === 503)) return false;
   }
   return failureCount < 1;
 };
@@ -179,7 +179,7 @@ export function useMapRoute(
     retry: retryTransientFailure,
   });
 
-  const isFallback = !query.data?.routes?.length && Boolean(origin && destination) && (query.isError || !query.isLoading);
+  const isFallback = Boolean(query.data?.isFallback) || (!query.data?.routes?.length && Boolean(origin && destination) && (query.isError || !query.isLoading));
 
   const routes = useMemo(() => {
     if (query.data?.routes?.length) {
