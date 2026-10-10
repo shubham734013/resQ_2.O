@@ -45,3 +45,4 @@ export const arrivedPickup=async(req:Request,res:Response)=>sendSuccess(res,awai
 export const patientPickedUp=async(req:Request,res:Response)=>sendSuccess(res,await service.patientPickedUp(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const arrivedHospital=async(req:Request,res:Response)=>sendSuccess(res,await service.arrivedHospital(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const completeTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.completeTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const cancelTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.cancelTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));
