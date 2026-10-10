@@ -1,10 +1,16 @@
+import { createServer } from 'node:http';
 import { app } from './app.js';
+import { initializeTrackingSockets } from './services/trackingSocketService.js';
 import { connectDatabase, disconnectDatabase, sanitizeMongoUri } from './config/database.js';
 import { env } from './config/env.js';
+import { startDispatchWorker } from './services/dispatchService.js';
 
 const startServer = async (): Promise<void> => {
   await connectDatabase();
-  const server = app.listen(env.PORT, () => console.info(`ResQ API listening on port ${env.PORT}`));
+  const stopDispatchWorker = startDispatchWorker();
+  const server = createServer(app);
+  const stopTrackingSockets = initializeTrackingSockets(server);
+  server.listen(env.PORT, () => console.info(`ResQ API listening on port ${env.PORT}`));
 
   let isShuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
@@ -18,6 +24,8 @@ const startServer = async (): Promise<void> => {
     }, 10000);
     forceExitTimeout.unref();
 
+    stopDispatchWorker();
+    await stopTrackingSockets();
     server.close(async (err) => {
       if (err) {
         console.error('Error closing HTTP server:', err);
