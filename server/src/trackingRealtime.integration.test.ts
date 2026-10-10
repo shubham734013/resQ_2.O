@@ -131,7 +131,6 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
 
     const userLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => userSocket.once('tracking:location', resolve));
     const hospitalLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => hospitalSocket.once('tracking:location', resolve));
-    const outsiderLocation = new Promise<void>((resolve) => outsiderSocket.once('tracking:location', () => resolve()));
     const telemetry = await updateDriverLocation(String(driverId), {
       latitude: 26.91241, longitude: 75.78731, accuracy: 6, timestamp: new Date(),
     });
@@ -156,7 +155,6 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     outsiderSocket.on('tracking:location', () => { outsiderReceived = true; });
     await delay(100);
     assert.equal(outsiderReceived, false, 'GPS must not leak to an unrelated user');
-    void outsiderLocation;
     assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, true, 'authorized user may explicitly subscribe to their trip');
     const terminalStatus = new Promise<{ data: { status: string } }>((resolve) => userSocket.once('tracking:status', resolve));
     broadcastEvent('trip:' + tripId, 'tracking:status', { id: String(tripId), emergencyRequestId: String(emergencyId), status: 'COMPLETED' });
@@ -164,7 +162,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await delay(50);
     let tripRoomLocationReceived = false;
     userSocket.on('tracking:location', () => { tripRoomLocationReceived = true; });
-    broadcastEvent('trip:' + tripId, 'tracking:location', locationEvent);
+    broadcastEvent('trip:' + tripId, 'tracking:location', { emergencyRequestId: String(emergencyId), tripId: String(tripId), latitude: telemetry.latitude, longitude: telemetry.longitude, coordinatesAreLive: false });
     await delay(100);
     assert.equal(tripRoomLocationReceived, false, 'trip room is cleaned after terminal status delivery');
 
