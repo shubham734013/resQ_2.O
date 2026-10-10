@@ -82,7 +82,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await AmbulanceDriverModel.create({
       _id: driverId, fullName: 'Tracking Test Driver', email: 'tracking-driver-' + suffix + '@example.test',
       phone: '0000000000', passwordHash: 'test-only', authProvider: 'LOCAL', licenseNumber: 'TRL-' + suffix,
-      providerId, assignedAmbulanceId: ambulanceId, availabilityStatus: 'BUSY',
+      providerId, assignedAmbulanceId: ambulanceId, availabilityStatus: 'BUSY', profileCompletionStatus: 'COMPLETE',
       licenseVerificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
     });
     await EmergencyRequestModel.create({
@@ -99,6 +99,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     const { app } = await import('./app.js');
     const { initializeTrackingSockets } = await import('./services/trackingSocketService.js');
     const { broadcastEvent } = await import('./services/realtimeService.js');
+    const { updateDriverLocation } = await import('./services/driverDutyService.js');
     server = createServer(app);
     stopSockets = initializeTrackingSockets(server);
     await new Promise<void>((resolve) => server!.listen(0, resolve));
@@ -128,23 +129,35 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     assert.equal(userSnapshot.trip.status, hospitalSnapshot.trip.status);
     assert.equal(userSnapshot.location.updatedAt, hospitalSnapshot.location.updatedAt, 'user and hospital snapshots must share the persisted GPS timestamp');
 
-    const locationEvent = {
-      emergencyRequestId: String(emergencyId), tripId: String(tripId), tripStatus: 'ACCEPTED',
-      ambulanceId: String(ambulanceId), latitude: 26.9125, longitude: 75.7874, accuracyMeters: 6,
-      locationUpdatedAt: new Date(Date.now() + 1000).toISOString(), sourceTimestamp: new Date().toISOString(),
-      freshness: 'FRESH', coordinatesAreLive: true,
-    };
-    const userLocation = new Promise<{ data: typeof locationEvent }>((resolve) => userSocket.once('tracking:location', resolve));
-    const hospitalLocation = new Promise<{ data: typeof locationEvent }>((resolve) => hospitalSocket.once('tracking:location', resolve));
-    broadcastEvent('emergency:' + emergencyId, 'tracking:location', locationEvent);
+    const userLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => userSocket.once('tracking:location', resolve));
+    const hospitalLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => hospitalSocket.once('tracking:location', resolve));
+    const outsiderLocation = new Promise<void>((resolve) => outsiderSocket.once('tracking:location', () => resolve()));
+    const telemetry = await updateDriverLocation(String(driverId), {
+      latitude: 26.91241, longitude: 75.78731, accuracy: 6, timestamp: new Date(),
+    });
     const [userEnvelope, hospitalEnvelope] = await Promise.all([userLocation, hospitalLocation]);
-    assert.deepEqual(userEnvelope.data, hospitalEnvelope.data);
+    assert.deepEqual(userEnvelope.data, hospitalEnvelope.data, 'user and hospital receive the same authoritative GPS payload');
+    assert.equal(userEnvelope.data.latitude, telemetry.latitude);
+    assert.equal(userEnvelope.data.longitude, telemetry.longitude);
+    assert.equal(userEnvelope.data.tripId, String(tripId));
+    assert.equal(userEnvelope.data.coordinatesAreLive, true);
+
+    const userAfter = await fetch(url + '/api/v1/tracking/emergencies/' + emergencyId, { headers: { Cookie: 'resq_access_token=' + encodeURIComponent(userToken) } });
+    const hospitalAfter = await fetch(url + '/api/v1/tracking/emergencies/' + emergencyId, { headers: { Cookie: 'resq_access_token=' + encodeURIComponent(hospitalToken) } });
+    const userAfterSnapshot = (await userAfter.json() as { data: { trip: { status: string }; location: { updatedAt: string; latitude: number; longitude: number } } }).data;
+    const hospitalAfterSnapshot = (await hospitalAfter.json() as { data: { trip: { status: string }; location: { updatedAt: string; latitude: number; longitude: number } } }).data;
+    assert.equal(userAfterSnapshot.trip.status, hospitalAfterSnapshot.trip.status);
+    assert.equal(userAfterSnapshot.location.updatedAt, hospitalAfterSnapshot.location.updatedAt);
+    assert.equal(userAfterSnapshot.location.latitude, telemetry.latitude);
+    assert.equal(hospitalAfterSnapshot.location.longitude, telemetry.longitude);
+    assert.equal(userAfterSnapshot.location.updatedAt, String(telemetry.locationUpdatedAt instanceof Date ? telemetry.locationUpdatedAt.toISOString() : telemetry.locationUpdatedAt));
+
     let outsiderReceived = false;
     outsiderSocket.on('tracking:location', () => { outsiderReceived = true; });
-    broadcastEvent('emergency:' + emergencyId, 'tracking:location', locationEvent);
     await delay(100);
-    assert.equal(outsiderReceived, false);
-
+    assert.equal(outsiderReceived, false, 'GPS must not leak to an unrelated user');
+    void outsiderLocation;
+    assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, true, 'authorized user may explicitly subscribe to their trip');
     const terminalStatus = new Promise<{ data: { status: string } }>((resolve) => userSocket.once('tracking:status', resolve));
     broadcastEvent('trip:' + tripId, 'tracking:status', { id: String(tripId), emergencyRequestId: String(emergencyId), status: 'COMPLETED' });
     assert.equal((await terminalStatus).data.status, 'COMPLETED');
