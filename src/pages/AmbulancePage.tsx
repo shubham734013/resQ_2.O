@@ -113,20 +113,7 @@ export const AmbulancePage=()=>{
  const lastGpsSentAtRef=useRef(0);
  const locationRequestInFlightRef=useRef(false);
 
- useEffect(() => {
-   if (!location || status.data?.status === 'OFFLINE') return;
-   const lastSent = Number(sessionStorage.getItem('resq-driver-location-sent-at') ?? '0');
-   if (Date.now() - lastSent < 15000) return;
-   sessionStorage.setItem('resq-driver-location-sent-at', String(Date.now()));
-   void ambulanceDriverApi.updateLocation({
-     latitude: location.latitude,
-     longitude: location.longitude,
-     accuracy: location.accuracyMeters ?? 0,
-     timestamp: location.timestamp,
-   }).catch(() => {
-     sessionStorage.removeItem('resq-driver-location-sent-at');
-   });
- }, [location, status.data?.status]);
+
  const activeRequest=useQuery({queryKey:['ambulance-driver','request',activeTrip?.emergencyRequestId],queryFn:()=>ambulanceDriverApi.getRequest(activeTrip!.emergencyRequestId),enabled:Boolean(activeTrip?.emergencyRequestId)});
  const incoming=requests.data?.items.find(r=>!r.driverId && ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION'].includes(r.status))??requests.data?.items[0]??null;
  const incomingOffer=offers.data?.[0]??null;
