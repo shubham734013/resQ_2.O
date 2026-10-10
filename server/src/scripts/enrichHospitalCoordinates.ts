@@ -129,12 +129,40 @@ export async function enrichHospitalCoordinates(options: EnrichmentOptions = {})
       const data = (await response.json()) as GoogleGeocodeResponse;
 
       if (data.status === 'REQUEST_DENIED') {
+        // Try fallback to Google Places API which has active authorization
+        const { searchGooglePlaces } = await import('../services/placesService.js');
+        const places = await searchGooglePlaces(addressQuery);
+        const topPlace = places[0];
+        if (topPlace && topPlace.location && typeof topPlace.location.latitude === 'number' && typeof topPlace.location.longitude === 'number') {
+          const { latitude: lat, longitude: lng } = topPlace.location;
+          const updateSet: Record<string, unknown> = {
+            latitude: lat,
+            longitude: lng,
+            location: {
+              type: 'Point',
+              coordinates: [lng, lat],
+            },
+          };
+          if (topPlace.formattedAddress) {
+            updateSet.formattedAddress = topPlace.formattedAddress;
+          }
+          if (isDryRun) {
+            console.log(`[DRY-RUN (Places Fallback)] Hospital "${hospital.name}" (${hospital._id}) -> lat=${lat}, lng=${lng}`);
+            result.enriched++;
+          } else {
+            await HospitalModel.collection.updateOne({ _id: hospital._id }, { $set: updateSet });
+            console.log(`Enriched hospital via Places API "${hospital.name}" (${hospital._id}) -> [${lat}, ${lng}]`);
+            result.enriched++;
+          }
+          await sleep(200);
+          continue;
+        }
+
         result.billingBlocked = true;
         const reason = data.error_message || 'API request denied by Google Cloud';
         result.notes.push(`Google Geocoding API blocked: ${reason}`);
-        console.warn(`\n[GEOCODING NOTICE] Google Geocoding API returned REQUEST_DENIED:`);
+        console.warn(`\n[GEOCODING NOTICE] Google Geocoding API returned REQUEST_DENIED and Places fallback found no match:`);
         console.warn(`Details: ${reason}`);
-        console.warn('Google Cloud billing is required to use the Geocoding API.');
         console.warn('Real coordinates were not fabricated. The remaining hospitals remain in PENDING geocoding status.\n');
         break; // Stop further calls to avoid repeated denied requests
       }

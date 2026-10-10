@@ -8,6 +8,7 @@ type RouteInput = z.infer<typeof routeRequestSchema>;
 interface GoogleStep {
   distanceMeters?: number;
   duration?: string;
+  staticDuration?: string;
   navigationInstruction?: { instructions?: string; maneuver?: string };
   localizedValues?: { distance?: { text?: string }; duration?: { text?: string } };
 }
@@ -122,7 +123,7 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.staticDuration,routes.description,routes.polyline.encodedPolyline,routes.legs.steps.distanceMeters,routes.legs.steps.duration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues',
+      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.staticDuration,routes.description,routes.polyline.encodedPolyline,routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues',
     },
     body: JSON.stringify({
       origin: { location: { latLng: { latitude: input.origin.latitude, longitude: input.origin.longitude } } },
@@ -155,7 +156,8 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
     const instructions = steps.map((step, stepIndex) => {
       const stepMeters = step.distanceMeters ?? 0;
       const previousStep = stepIndex > 0 ? steps[stepIndex - 1] : undefined;
-      remainingSeconds = Math.max(0, remainingSeconds - secondsFromDuration(previousStep?.duration));
+      const stepDuration = previousStep?.staticDuration || previousStep?.duration;
+      remainingSeconds = Math.max(0, remainingSeconds - secondsFromDuration(stepDuration));
       remainingMeters = Math.max(0, remainingMeters - (previousStep?.distanceMeters ?? 0));
       return {
         id: 'step-' + index + '-' + stepIndex,

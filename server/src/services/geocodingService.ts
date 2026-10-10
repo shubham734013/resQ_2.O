@@ -25,11 +25,28 @@ export const geocodeAddress = async (address: string) => {
         }
       }
     } catch {
-      // Continue to local MongoDB facility fallback on network or DNS errors.
+      // Continue to Google Places or local MongoDB facility fallback on network or DNS errors.
     }
   }
 
-  // Fallback: search Hospital in MongoDB matching the address or name
+  // Fallback 1: Try Google Places search which often has valid billing/authorization
+  try {
+    const { searchGooglePlaces } = await import('./placesService.js');
+    const places = await searchGooglePlaces(address);
+    const topPlace = places[0];
+    if (topPlace && topPlace.location && typeof topPlace.location.latitude === 'number' && typeof topPlace.location.longitude === 'number') {
+      return {
+        placeId: topPlace.id,
+        formattedAddress: topPlace.formattedAddress || topPlace.displayName,
+        latitude: topPlace.location.latitude,
+        longitude: topPlace.location.longitude,
+      };
+    }
+  } catch {
+    // Continue to database search fallback
+  }
+
+  // Fallback 2: search Hospital in MongoDB matching the address or name
   const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(escaped, 'i');
   try {
