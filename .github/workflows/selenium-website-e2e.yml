@@ -47,7 +47,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Build production frontend
         run: npm run build
