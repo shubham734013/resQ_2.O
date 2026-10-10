@@ -147,6 +147,7 @@ export const CoordinationStatus = ({
             <p className="mt-1 text-xs text-emerald-800">
               Persisted in the selected hospital&apos;s emergency queue. Hospital response controls the next coordination step.
             </p>
+            <p className="mt-1 text-[11px] text-emerald-800">Request ID: {data?.id ?? emergencyRequestId}</p>
           </div>
         )}
 
