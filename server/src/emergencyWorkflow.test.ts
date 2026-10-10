@@ -50,6 +50,7 @@ test('hospital capability matching is category-aware', () => {
   assert.equal(hospitalMatchesSituation({ hospitalType: 'General Hospital', services: ['Emergency Department'], capabilities: ['Cardiology & Cath Lab'] }, 'Chest Pain'), true);
   assert.equal(hospitalMatchesSituation({ hospitalType: 'Orthopaedic Clinic', services: ['Bone care'], capabilities: ['Fracture care'] }, 'Chest Pain'), false);
   assert.equal(hospitalMatchesSituation({ hospitalType: 'Trauma Center', services: ['Trauma Care'], capabilities: [] }, 'Accident / Injury'), true);
+  assert.equal(hospitalMatchesSituation({ hospitalType: 'General Hospital', services: ['Cardiology & Cath Lab'], capabilities: [] }, 'Severe chest pain and shortness of breath'), true);
 });
 
 test('SOS reuses the existing emergency status enum', () => {
