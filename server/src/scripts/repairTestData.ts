@@ -96,7 +96,7 @@ async function main(): Promise<void> {
 
   let ambulancesUpdated = 0;
   const ambulances = await AmbulanceModel.collection.find({}).toArray();
-  for (const [i, doc] of ambulances.entries()) {
+  for (const doc of ambulances) {
     const set: Record<string, unknown> = {};
     const idSuffix = suffix(doc._id);
     if (!isText(doc.registrationNumber)) set.registrationNumber = `TEST-AMB-REG-${idSuffix}`;
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     if (!isText(doc.ambulanceType)) set.ambulanceType = 'TEST_FIXTURE';
     if (!Array.isArray(doc.capabilities)) set.capabilities = [];
     if (!doc.providerId || !validProviderIdSet.has(String(doc.providerId))) {
-      set.providerId = validProviderIds[i % validProviderIds.length];
+      set.providerId = validProviderIds[ambulancesUpdated % validProviderIds.length];
     }
     if (!['AVAILABLE', 'BUSY', 'OFFLINE', 'MAINTENANCE'].includes(String(doc.currentStatus))) {
       set.currentStatus = 'OFFLINE';
