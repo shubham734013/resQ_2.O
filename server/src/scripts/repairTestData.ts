@@ -96,9 +96,7 @@ async function main(): Promise<void> {
 
   let ambulancesUpdated = 0;
   const ambulances = await AmbulanceModel.collection.find({}).toArray();
-  for (let i = 0; i < ambulances.length; i++) {
-    const doc = ambulances[i];
-    if (doc === undefined) continue;
+  for (const [i, doc] of ambulances.entries()) {
     const set: Record<string, unknown> = {};
     const idSuffix = suffix(doc._id);
     if (!isText(doc.registrationNumber)) set.registrationNumber = `TEST-AMB-REG-${idSuffix}`;
