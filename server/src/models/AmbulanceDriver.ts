@@ -8,7 +8,7 @@ export interface AmbulanceDriverDocument {
   fullName: string; email: string; phone: string; passwordHash: string; authProvider: AuthProvider; providerSubject?: string; licenseNumber: string;
   licenseVerificationStatus: VerificationStatus; profileCompletionStatus: DriverProfileCompletionStatus; address?: string; city?: string; state?: string; country?: string;
   registeredLatitude?: number; registeredLongitude?: number; providerId: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus;
-  accountStatus: AccountStatus; createdAt: Date; updatedAt: Date;
+  accountStatus: AccountStatus; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceDriverDocument>({
   fullName: { type: String, required: true, trim: true }, email: { type: String, required: true, unique: true, lowercase: true, index: true }, phone: { type: String, required: true },
@@ -18,6 +18,7 @@ const schema = new Schema<AmbulanceDriverDocument>({
   address: String, city: String, state: String, country: String, registeredLatitude: Number, registeredLongitude: Number,
   providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true }, assignedAmbulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance', index: true },
   availabilityStatus: { type: String, enum: DRIVER_AVAILABILITY_STATUSES, default: 'OFFLINE' }, accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
+  dispatchReservationId: { type: Schema.Types.ObjectId, index: true }, dispatchReservationExpiresAt: Date,
 }, { timestamps: true });
 schema.index({ authProvider: 1, providerSubject: 1 }, { unique: true, partialFilterExpression: { providerSubject: { $type: 'string' } } });
 schema.index({ registeredLatitude: 1, registeredLongitude: 1 });
