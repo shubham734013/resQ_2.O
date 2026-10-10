@@ -322,7 +322,7 @@ export const getDriverDutyStatus = async (driverId: string) => {
       provider?.accountStatus === 'ACTIVE' && provider.verificationStatus === 'VERIFIED' &&
       driver.availabilityStatus === 'OFFLINE' && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer &&
       !hasReservation(driver, now) && Boolean(ambulance && ambulance.accountStatus === 'ACTIVE' && ambulance.verificationStatus === 'VERIFIED' && ['OFFLINE', 'AVAILABLE'].includes(ambulance.currentStatus) && !hasReservation(ambulance, now)),
-    canEndDuty: driver.availabilityStatus === 'ONLINE' && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer,
+    canEndDuty: driver.availabilityStatus === 'ONLINE' && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer && !hasReservation(driver, now) && Boolean(!ambulance || !hasReservation(ambulance, now)),
   };
 };
 
