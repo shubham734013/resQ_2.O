@@ -1,5 +1,4 @@
 import { Types } from 'mongoose';
-import { env } from '../config/env.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { HospitalCoordinationNotificationModel, type HospitalCoordinationNotificationDocument, type HospitalCoordinationNotificationType } from '../models/HospitalCoordinationNotification.js';
@@ -9,6 +8,10 @@ import { AppError } from '../utils/AppError.js';
 import { broadcastEvent } from './realtimeService.js';
 
 const ACTIVE_TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] as const;
+const locationStaleAfterMs = () => {
+  const configured = Number(process.env.DRIVER_LOCATION_STALE_AFTER_MS);
+  return Number.isFinite(configured) && configured >= 1000 && configured <= 120000 ? configured : 15000;
+};
 const MATERIAL_TRANSPORT_STATUSES = ['TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] as const;
 const idOf = (value: string, label: string) => {
   if (!Types.ObjectId.isValid(value)) throw new AppError('INVALID_ID', `Invalid ${label} ID.`, 400);
@@ -222,7 +225,7 @@ export const getHospitalCoordinationDetail = async (hospitalId: string, emergenc
     if (vehicle) {
       const timestamp = vehicle.locationUpdatedAt ? new Date(vehicle.locationUpdatedAt).getTime() : NaN;
       const ageMs = Date.now() - timestamp;
-      const fresh = isActive && Number.isFinite(timestamp) && ageMs >= 0 && ageMs <= env.DRIVER_LOCATION_STALE_AFTER_MS;
+      const fresh = isActive && Number.isFinite(timestamp) && ageMs >= 0 && ageMs <= locationStaleAfterMs();
       ambulance = { id: String(trip.ambulanceId), registrationNumber: vehicle.registrationNumber, vehicleNumber: vehicle.vehicleNumber, ambulanceType: vehicle.ambulanceType, currentStatus: vehicle.currentStatus,
         location: typeof vehicle.currentLatitude === 'number' && typeof vehicle.currentLongitude === 'number' ? { latitude: vehicle.currentLatitude, longitude: vehicle.currentLongitude, accuracyMeters: vehicle.locationAccuracyMeters, updatedAt: vehicle.locationUpdatedAt, ageMs: Number.isFinite(ageMs) ? Math.max(0, ageMs) : undefined, freshness: fresh ? 'FRESH' : 'STALE', coordinatesAreLive: fresh } : null };
     }
@@ -240,6 +243,6 @@ export const getHospitalCoordinationDetail = async (hospitalId: string, emergenc
     emergency: { id: String(emergency._id), requestCode: emergency.requestCode, category: emergency.category ?? emergency.situationType, situationType: emergency.situationType, reportedAt: emergency.reportedAt, status: emergency.status, pickup: { label: emergency.location, latitude: emergency.latitude, longitude: emergency.longitude }, etaMinutes: emergency.etaMinutes },
     patient: patient ? { caseId: patient.caseId, coordinationStatus: patient.coordinationStatus, receivedAt: patient.receivedAt, etaMinutes: patient.etaMinutes } : null,
     trip: trip ? { id: String(trip._id), status: trip.status, acceptedAt: trip.acceptedAt, arrivedAtPickupAt: trip.arrivedAtPickupAt, patientPickedUpAt: trip.patientPickedUpAt, arrivedAtHospitalAt: trip.arrivedAtHospitalAt, completedAt: trip.completedAt, createdAt: trip.createdAt, updatedAt: trip.updatedAt, history: trip.statusHistory ?? [] } : null,
-    ambulance, allowedActions, freshnessThresholdMs: env.DRIVER_LOCATION_STALE_AFTER_MS,
+    ambulance, allowedActions, freshnessThresholdMs: locationStaleAfterMs(),
   };
 };
