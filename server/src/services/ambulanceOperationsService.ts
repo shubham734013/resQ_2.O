@@ -9,6 +9,7 @@ import { TripModel, type TripDocument } from '../models/Trip.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { broadcastEvent } from './realtimeService.js';
+import { hospitalNotificationTypeForTripStatus, recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type * as S from '../schemas/ambulance.js';
@@ -134,11 +135,18 @@ export const acceptRequest = async (did: string, id: string) => {
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Assigned ambulance is not operational', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(id, 'request'), status: 'AMBULANCE_COORDINATION', ambulanceId: a._id, driverId: { $exists: false } }, { $set: { driverId: d._id } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is already accepted', 409);
-  const existing = await TripModel.findOne({ emergencyRequestId: x._id }).exec();
-  if (existing) return tripOut(existing.toObject());
-  const trip = await TripModel.create({ emergencyRequestId: x._id, providerId: d.providerId, ambulanceId: a._id, driverId: d._id, destinationHospitalId: x.hospitalId, status: 'ACCEPTED', acceptedAt: new Date() });
+  const existing = await TripModel.findOne({ emergencyRequestId: x._id, status: { $in: activeTripStatuses } }).sort({ createdAt: -1 }).exec();
+  if (existing) {
+    try { await recordHospitalCoordinationEvent({ emergencyId: String(x._id), tripId: String(existing._id), type: 'AMBULANCE_ASSIGNED' }); }
+    catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
+    return tripOut(existing.toObject());
+  }
+  const acceptedAt = new Date();
+  const trip = await TripModel.create({ emergencyRequestId: x._id, providerId: d.providerId, ambulanceId: a._id, driverId: d._id, destinationHospitalId: x.hospitalId, status: 'ACCEPTED', acceptedAt, statusHistory: [{ status: 'ACCEPTED', changedAt: acceptedAt, actorId: d._id, actorRole: 'AMBULANCE_DRIVER' }] });
   await AmbulanceDriverModel.updateOne({ _id: d._id }, { $set: { availabilityStatus: 'BUSY' } }).exec();
   const out = tripOut(trip.toObject());
+  try { await recordHospitalCoordinationEvent({ emergencyId: String(x._id), tripId: String(trip._id), type: 'AMBULANCE_ASSIGNED' }); }
+  catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
   broadcastEvent(`emergency:${x._id}`, 'dispatch:accepted', out);
   broadcastEvent(`hospital:${x.hospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent('operations', 'dispatch:accepted', out);
@@ -162,8 +170,8 @@ export const allowedTripTransitions: { [K in TripStatus]?: TripStatus[] } = {
   ACCEPTED: ['TO_PICKUP', 'AT_PICKUP', 'CANCELLED'],
   TO_PICKUP: ['AT_PICKUP', 'CANCELLED'],
   AT_PICKUP: ['PATIENT_ONBOARD', 'CANCELLED'],
-  PATIENT_ONBOARD: ['TO_HOSPITAL', 'AT_HOSPITAL', 'CANCELLED'],
-  TO_HOSPITAL: ['AT_HOSPITAL', 'CANCELLED'],
+  PATIENT_ONBOARD: ['TO_HOSPITAL', 'AT_HOSPITAL'],
+  TO_HOSPITAL: ['AT_HOSPITAL'],
   AT_HOSPITAL: ['COMPLETED'],
   COMPLETED: [],
   CANCELLED: []
@@ -179,41 +187,69 @@ async function moveTrip(did:string,id:string,next:TripStatus){
   if(next==='PATIENT_ONBOARD')set.patientPickedUpAt=now;
   if(next==='AT_HOSPITAL')set.arrivedAtHospitalAt=now;
   if(next==='COMPLETED')set.completedAt=now;
-  const x=await TripModel.findOneAndUpdate({_id:current._id,driverId:oid(did,'driver'),status:current.status},{$set:set},{new:true}).lean().exec();
+  const x=await TripModel.findOneAndUpdate(
+    {_id:current._id,driverId:oid(did,'driver'),status:current.status},
+    {$set:set,$push:{statusHistory:{status:next,changedAt:now,actorId:oid(did,'driver'),actorRole:'AMBULANCE_DRIVER',previousStatus:current.status}}},
+    {new:true}
+  ).lean().exec();
   if(!x)throw new AppError('INVALID_TRIP_TRANSITION','Trip changed before this action could be applied',409);
+
   if(next==='AT_HOSPITAL'){
     await HospitalPatientModel.updateOne(
-      { emergencyId: x.emergencyRequestId, coordinationStatus: { $in: ['INCOMING', 'HOSPITAL_NOTIFIED'] } },
-      { $set: { coordinationStatus: 'AT_HOSPITAL' } }
+      {emergencyId:x.emergencyRequestId,hospitalId:x.destinationHospitalId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+      {$set:{coordinationStatus:'AT_HOSPITAL'}}
     ).exec();
   }
   if(next==='COMPLETED'){
     await Promise.all([
-      AmbulanceModel.updateOne({_id:x.ambulanceId},{$set:{currentStatus:'AVAILABLE'}}).exec(),
-      AmbulanceDriverModel.updateOne({_id:x.driverId},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+      AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
+      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
       EmergencyRequestModel.updateOne(
-        { _id: x.emergencyRequestId, status: 'AMBULANCE_COORDINATION' },
-        {
-          $set: { status: 'RESOLVED' },
-          $push: {
-            statusHistory: {
-              status: 'RESOLVED',
-              changedAt: now,
-              previousStatus: 'AMBULANCE_COORDINATION',
-              actorId: x.driverId,
-              actorRole: 'AMBULANCE_DRIVER',
-            },
-          },
-        }
+        {_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION'},
+        {$set:{status:'RESOLVED'},$push:{statusHistory:{status:'RESOLVED',changedAt:now,previousStatus:'AMBULANCE_COORDINATION',actorId:x.driverId,actorRole:'AMBULANCE_DRIVER'}}}
       ).exec(),
       HospitalPatientModel.updateOne(
-        { emergencyId: x.emergencyRequestId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
-        { $set: { coordinationStatus: 'RESOLVED' } }
+        {emergencyId:x.emergencyRequestId,hospitalId:x.destinationHospitalId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+        {$set:{coordinationStatus:'RESOLVED'}}
       ).exec(),
     ]);
   }
+  if(next==='CANCELLED'){
+    await Promise.all([
+      AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
+      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+      EmergencyRequestModel.updateOne(
+        {_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION',ambulanceId:x.ambulanceId},
+        {$unset:{ambulanceId:1,ambulanceProviderId:1,driverId:1,etaMinutes:1}}
+      ).exec(),
+      HospitalPatientModel.updateOne(
+        {emergencyId:x.emergencyRequestId,hospitalId:x.destinationHospitalId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+        {$set:{coordinationStatus:'REASSIGNMENT_REQUIRED'},$unset:{ambulanceId:1,etaMinutes:1}}
+      ).exec(),
+    ]);
+    const job=await DispatchJobModel.findOne({emergencyRequestId:x.emergencyRequestId,status:'ACCEPTED',acceptedTripId:x._id}).lean().exec();
+    if(job){
+      const set:Record<string,unknown>={status:'PENDING',generation:job.generation+1,nextAttemptAt:now};
+      const options:Record<string,unknown>={};
+      if(job.currentAttemptId){
+        set['attempts.$[attempt].status']='CANCELLED';
+        set['attempts.$[attempt].respondedAt']=now;
+        set['attempts.$[attempt].reason']='Trip cancelled before transport; returning emergency to dispatch.';
+        options.arrayFilters=[{'attempt.attemptId':job.currentAttemptId}];
+      }
+      await DispatchJobModel.updateOne({_id:job._id,status:'ACCEPTED',acceptedTripId:x._id},{
+        $set:set,
+        $unset:{acceptedTripId:1,currentAttemptId:1,currentProviderId:1,currentAmbulanceId:1,currentDriverId:1,deadlineAt:1,leaseUntil:1,leaseToken:1,exhaustedAt:1,escalatedAt:1,escalationReason:1},
+        $push:{events:{event:'TRIP_CANCELLED_REDISPATCH_QUEUED',at:now,actorId:oid(did,'driver'),actorRole:'AMBULANCE_DRIVER',reason:'Trip cancelled before patient transport.'}},
+      },options).exec();
+    }
+  }
+  const eventType=hospitalNotificationTypeForTripStatus(next);
+  if(eventType){
+    try{await recordHospitalCoordinationEvent({emergencyId:String(x.emergencyRequestId),tripId:String(x._id),type:eventType});}
+    catch(error){console.error('Hospital trip notification will reconcile from persisted trip history:',error instanceof Error?error.message:'notification persistence failed');}
+  }
   const out = tripOut(x);
-  // The same persisted trip transition is fanned out to every authorized view.
   broadcastEvent(`emergency:${x.emergencyRequestId}`, 'tracking:status', out);
   broadcastEvent(`trip:${x._id}`, 'tracking:status', out);
   broadcastEvent(`hospital:${x.destinationHospitalId}`, 'hospital:incoming-patient', out);
