@@ -1,3 +1,4 @@
+import { publishSocketEvent } from './trackingSocketService.js';
 import type { Response } from 'express';
 
 export interface RealtimeEventPayload {
@@ -76,4 +77,5 @@ export const broadcastEvent = (channel: string, event: string, data: unknown): v
     }
   }
   deadIds.forEach((id) => clients.delete(id));
+  publishSocketEvent(channel, event, payload);
 };
