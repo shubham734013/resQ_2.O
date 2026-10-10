@@ -20,6 +20,7 @@ export interface EmergencyRequestDocument {
   userId: Types.ObjectId;
   hospitalId: Types.ObjectId;
   situationType: string;
+  category?: string;
   reportedAt: Date;
   location?: string;
   latitude?: number;
@@ -50,6 +51,7 @@ const schema = new Schema<EmergencyRequestDocument>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
   situationType: { type: String, required: true, trim: true },
+  category: { type: String, enum: ['accident_injury', 'severe_bleeding', 'breathing_difficulty', 'chest_pain', 'stroke_symptoms', 'unconscious_person', 'burn', 'other'], required: false },
   reportedAt: { type: Date, required: true, default: Date.now, index: true },
   location: String,
   latitude: Number,
