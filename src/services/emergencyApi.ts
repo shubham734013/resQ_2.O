@@ -57,8 +57,8 @@ export interface EmergencyDiscoveryHospital {
 }
 
 export const emergencyApi = {
-  discover: (latitude: number, longitude: number, category: EmergencySituationId, radiusMeters = 30000) => {
-    const query = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), category, radiusMeters: String(radiusMeters), limit: '10' });
+  discover: (latitude: number, longitude: number, category: EmergencySituationId, radiusMeters = 30000, includeRoutes = true) => {
+    const query = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), category, radiusMeters: String(radiusMeters), limit: '10', includeRoutes: String(includeRoutes) });
     return request<{ items: EmergencyDiscoveryHospital[]; pagination: { page: number; limit: number; total: number; totalPages: number }; searchedAt: string }>('/emergencies/discovery?' + query.toString());
   },
   create: (input: CreateEmergencyRequest, idempotencyKey: string) =>
