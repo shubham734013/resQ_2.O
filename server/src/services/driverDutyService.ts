@@ -170,23 +170,51 @@ export const startDriverDuty = async (driverId: string, input: LocationInput) =>
 export const endDriverDuty = async (driverId: string) => {
   const did = oid(driverId, 'driver');
   const session = await startSession();
-  let result: { ambulanceId?: Types.ObjectId; status: string; dutyState: string; alreadyOffDuty?: boolean } | null = null;
+  let result: { ambulanceId?: Types.ObjectId; status: 'OFFLINE'; dutyState: 'OFF_DUTY'; alreadyOffDuty?: boolean } | null = null;
   try {
     await session.withTransaction(async () => {
       const driver = await operationalDriver(driverId, session);
+      const driverTrip = await activeTripForDriver(did, session);
+      if (driver.availabilityStatus === 'BUSY' || driverTrip) {
+        throw new AppError('DRIVER_ON_ACTIVE_TRIP', 'Complete or hand over the active trip before ending duty.', 409);
+      }
       if (!driver.assignedAmbulanceId) {
-        if (driver.availabilityStatus === 'OFFLINE') { result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true }; return; }
+        if (driver.availabilityStatus === 'OFFLINE') {
+          result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
+          return;
+        }
         throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED', 'No assigned ambulance is available to end duty safely.', 409);
       }
+      const ambulance = await AmbulanceModel.findOne({
+        _id: driver.assignedAmbulanceId, providerId: driver.providerId,
+      }).session(session).exec();
+      if (!ambulance) {
+        if (driver.availabilityStatus === 'OFFLINE') {
+          result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
+          return;
+        }
+        throw new AppError('AMBULANCE_NOT_FOUND', 'Assigned ambulance record is unavailable; contact operations to reconcile duty.', 409);
+      }
+      if (await activeTripForAmbulance(ambulance._id, session)) {
+        throw new AppError('AMBULANCE_ON_ACTIVE_TRIP', 'Ambulance has an active trip.', 409);
+      }
+      ensureNoReservation(driver, ambulance, new Date());
       if (driver.availabilityStatus === 'OFFLINE') {
-        result = { ambulanceId: driver.assignedAmbulanceId, status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
+        if (ambulance.currentStatus === 'AVAILABLE') {
+          const correctedAmbulance = await AmbulanceModel.findOneAndUpdate({
+            _id: ambulance._id, providerId: driver.providerId, currentStatus: 'AVAILABLE',
+            $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }],
+          }, { $set: { currentStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
+          if (!correctedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state changed while reconciling off-duty status.', 409);
+        } else if (!['OFFLINE', 'MAINTENANCE'].includes(ambulance.currentStatus)) {
+          throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state is inconsistent with an off-duty driver; contact operations.', 409);
+        }
+        result = { ambulanceId: ambulance._id, status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
         return;
       }
-      if (driver.availabilityStatus === 'BUSY' || await activeTripForDriver(did, session)) throw new AppError('DRIVER_ON_ACTIVE_TRIP', 'Complete or hand over the active trip before ending duty.', 409);
-      const ambulance = await AmbulanceModel.findOne({ _id: driver.assignedAmbulanceId, providerId: driver.providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).session(session).exec();
-      if (!ambulance) throw new AppError('AMBULANCE_NOT_OPERATIONAL', 'Assigned ambulance is not operational. Contact the provider.', 409);
-      if (await activeTripForAmbulance(ambulance._id, session)) throw new AppError('AMBULANCE_ON_ACTIVE_TRIP', 'Ambulance has an active trip.', 409);
-      ensureNoReservation(driver, ambulance, new Date());
+      if (driver.availabilityStatus !== 'ONLINE') {
+        throw new AppError('DUTY_STATE_CONFLICT', 'Only an available on-duty driver can end duty.', 409);
+      }
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
         _id: did, availabilityStatus: 'ONLINE', assignedAmbulanceId: ambulance._id, providerId: driver.providerId,
       }, { $set: { availabilityStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
