@@ -1,7 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server, type Socket } from 'socket.io';
 import { Types } from 'mongoose';
-import { authenticateAccessToken } from './authService.js';
 import { getAllowedOrigins } from '../middlewares/security.js';
 import type { AuthenticatedIdentity } from '../types/auth.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
