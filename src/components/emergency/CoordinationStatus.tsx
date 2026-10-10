@@ -1,3 +1,4 @@
+import { LiveAmbulanceTracking } from '../LiveAmbulanceTracking';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -171,6 +172,8 @@ export const CoordinationStatus = ({
             )}
           </div>
         )}
+
+        {emergencyRequestId && <LiveAmbulanceTracking emergencyRequestId={emergencyRequestId} />}
 
         {error && (
           <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-2 text-xs text-amber-900">
