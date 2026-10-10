@@ -16,13 +16,13 @@ interface LocationEvent {
   latitude: number; longitude: number; accuracyMeters?: number; locationUpdatedAt: string;
   sourceTimestamp?: string; freshness: 'FRESH' | 'STALE'; coordinatesAreLive: boolean;
 }
-const activeStatuses = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'];
-const labelStatus = (status?: string) => ({
-  ASSIGNED: 'Assigned', ACCEPTED: 'Driver accepted', TO_PICKUP: 'En route to pickup',
+const statusLabels: Record<string, string> = {
+  ASSIGNED: 'Assigned', ACCEPTED: 'Driver accepted · pickup navigation active', TO_PICKUP: 'En route to pickup',
   AT_PICKUP: 'Driver arrived at pickup', PATIENT_ONBOARD: 'Patient picked up',
   TO_HOSPITAL: 'En route to hospital', AT_HOSPITAL: 'Arrived at hospital',
   COMPLETED: 'Trip completed', CANCELLED: 'Trip cancelled',
-}[status ?? ''] ?? status ?? 'Awaiting dispatch');
+};
+const labelStatus = (status?: string) => statusLabels[status ?? ''] ?? status ?? 'Awaiting dispatch';
 const formatAge = (ageMs: number | null | undefined) => {
   if (typeof ageMs !== 'number') return 'Update time unavailable';
   if (ageMs < 1000) return 'Updated just now';
