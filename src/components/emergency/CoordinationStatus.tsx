@@ -114,7 +114,7 @@ export const CoordinationStatus = ({
       <div className="space-y-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${ready ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
+            <span className={`w-2.5 h-2.5 rounded-full ${ready && !request.isError ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
               {statusLabel}
             </span>
@@ -178,7 +178,7 @@ export const CoordinationStatus = ({
                 done: ready,
                 current: isCreatingRequest,
               },
-              { label: 'Ready for navigation', detail: 'Live route is available from the navigation screen.', done: ready },
+              { label: 'Ready for navigation', detail: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? 'Hospital coordinates are available for navigation.' : 'Hospital coordinates are not currently available.', done: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' },
             ].map((step, index) => (
               <li key={step.label} className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
@@ -217,7 +217,7 @@ export const CoordinationStatus = ({
             icon={<Navigation className="w-4 h-4" />}
             onClick={() => navigate(`/route/${facility.id}?emergency=true`)}
             className="flex-1 font-bold"
-            disabled={!ready}
+            disabled={!ready || typeof facility.latitude !== 'number' || typeof facility.longitude !== 'number'}
           >
             Start Navigation
           </Button>
