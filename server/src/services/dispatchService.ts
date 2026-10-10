@@ -88,7 +88,9 @@ export const rankDispatchCandidates = (candidates: DispatchCandidate[]) => [...c
   return a.straightLineMeters - b.straightLineMeters;
 });
 const attemptFor = (job: DispatchJobLean, attemptId: string) => job.attempts.find((attempt) => attempt.attemptId === attemptId);
-export const isDispatchLocationFresh = (updatedAt: Date | undefined, now: Date) => Boolean(updatedAt && updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS && updatedAt.getTime() >= now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS);\nconst isFresh = isDispatchLocationFresh;\nexport const isDispatchOfferAcceptable = (status: string, deadlineAt: Date | undefined, now: Date) => status === 'OFFERED' && Boolean(deadlineAt && deadlineAt.getTime() > now.getTime());
+export const isDispatchLocationFresh = (updatedAt: Date | undefined, now: Date) => Boolean(updatedAt && updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS && updatedAt.getTime() >= now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS);
+const isFresh = isDispatchLocationFresh;
+export const isDispatchOfferAcceptable = (status: string, deadlineAt: Date | undefined, now: Date) => status === 'OFFERED' && Boolean(deadlineAt && deadlineAt.getTime() > now.getTime());
 const appendEvent = (event: string, reason?: string, actorId?: Types.ObjectId, actorRole: 'SYSTEM' | 'ADMIN' | 'AMBULANCE_DRIVER' | 'USER' = 'SYSTEM', attemptId?: string) => ({
   event, at: new Date(), actorId, actorRole, reason, attemptId,
 });
