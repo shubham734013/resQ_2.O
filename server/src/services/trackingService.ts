@@ -10,7 +10,6 @@ import { TripModel } from '../models/Trip.js';
 import { calculateGoogleRoutes } from './mapsService.js';
 import { AppError } from '../utils/AppError.js';
 
-const ACTIVE_TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'];
 const TERMINAL_TRIP_STATUSES = ['COMPLETED', 'CANCELLED'];
 const idOf = (value: string, label: string) => {
   if (!Types.ObjectId.isValid(value)) throw new AppError('INVALID_ID', `Invalid ${label} ID.`, 400);
