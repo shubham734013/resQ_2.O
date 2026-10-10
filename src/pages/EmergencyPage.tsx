@@ -223,17 +223,28 @@ export const EmergencyPage = () => {
     }
   };
 
-  const handleSelectRecommendation = (item: FacilityRecommendationItem) => {
+  const handleSelectRecommendation = useCallback((item: FacilityRecommendationItem) => {
     setSelectedFacility(item.facility);
     setCoordinationError(null);
     setCurrentStep('confirmation');
-  };
+  }, []);
 
   const handleConfirmEmergency = async () => {
     if (!selectedFacility || !selectedSituation || !confirmedLocation || isCreatingRequest) return;
     setIsCreatingRequest(true);
     setCoordinationError(null);
     try {
+      // Recheck active requests at submit time to protect against stale tabs and repeat submissions.
+      const active = await queryClient.fetchQuery({ queryKey: activeEmergencyQueryKey, queryFn: loadActiveEmergency, staleTime: 0 });
+      if (active) {
+        setEmergencyRequestId(active.id);
+        setSelectedSituationId(situationIdForLabel(active.situationType));
+        let activeFacility = fallbackFacility(active.hospitalId);
+        try { activeFacility = await facilityApi.getById(active.hospitalId); } catch { /* preserve request visibility */ }
+        setSelectedFacility(activeFacility);
+        setCurrentStep('coordination');
+        return;
+      }
       // Refresh eligibility immediately before confirmation; never trust a stale availability badge.
       const latest = await emergencyApi.discover(
         confirmedLocation.latitude, confirmedLocation.longitude, selectedSituation.id, searchRadius, false,
@@ -284,7 +295,7 @@ export const EmergencyPage = () => {
       isSelected: selectedFacility?.id === item.facility.id,
       onClick: () => handleSelectRecommendation(item),
     }];
-  }), [recommendations, selectedFacility?.id]);
+  }), [recommendations, selectedFacility?.id, handleSelectRecommendation]);
 
   const meta = currentStep === 'situation'
     ? { step: 1, label: 'Situation' }
