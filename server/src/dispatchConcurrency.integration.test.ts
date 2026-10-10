@@ -52,14 +52,14 @@ test('concurrent reservations and duplicate acceptances create one active trip',
       providerId, assignedAmbulanceId: ambulanceId, availabilityStatus: 'ONLINE',
       licenseVerificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
     });
-    await EmergencyRequestModel.create(requestIds.map((requestId, index) => ({
+    await EmergencyRequestModel.insertMany(requestIds.map((requestId, index) => ({
       _id: requestId, requestCode: 'RSQ-' + suffix.slice(0, 6) + index, userId, hospitalId,
       situationType: 'Other Acute Situation', category: 'other', reportedAt: new Date(),
       latitude: 26.9124, longitude: 75.7873, status: 'AMBULANCE_COORDINATION',
       statusHistory: [{ status: 'AMBULANCE_COORDINATION', changedAt: new Date(), actorRole: 'SYSTEM', previousStatus: 'RECEIVED' }],
     })));
-    await DispatchJobModel.create(jobIds.map((jobId, index) => ({
-      _id: jobId, emergencyRequestId: requestIds[index], hospitalId, userId, category: 'other',
+    await DispatchJobModel.insertMany(jobIds.map((jobId, index) => ({
+      _id: jobId, emergencyRequestId: requestIds[index]!, hospitalId, userId, category: 'other',
       pickupLatitude: 26.9124, pickupLongitude: 75.7873, status: 'SEARCHING', generation: 1,
       attempts: [], events: [], leaseToken: 'test-lease-' + index, leaseUntil: new Date(Date.now() + 30000),
     })));
@@ -70,13 +70,13 @@ test('concurrent reservations and duplicate acceptances create one active trip',
       straightLineMeters: 100,
       route: { source: 'DRIVING', distanceMeters: 300, etaSeconds: 90 },
     };
-    const jobs = await Promise.all(jobIds.map(async (jobId) => {
+    const jobs: Array<Parameters<typeof reserveAndOffer>[0]> = await Promise.all(jobIds.map(async (jobId) => {
       const job = await DispatchJobModel.findById(jobId).lean().exec();
       assert.ok(job);
       return job as unknown as Parameters<typeof reserveAndOffer>[0];
     }));
-    const reservations = await Promise.allSettled(jobs.map((job) => reserveAndOffer(job, candidate)));
-    assert.equal(reservations.filter((result) => result.status === 'fulfilled').length, 1, 'only one dispatch job may reserve a shared ambulance/driver');
+    const reservations = await Promise.allSettled(jobs.map((job: Parameters<typeof reserveAndOffer>[0]) => reserveAndOffer(job, candidate)));
+    assert.equal(reservations.filter((result: PromiseSettledResult<Awaited<ReturnType<typeof reserveAndOffer>>) => result.status === 'fulfilled').length, 1, 'only one dispatch job may reserve a shared ambulance/driver');
     const offered = await DispatchJobModel.findOne({ _id: { $in: jobIds }, status: 'OFFERED' }).lean().exec();
     assert.ok(offered);
     assert.equal(String(offered.currentAmbulanceId), String(ambulanceId));
