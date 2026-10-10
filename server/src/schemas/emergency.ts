@@ -9,10 +9,16 @@ const date = z.string().datetime().transform((value) => new Date(value));
 export const createEmergencyRequestSchema = z.object({
   hospitalId: objectId,
   situationType: z.string().trim().min(2).max(120),
+  category: z.enum(EMERGENCY_CATEGORY_IDS).optional(),
   location: z.string().trim().min(2).max(300).optional(),
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  const labelIndex = EMERGENCY_SITUATION_LABELS.indexOf(value.situationType as (typeof EMERGENCY_SITUATION_LABELS)[number]);
+  if (value.category && labelIndex >= 0 && value.category !== EMERGENCY_CATEGORY_IDS[labelIndex]) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['category'], message: 'category must match situationType' });
+  }
+});
 
 export const emergencyDiscoveryQuerySchema = z.object({
   latitude: z.coerce.number().finite().min(-90).max(90),
