@@ -342,7 +342,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
             duplicate.latitude !== input.latitude || duplicate.longitude !== input.longitude) {
           throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
         }
-        return output(duplicate as EmergencyRecord);
+        return { ...output(duplicate as EmergencyRecord), dispatch: await dispatchSummary(duplicate._id) };
       }
     }
     throw error;
