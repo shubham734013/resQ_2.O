@@ -133,7 +133,10 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
       languageCode: 'en-US',
       units: 'METRIC',
     }),
-  });
+    });
+  } catch {
+    throw new AppError('ROUTE_PROVIDER_UNAVAILABLE', 'Google Routes could not be reached. Check backend internet access and retry.', 502);
+  }
 
   const payload = await response.json().catch(() => null) as GoogleRoutesResponse | null;
   if (!response.ok) {
