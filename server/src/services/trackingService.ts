@@ -62,7 +62,7 @@ export const getEmergencyTrackingSnapshot = async (identity: AuthenticatedIdenti
         accuracyMeters: vehicle.locationAccuracyMeters ?? null,
         updatedAt: updatedAt?.toISOString() ?? null,
         sourceTimestamp: vehicle.locationSourceTimestamp ? new Date(vehicle.locationSourceTimestamp).toISOString() : null,
-        ageMs: Number.isFinite(ageMs) ? Math.max(0, ageMs) : null,
+        ageMs: Number.isFinite(ageMs) && ageMs >= 0 ? ageMs : null,
         freshness: fresh && hasCoords ? 'FRESH' : 'STALE',
         coordinatesAreLive: Boolean(fresh && hasCoords && trackingActive),
       };
