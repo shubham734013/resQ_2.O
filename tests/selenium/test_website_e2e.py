@@ -36,8 +36,8 @@ class ResQWebsiteE2ETests(unittest.TestCase):
         options.add_argument("--window-size=1440,1000")
         options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
         cls.driver = webdriver.Chrome(options=options)
-        cls.driver.set_page_load_timeout(20)
-        cls.wait = WebDriverWait(cls.driver, 12)
+        cls.driver.set_page_load_timeout(15)
+        cls.wait = WebDriverWait(cls.driver, 6)
 
     @classmethod
     def tearDownClass(cls) -> None:
