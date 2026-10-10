@@ -84,12 +84,22 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
 
   const ambulanceId = trip?.ambulanceId;
   let effectiveType = type;
-  if (type === 'AMBULANCE_ASSIGNED' && ambulanceId) {
-    const previousAssignment = await HospitalCoordinationNotificationModel.findOne({
-      hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId,
-      type: { $in: ['AMBULANCE_ASSIGNED', 'AMBULANCE_REASSIGNED'] }, ambulanceId: { $exists: true },
-    }).sort({ createdAt: -1 }).select('ambulanceId').lean().exec();
-    if (previousAssignment && String(previousAssignment.ambulanceId) !== String(ambulanceId)) effectiveType = 'AMBULANCE_REASSIGNED';
+  if (type === 'AMBULANCE_ASSIGNED' && ambulanceId && trip) {
+    const assignmentTypes = ['AMBULANCE_ASSIGNED', 'AMBULANCE_REASSIGNED'];
+    const currentTripAssignment = await HospitalCoordinationNotificationModel.findOne({
+      hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId, tripId: trip._id, ambulanceId,
+      type: { $in: assignmentTypes },
+    }).sort({ createdAt: -1 }).select('type').lean().exec();
+    if (currentTripAssignment) {
+      // Reconciliation must preserve the original event type instead of creating a second "assigned" alert for a reassignment.
+      effectiveType = currentTripAssignment.type as HospitalCoordinationNotificationType;
+    } else {
+      const previousAssignment = await HospitalCoordinationNotificationModel.findOne({
+        hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId, tripId: { $ne: trip._id },
+        createdAt: { $lt: trip.createdAt }, type: { $in: assignmentTypes }, ambulanceId: { $exists: true },
+      }).sort({ createdAt: -1 }).select('ambulanceId').lean().exec();
+      if (previousAssignment && String(previousAssignment.ambulanceId) !== String(ambulanceId)) effectiveType = 'AMBULANCE_REASSIGNED';
+    }
   }
   const descriptor = eventCopy[effectiveType];
   const dedupeKey = `${String(emergency.hospitalId)}:${String(emergencyObjectId)}:${trip ? String(trip._id) : 'no-trip'}:${effectiveType}:${ambulanceId ? String(ambulanceId) : 'none'}`;
