@@ -159,7 +159,13 @@ export const EmergencyPage = () => {
       }
       if (cancelled) return;
       setEmergencyRequestId(active.id);
-      setSelectedFacility(facility);
+      setSelectedFacility({
+        ...facility,
+        distance: typeof active.routeDistanceMeters === 'number' ? formatDistance(active.routeDistanceMeters) : facility.distance,
+        distanceMeters: active.routeDistanceMeters ?? facility.distanceMeters,
+        distanceType: typeof active.routeDistanceMeters === 'number' ? 'DRIVING' : facility.distanceType,
+        estimatedTime: typeof active.etaMinutes === 'number' ? active.etaMinutes + ' min' : 'Driving ETA unavailable',
+      });
       setSelectedSituationId(situationIdForLabel(active.situationType));
       if (typeof active.latitude === 'number' && typeof active.longitude === 'number') {
         setConfirmedLocation({
@@ -270,6 +276,13 @@ export const EmergencyPage = () => {
         longitude: confirmedLocation.longitude,
       }, key);
       setEmergencyRequestId(request.id);
+      setSelectedFacility({
+        ...refreshedFacility,
+        distance: typeof request.routeDistanceMeters === 'number' ? formatDistance(request.routeDistanceMeters) : refreshedFacility.distance,
+        distanceMeters: request.routeDistanceMeters ?? refreshedFacility.distanceMeters,
+        distanceType: typeof request.routeDistanceMeters === 'number' ? 'DRIVING' : refreshedFacility.distanceType,
+        estimatedTime: typeof request.etaMinutes === 'number' ? request.etaMinutes + ' min' : 'Driving ETA unavailable',
+      });
       idempotencyKeyRef.current = null;
       await queryClient.invalidateQueries({ queryKey: activeEmergencyQueryKey });
       setCurrentStep('coordination');
