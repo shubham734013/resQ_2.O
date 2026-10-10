@@ -39,10 +39,15 @@ export function useMapRoute(facility: Facility | null, location: UserLocation | 
     && Number.isFinite(location.longitude) && location.longitude >= -180 && location.longitude <= 180
     ? { latitude: location.latitude, longitude: location.longitude }
     : null;
-  const destination = facility
-    && Number.isFinite(facility.latitude) && facility.latitude >= -90 && facility.latitude <= 90
-    && Number.isFinite(facility.longitude) && facility.longitude >= -180 && facility.longitude <= 180
-    ? { latitude: facility.latitude, longitude: facility.longitude }
+  // Facility coordinates are optional in the API model; narrow to numbers before range checks.
+  const latitude = facility?.latitude;
+  const longitude = facility?.longitude;
+  const hasValidDestination = typeof latitude === 'number'
+    && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
+    && typeof longitude === 'number'
+    && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
+  const destination = facility && hasValidDestination
+    ? { latitude, longitude }
     : null;
 
   const query = useQuery({
