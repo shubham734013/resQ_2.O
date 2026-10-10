@@ -169,7 +169,7 @@ export const discoverEmergencyHospitals = async (userId: string, query: Emergenc
   const ranked = [...byId.values()].sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters).slice(0, query.limit);
   const items = await Promise.all(ranked.map(async ({ hospital, straightLineDistanceMeters }) => {
     const destination = hospitalCoordinate(hospital);
-    const route = destination ? await safeRoute(origin, destination) : null;
+    const route = destination && query.includeRoutes ? await safeRoute(origin, destination) : null;
     return {
       id: String(hospital._id),
       name: hospital.name,
@@ -200,7 +200,13 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   const userObjectId = assertId(userId, 'user');
   const hospitalId = assertId(input.hospitalId, 'hospital');
   const existing = await EmergencyRequestModel.findOne({ userId: userObjectId, idempotencyKey }).lean().exec();
-  if (existing) return output(existing as EmergencyRecord);
+  if (existing) {
+    if (String(existing.hospitalId) !== String(hospitalId) || existing.situationType !== input.situationType ||
+        existing.latitude !== input.latitude || existing.longitude !== input.longitude) {
+      throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
+    }
+    return output(existing as EmergencyRecord);
+  }
 
   const hospital = await HospitalModel.findOne({
     _id: hospitalId,
@@ -257,7 +263,13 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 11000) {
       const duplicate = await EmergencyRequestModel.findOne({ userId: userObjectId, idempotencyKey }).lean().exec();
-      if (duplicate) return output(duplicate as EmergencyRecord);
+      if (duplicate) {
+        if (String(duplicate.hospitalId) !== String(hospitalId) || duplicate.situationType !== input.situationType ||
+            duplicate.latitude !== input.latitude || duplicate.longitude !== input.longitude) {
+          throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
+        }
+        return output(duplicate as EmergencyRecord);
+      }
     }
     throw error;
   } finally {
