@@ -9,7 +9,6 @@ import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/Am
 import { HospitalModel } from '../models/Hospital.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { calculateGoogleRoutes } from './mapsService.js';
-import { broadcastEvent } from './realtimeService.js';
 import { AppError } from '../utils/AppError.js';
 
 export const DISPATCH_ALLOWED_TRANSITIONS = {
@@ -196,52 +195,6 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
   return rankDispatchCandidates(routedPool);
 };
 
-const notifyOffer = async (job: DispatchJobLean, attempt: DispatchAttemptDocument) => {
-  const [request, hospital] = await Promise.all([
-    EmergencyRequestModel.findById(job.emergencyRequestId).select('requestCode situationType category location latitude longitude status').lean().exec(),
-    HospitalModel.findById(job.hospitalId).select('name address city state phone latitude longitude location').lean().exec(),
-  ]);
-  if (!request || !hospital) return;
-  const hospitalCoords = ambulanceCoordinates({
-    location: hospital.location as { coordinates?: number[] } | undefined,
-    currentLatitude: hospital.latitude,
-    currentLongitude: hospital.longitude,
-  });
-  const payload = {
-    dispatchJobId: String(job._id),
-    attemptId: attempt.attemptId,
-    deadlineAt: attempt.deadlineAt,
-    request: {
-      id: String(request._id),
-      requestCode: request.requestCode,
-      category: request.category ?? job.category,
-      situationType: request.situationType,
-      pickup: { latitude: job.pickupLatitude, longitude: job.pickupLongitude, label: request.location ?? '' },
-    },
-    hospital: {
-      id: String(job.hospitalId),
-      name: hospital.name,
-      address: hospital.address,
-      city: hospital.city,
-      phone: hospital.phone,
-      latitude: hospitalCoords?.latitude,
-      longitude: hospitalCoords?.longitude,
-    },
-    approachRoute: {
-      source: attempt.routeSource,
-      distanceMeters: attempt.routeDistanceMeters,
-      etaSeconds: attempt.etaSeconds,
-    },
-    instructions: 'Accept or reject before the server deadline. This offer is not an active trip until acceptance is committed.',
-  };
-  broadcastEvent(`driver:${attempt.driverId}`, 'dispatch:offer', payload);
-  broadcastEvent('operations', 'dispatch:offer-created', {
-    dispatchJobId: String(job._id), attemptId: attempt.attemptId, requestCode: request.requestCode,
-    providerId: String(attempt.providerId), ambulanceId: String(attempt.ambulanceId), driverId: String(attempt.driverId),
-    deadlineAt: attempt.deadlineAt, routeSource: attempt.routeSource,
-  });
-};
-
 export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchCandidate, actor?: { id: Types.ObjectId; role: 'ADMIN' }) => {
   const now = new Date();
   const deadlineAt = new Date(now.getTime() + DISPATCH_OFFER_TIMEOUT_MS);
@@ -347,7 +300,6 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
   } finally {
     await session.endSession();
   }
-  if (result) await notifyOffer(result.job, result.attempt);
   return result;
 };
 
@@ -361,8 +313,6 @@ const markExhausted = async (job: DispatchJobLean, reason: string) => {
       $push: { events: appendEvent('DISPATCH_EXHAUSTED', reason) },
     },
   ).exec();
-  broadcastEvent('operations', 'dispatch:exhausted', { dispatchJobId: String(job._id), emergencyRequestId: String(job.emergencyRequestId), reason, actions: ['RETRY', 'MANUAL_ASSIGN', 'ESCALATE', 'CALL_112'] });
-  broadcastEvent(`emergency:${job.emergencyRequestId}`, 'dispatch:exhausted', { dispatchJobId: String(job._id), reason, actions: ['RETRY', 'CALL_112'] });
 };
 
 const claimJob = async () => {
@@ -427,8 +377,6 @@ const expireOrReleaseOffer = async (job: DispatchJobLean, reason: string, outcom
     await session.endSession();
   }
   if (updated) {
-    broadcastEvent('operations', 'dispatch:offer-released', { dispatchJobId: String(job._id), attemptId, outcome, reason });
-    broadcastEvent(`emergency:${job.emergencyRequestId}`, 'dispatch:attempt-ended', { dispatchJobId: String(job._id), outcome, reason });
   }
 };
 
@@ -575,12 +523,7 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
     await session.endSession();
   }
   if (!result) throw new AppError('DISPATCH_ACCEPT_FAILED', 'Offer acceptance could not be committed', 500);
-  const event = { dispatchJobId: String(jid), ...result, status: 'ACCEPTED' };
-  broadcastEvent(`driver:${did}`, 'dispatch:accepted', event);
-  broadcastEvent(`emergency:${result.emergencyRequestId}`, 'dispatch:accepted', event);
-  broadcastEvent(`hospital:${result.hospitalId}`, 'hospital:incoming-patient', event);
-  broadcastEvent('operations', 'dispatch:accepted', event);
-  return event;
+  return { dispatchJobId: String(jid), ...result, status: 'ACCEPTED' };
 };
 
 export const rejectDispatchOffer = async (driverId: string, dispatchJobId: string) => {
@@ -691,8 +634,6 @@ export const escalateDispatchJob = async (adminId: string, dispatchJobId: string
   }, { new: true }).lean().exec() as DispatchJobLean | null;
   if (!job) throw new AppError('DISPATCH_NOT_ESCALATED', 'Only an exhausted dispatch job can be escalated', 409);
   const payload = { dispatchJobId: String(jid), emergencyRequestId: String(job.emergencyRequestId), status: 'ESCALATED', reason, emergencyCallNumber: '112' };
-  broadcastEvent('operations', 'dispatch:escalated', payload);
-  broadcastEvent(`emergency:${job.emergencyRequestId}`, 'dispatch:escalated', payload);
   return payload;
 };
 
@@ -713,5 +654,4 @@ export const cancelDispatchForEmergencyInSession = async (emergencyRequestId: Ty
     $push: { events: appendEvent('DISPATCH_CANCELLED', 'Emergency request was cancelled by the user', actorId, 'USER', job.currentAttemptId) },
   }, options).exec();
   await releaseReservationInSession(job._id, job.currentAmbulanceId, job.currentDriverId, session);
-  broadcastEvent('operations', 'dispatch:cancelled', { dispatchJobId: String(job._id), emergencyRequestId: String(emergencyRequestId) });
 };
