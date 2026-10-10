@@ -115,14 +115,13 @@ export const NavigationControls = ({
 
         <div className="sm:col-span-8">
           <Button
-            variant="secondary"
+            variant={currentStepIndex + 1 >= totalSteps ? 'primary' : 'secondary'}
             size="md"
             fullWidth
             onClick={onNextStep}
-            aria-label="Advance to next navigation instruction"
-            disabled={currentStepIndex + 1 >= totalSteps}
+            aria-label={currentStepIndex + 1 >= totalSteps ? 'Arrive at destination' : 'Advance to next navigation instruction'}
           >
-            Next instruction
+            {currentStepIndex + 1 >= totalSteps ? 'Arrive at destination' : 'Next instruction'}
           </Button>
         </div>
       </div>
