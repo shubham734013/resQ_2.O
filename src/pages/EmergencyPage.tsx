@@ -48,6 +48,7 @@ const toFacility = (item: EmergencyDiscoveryHospital): Facility => ({
   })(),
   distance: formatDistance(item.distanceMeters),
   distanceMeters: item.distanceMeters,
+  distanceType: item.distanceType,
   estimatedTime: item.estimatedTime ?? 'Driving ETA unavailable',
   emergencyAvailable: item.emergencyAvailability === 'AVAILABLE',
   verified: item.verified,
@@ -344,6 +345,7 @@ export const EmergencyPage = () => {
             <h2 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">Hospitals for {selectedSituation?.label ?? 'your emergency'}</h2>
             <p className="mt-1 text-xs text-slate-500">Verified facilities matched by declared capabilities, current emergency intake and geographic proximity. Driving ETAs are provided only when routing succeeds.</p>
           </div>
+          {coordinationError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{coordinationError}</div>}
           {searchError && (
             <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-white p-5 text-center">
               <AlertTriangle className="mx-auto h-6 w-6 text-rose-700" />
@@ -418,7 +420,7 @@ export const EmergencyPage = () => {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{selectedFacility.name}</p><span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800"><CheckCircle2 className="h-3 w-3" /> Verified</span></div>
                 <p className="mt-1 text-xs text-slate-600">{selectedFacility.address || 'Address unavailable'}</p>
-                <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700"><span><strong>{selectedFacility.distance}</strong> {selectedFacility.distanceMeters ? 'from pickup' : ''}</span><span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{selectedFacility.estimatedTime || 'Driving ETA unavailable'}</span></p>
+                <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700"><span><strong>{selectedFacility.distance}</strong> {selectedFacility.distanceMeters ? (selectedFacility.distanceType === 'DRIVING' ? 'driving distance' : 'straight-line distance') : ''}</span><span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{selectedFacility.estimatedTime || 'Driving ETA unavailable'}</span></p>
                 {selectedFacility.phone && <p className="mt-2 text-xs text-slate-600">Contact: {selectedFacility.phone}</p>}
                 {selectedFacility.capabilities.length > 0 && <p className="mt-2 text-xs text-slate-600">Declared capabilities: {selectedFacility.capabilities.slice(0, 5).join(', ')}</p>}
               </div>
