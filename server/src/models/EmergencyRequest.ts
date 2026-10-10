@@ -16,6 +16,7 @@ export interface EmergencyStatusHistoryEntry {
 
 export interface EmergencyRequestDocument {
   requestCode: string;
+  idempotencyKey?: string;
   userId: Types.ObjectId;
   hospitalId: Types.ObjectId;
   situationType: string;
@@ -44,6 +45,7 @@ const statusHistorySchema = new Schema<EmergencyStatusHistoryEntry>({
 
 const schema = new Schema<EmergencyRequestDocument>({
   requestCode: { type: String, required: true, unique: true, index: true },
+  idempotencyKey: { type: String, required: false, trim: true },
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
   situationType: { type: String, required: true, trim: true },
@@ -60,6 +62,7 @@ const schema = new Schema<EmergencyRequestDocument>({
   etaMinutes: Number,
 }, { timestamps: true });
 
+schema.index({ idempotencyKey: 1 }, { unique: true, sparse: true, name: 'emergency_idempotency_key_unique' });
 schema.index({ userId: 1, createdAt: -1 });
 schema.index({ hospitalId: 1, status: 1, reportedAt: -1 });
 schema.index({ hospitalId: 1, reportedAt: -1 });
