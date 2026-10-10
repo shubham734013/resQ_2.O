@@ -4,6 +4,7 @@ import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { AuthSessionModel } from '../models/AuthSession.js';
 import { ExternalIdentityModel } from '../models/ExternalIdentity.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { UserModel } from '../models/User.js';
@@ -156,6 +157,10 @@ export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInpu
   if(!await AmbulanceProviderModel.exists({_id:input.providerId})) throw new AppError('PROVIDER_NOT_FOUND','Ambulance provider was not found',404);
   const provider = await AmbulanceProviderModel.findOne({_id:input.providerId,accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).lean().exec();
   if(!provider) throw new AppError('PROVIDER_NOT_OPERATIONAL','Driver cannot be registered against an inactive or unverified provider',409);
+  if (input.assignedAmbulanceId) {
+    const ambulance = await AmbulanceModel.findOne({ _id: input.assignedAmbulanceId, providerId: input.providerId }).lean().exec();
+    if (!ambulance) throw new AppError('AMBULANCE_NOT_FOUND', 'Assigned ambulance does not exist or does not belong to the selected provider', 404);
+  }
   const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
   const a=await AmbulanceDriverModel.create({...input,email:normalizeEmail(input.email),passwordHash,licenseVerificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'}); return identityFromDocument(a,'AMBULANCE_DRIVER');
 };

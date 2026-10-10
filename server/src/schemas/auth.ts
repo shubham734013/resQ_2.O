@@ -1,14 +1,17 @@
 import { z } from 'zod';
 
+const optionalText = (max: number) =>
+  z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), z.string().trim().max(max).optional());
+
 const baseRegistration = {
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   phone: z.string().trim().min(7).max(20),
   password: z.string().min(8, 'Password must be at least 8 characters long.').max(128),
-  address: z.string().trim().max(250).optional(),
-  city: z.string().trim().max(100).optional(),
-  state: z.string().trim().max(100).optional(),
-  country: z.string().trim().max(100).optional(),
+  address: optionalText(250),
+  city: optionalText(100),
+  state: optionalText(100),
+  country: optionalText(100),
   latitude: z.number().finite().min(-90).max(90).optional(),
   longitude: z.number().finite().min(-180).max(180).optional(),
 };
@@ -32,12 +35,15 @@ export const ambulanceDriverRegistrationSchema = z.object({
   phone: z.string().trim().min(7).max(20),
   password: z.string().min(8, 'Password must be at least 8 characters long.').max(128),
   licenseNumber: z.string().trim().min(3).max(80),
-  address: z.string().trim().max(250).optional(),
-  city: z.string().trim().max(100).optional(),
-  state: z.string().trim().max(100).optional(),
-  country: z.string().trim().max(100).optional(),
+  address: optionalText(250),
+  city: optionalText(100),
+  state: optionalText(100),
+  country: optionalText(100),
   providerId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid providerId'),
-  assignedAmbulanceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid assignedAmbulanceId').optional(),
+  assignedAmbulanceId: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid assignedAmbulanceId').optional(),
+  ),
 });
 export const loginSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),

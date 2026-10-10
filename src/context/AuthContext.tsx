@@ -13,13 +13,21 @@ interface AuthContextValue extends AuthState {
 }
 const AuthContext=createContext<AuthContextValue|null>(null);
 const getUserFromResponse=(response:{data:{user:AuthUser}}):AuthUser=>response.data.user;
+const HAS_SESSION_KEY = 'resq_has_session';
 
 export const AuthProvider=({children}:{children:ReactNode})=>{
   const queryClient = useQueryClient();
   const [state,setState]=useState<AuthState>({user:null,isAuthenticated:false,isLoading:true});
   // A late startup /auth/me response must not overwrite a newer successful login.
   const authOperationVersion=useRef(0);
-  const setAuthenticatedUser=useCallback((user:AuthUser|null)=>setState({user,isAuthenticated:user!==null,isLoading:false}),[]);
+  const setAuthenticatedUser=useCallback((user:AuthUser|null)=>{
+    if (user) {
+      try { localStorage.setItem(HAS_SESSION_KEY, 'true'); } catch { /* ignore */ }
+    } else {
+      try { localStorage.removeItem(HAS_SESSION_KEY); } catch { /* ignore */ }
+    }
+    setState({user,isAuthenticated:user!==null,isLoading:false});
+  },[]);
   const refreshUser=useCallback(async():Promise<AuthUser|null>=>{
     const operationVersion=++authOperationVersion.current;
     try{
@@ -30,6 +38,13 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
       if(!(error instanceof AuthApiError)||error.status!==401){
         if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
         throw error;
+      }
+      const hasPriorSession = (() => {
+        try { return localStorage.getItem(HAS_SESSION_KEY) === 'true'; } catch { return false; }
+      })();
+      if (!hasPriorSession) {
+        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+        return null;
       }
       try{
         const user=getUserFromResponse(await authApi.refresh());

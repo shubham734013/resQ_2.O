@@ -13,7 +13,7 @@ import { TripModel } from '../models/Trip.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 
 export interface AuditIssue {
-  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  severity: 'CRITICAL' | 'WARNING' | 'READINESS' | 'INFO';
   collection: string;
   documentId?: string;
   field?: string;
@@ -47,13 +47,14 @@ export interface AuditReport {
     totalDocuments: number;
     criticalIssues: number;
     warningIssues: number;
+    readinessIssues: number;
     infoIssues: number;
   };
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const isValidCoordinate = (lat?: number | null, lng?: number | null): { valid: boolean; reason?: string } => {
+export const isValidCoordinate = (lat?: number | null, lng?: number | null): { valid: boolean; reason?: string } => {
   if (lat === undefined || lat === null || lng === undefined || lng === null) {
     return { valid: true };
   }
@@ -76,7 +77,7 @@ const countBy = <T extends object>(items: T[], key: keyof T): Record<string, num
   return result;
 };
 
-const findDuplicates = <T extends object>(
+export const findDuplicates = <T extends object>(
   items: T[],
   key: keyof T,
   collectionName: string,
@@ -189,7 +190,11 @@ export const runDatabaseAudit = async (): Promise<AuditReport> => {
     const hasLatLng = typeof hospital.latitude === 'number' && typeof hospital.longitude === 'number';
     const hasLocation = hospital.location?.coordinates && hospital.location.coordinates.length === 2;
     if (!hasLatLng && !hasLocation) {
-      issues.push({ severity: 'WARNING', collection: 'Hospitals_data', documentId: id, field: 'coordinates', issue: 'Hospital is missing geographic coordinates' });
+      if (hospital.verificationStatus === 'PENDING' || hospital.accountStatus === 'PENDING') {
+        issues.push({ severity: 'READINESS', collection: 'Hospitals_data', documentId: id, field: 'coordinates', issue: 'Hospital is missing geographic coordinates (pending geocoding onboarding)' });
+      } else {
+        issues.push({ severity: 'WARNING', collection: 'Hospitals_data', documentId: id, field: 'coordinates', issue: 'Hospital is missing geographic coordinates' });
+      }
     }
 
     const coordCheck = isValidCoordinate(hospital.latitude, hospital.longitude);
@@ -235,7 +240,7 @@ export const runDatabaseAudit = async (): Promise<AuditReport> => {
       issues.push({ severity: 'WARNING', collection: 'Providers_Data', documentId: id, field: 'email', issue: `Invalid email format "${provider.email}"` });
     }
     if (provider.profileCompletionStatus === 'INCOMPLETE') {
-      issues.push({ severity: 'INFO', collection: 'Providers_Data', documentId: id, field: 'profileCompletionStatus', issue: 'Provider profile is incomplete' });
+      issues.push({ severity: 'READINESS', collection: 'Providers_Data', documentId: id, field: 'profileCompletionStatus', issue: 'Provider profile is incomplete' });
     }
   }
 
@@ -266,7 +271,7 @@ export const runDatabaseAudit = async (): Promise<AuditReport> => {
         issues.push({ severity: 'CRITICAL', collection: 'AmbulanceDriver', documentId: id, field: 'providerId', issue: `Driver references nonexistent provider "${pId}"` });
       } else {
         if (prov.accountStatus !== 'ACTIVE' || prov.verificationStatus !== 'VERIFIED') {
-          issues.push({ severity: 'WARNING', collection: 'AmbulanceDriver', documentId: id, field: 'providerId', issue: `Driver linked to inactive or unverified provider (status: ${prov.accountStatus}, verification: ${prov.verificationStatus})` });
+          issues.push({ severity: 'READINESS', collection: 'AmbulanceDriver', documentId: id, field: 'providerId', issue: `Driver linked to inactive or unverified provider (status: ${prov.accountStatus}, verification: ${prov.verificationStatus})` });
         }
       }
     }
@@ -283,7 +288,7 @@ export const runDatabaseAudit = async (): Promise<AuditReport> => {
     }
 
     if (driver.profileCompletionStatus === 'INCOMPLETE') {
-      issues.push({ severity: 'INFO', collection: 'AmbulanceDriver', documentId: id, field: 'profileCompletionStatus', issue: 'Driver profile is incomplete' });
+      issues.push({ severity: 'READINESS', collection: 'AmbulanceDriver', documentId: id, field: 'profileCompletionStatus', issue: 'Driver profile is incomplete' });
     }
   }
 
@@ -415,6 +420,7 @@ export const runDatabaseAudit = async (): Promise<AuditReport> => {
 
   const criticalIssues = issues.filter((i) => i.severity === 'CRITICAL').length;
   const warningIssues = issues.filter((i) => i.severity === 'WARNING').length;
+  const readinessIssues = issues.filter((i) => i.severity === 'READINESS').length;
   const infoIssues = issues.filter((i) => i.severity === 'INFO').length;
   const totalDocuments =
     users.length +
@@ -436,6 +442,7 @@ export const runDatabaseAudit = async (): Promise<AuditReport> => {
       totalDocuments,
       criticalIssues,
       warningIssues,
+      readinessIssues,
       infoIssues,
     },
   };
@@ -448,7 +455,7 @@ const formatCountMap = (map?: Record<string, number>): string => {
     .join(', ');
 };
 
-const printReport = (report: AuditReport): void => {
+export const printReport = (report: AuditReport): void => {
   console.log('\n================================================================');
   console.log('             ResQ DATABASE INTEGRITY AUDIT REPORT               ');
   console.log('================================================================');
@@ -492,14 +499,21 @@ const printReport = (report: AuditReport): void => {
 
   console.log('\n----------------------------------------------------------------');
   console.log('AUDIT ANOMALIES & INTEGRITY FINDINGS:');
-  console.log(`  Critical: ${report.summary.criticalIssues} | Warning: ${report.summary.warningIssues} | Info: ${report.summary.infoIssues}`);
+  console.log(`  Critical: ${report.summary.criticalIssues} | Warning: ${report.summary.warningIssues} | Readiness: ${report.summary.readinessIssues} | Info: ${report.summary.infoIssues}`);
   console.log('----------------------------------------------------------------');
 
   if (report.issues.length === 0) {
     console.log('  No integrity issues or anomalies detected. Database is clean!');
   } else {
     for (const issue of report.issues) {
-      const tag = issue.severity === 'CRITICAL' ? '[CRITICAL]' : issue.severity === 'WARNING' ? '[WARNING]' : '[INFO]';
+      const tag =
+        issue.severity === 'CRITICAL'
+          ? '[CRITICAL]'
+          : issue.severity === 'WARNING'
+            ? '[WARNING]'
+            : issue.severity === 'READINESS'
+              ? '[READINESS]'
+              : '[INFO]';
       const doc = issue.documentId ? ` (Doc: ${issue.documentId})` : '';
       const field = issue.field ? ` [Field: ${issue.field}]` : '';
       console.log(`  ${tag} ${issue.collection}${doc}${field}: ${issue.issue}`);
@@ -510,36 +524,58 @@ const printReport = (report: AuditReport): void => {
 };
 
 const execute = async (): Promise<void> => {
+  const isJson = process.argv.includes('--json');
+  const isStrict = process.argv.includes('--strict');
   const sanitizedUri = sanitizeMongoUri(env.MONGODB_URI);
-  console.log(`Connecting to database (${sanitizedUri})...`);
+
+  if (!isJson) {
+    console.log(`Connecting to database (${sanitizedUri})...`);
+  }
 
   try {
     await connectDatabase();
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? sanitizeMongoUri(err.message) : 'Unknown connection error';
-    console.error('\n[DATABASE CONNECTION ERROR]');
-    console.error(`Could not connect to MongoDB at: ${sanitizedUri}`);
-    console.error(`Details: ${errorMsg}\n`);
-    console.error('TROUBLESHOOTING GUIDE:');
-    console.error('1. MongoDB Atlas: Check if your IP address is whitelisted in Atlas Network Access.');
-    console.error('2. Special Characters: Ensure username and password in MONGODB_URI are URL-encoded.');
-    console.error('3. Local MongoDB: Verify that your local mongod service is running (e.g. `brew services start mongodb-community`).');
-    console.error('4. Firewall/Sandbox: Verify network access is permitted to the database host.\n');
+    if (isJson) {
+      console.error(JSON.stringify({ error: 'DATABASE_CONNECTION_ERROR', details: errorMsg }));
+    } else {
+      console.error('\n[DATABASE CONNECTION ERROR]');
+      console.error(`Could not connect to MongoDB at: ${sanitizedUri}`);
+      console.error(`Details: ${errorMsg}\n`);
+      console.error('TROUBLESHOOTING GUIDE:');
+      console.error('1. MongoDB Atlas: Check if your IP address is whitelisted in Atlas Network Access.');
+      console.error('2. Special Characters: Ensure username and password in MONGODB_URI are URL-encoded.');
+      console.error('3. Local MongoDB: Verify that your local mongod service is running (e.g. `brew services start mongodb-community`).');
+      console.error('4. Firewall/Sandbox: Verify network access is permitted to the database host.\n');
+    }
     process.exitCode = 1;
     return;
   }
 
   try {
     const report = await runDatabaseAudit();
-    printReport(report);
-    if (report.summary.criticalIssues > 0) {
-      console.warn(`Audit completed with ${report.summary.criticalIssues} critical data integrity issue(s).`);
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
     } else {
-      console.info('Audit completed successfully. Data integrity validated.');
+      printReport(report);
+    }
+
+    if (report.summary.criticalIssues > 0) {
+      if (!isJson) console.warn(`Audit completed with ${report.summary.criticalIssues} critical data integrity issue(s).`);
+      process.exitCode = 1;
+    } else if (isStrict && report.summary.warningIssues > 0) {
+      if (!isJson) console.warn(`Audit strict check failed: ${report.summary.warningIssues} warning issue(s) detected.`);
+      process.exitCode = 1;
+    } else {
+      if (!isJson) console.info('Audit completed successfully. Data integrity validated.');
     }
   } catch (auditError: unknown) {
     const errorMsg = auditError instanceof Error ? sanitizeMongoUri(auditError.message) : 'Unknown audit error';
-    console.error(`Audit failed during execution: ${errorMsg}`);
+    if (isJson) {
+      console.error(JSON.stringify({ error: 'AUDIT_EXECUTION_ERROR', details: errorMsg }));
+    } else {
+      console.error(`Audit failed during execution: ${errorMsg}`);
+    }
     process.exitCode = 1;
   } finally {
     await disconnectDatabase();
@@ -560,4 +596,3 @@ const isMainModule = (): boolean => {
 if (isMainModule()) {
   void execute();
 }
-
