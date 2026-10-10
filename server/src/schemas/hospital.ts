@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HOSPITAL_EMERGENCY_STATUSES } from '../models/EmergencyRequest.js';
 import { HOSPITAL_PATIENT_STATUSES as PATIENT_STATUSES } from '../models/HospitalPatient.js';
+import { HOSPITAL_COORDINATION_NOTIFICATION_STATES } from '../models/HospitalCoordinationNotification.js';
 
 const coordinate = z.number().finite().min(-180).max(180);
 
@@ -62,4 +63,10 @@ export const hospitalAmbulanceListQuerySchema = z.object({
 
 export const hospitalEmergencyStatusUpdateSchema = z.object({
   status: z.enum(HOSPITAL_EMERGENCY_STATUSES),
+}).strict();
+
+export const hospitalCoordinationNotificationListQuerySchema = z.object({
+  state: z.enum([...HOSPITAL_COORDINATION_NOTIFICATION_STATES, 'ALL']).default('UNREAD'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
 }).strict();

@@ -35,7 +35,7 @@ const canAccessTrip = async (identity: AuthenticatedIdentity, tripId: Types.Obje
 const canAccessEmergency = async (identity: AuthenticatedIdentity, id: Types.ObjectId): Promise<boolean> => {
   const emergency = await EmergencyRequestModel.findById(id).select('userId hospitalId ambulanceProviderId').lean().exec();
   if (!emergency) return false;
-  const trip = await TripModel.findOne({ emergencyRequestId: id }).select('driverId providerId destinationHospitalId').lean().exec();
+  const trip = await TripModel.findOne({ emergencyRequestId: id }).sort({ createdAt: -1 }).select('driverId providerId destinationHospitalId status').lean().exec();
   return canAccessTrackingSnapshot(identity, emergency, trip);
 };
 const authorized = async (identity: AuthenticatedIdentity, request: RoomRequest): Promise<boolean> => {

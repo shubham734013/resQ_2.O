@@ -14,6 +14,7 @@ import type { HospitalEmergencyStatus, HospitalEmergencySummary } from '../types
 import { MapView } from '../components/map/MapView';
 import { LiveAmbulanceTracking } from '../components/LiveAmbulanceTracking';
 import { IncomingAmbulanceAlertPanel } from '../components/hospital/IncomingAmbulanceAlertPanel';
+import { HospitalCoordinationInbox } from '../components/hospital/HospitalCoordinationInbox';
 
 const wrap = 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8';
 const box = 'border border-slate-200 bg-white';
@@ -54,6 +55,7 @@ const HospitalOverviewPage = () => {
   ] as const;
   return <PageShell>
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs uppercase tracking-wider text-slate-500">Hospital Operations</p><h2 className="mt-1 text-2xl font-semibold">{p.name}</h2><p className="mt-1 text-sm text-slate-500">{p.address ?? 'Address not provided'}{p.city ? `, ${p.city}` : ''}</p></div><StatusBadge variant={statusVariant(p.verificationStatus)} label={p.verificationStatus} /></div>
+    <div className="mt-6"><HospitalCoordinationInbox /></div>
     <div className="mt-6">
       <IncomingAmbulanceAlertPanel
         emergencies={emergencies.data?.items ?? []}
@@ -125,6 +127,7 @@ const HospitalEmergenciesPage = () => {
 
   return <PageShell>
     <div className="space-y-4">
+      <HospitalCoordinationInbox />
       <IncomingAmbulanceAlertPanel
         emergencies={items}
         onUpdateStatus={(id, status) => mutation.mutate({ id, status })}

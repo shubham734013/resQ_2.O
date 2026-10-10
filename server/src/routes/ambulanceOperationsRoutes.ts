@@ -56,6 +56,7 @@ driver.post('/trips/:id/arrived-pickup',c.arrivedPickup);
 driver.post('/trips/:id/patient-picked-up',c.patientPickedUp);
 driver.post('/trips/:id/arrived-hospital',c.arrivedHospital);
 driver.post('/trips/:id/complete',c.completeTrip);
+driver.post('/trips/:id/cancel',c.cancelTrip);
 
 export const ambulanceProviderRouter=provider;
 export const ambulanceDriverRouter=driver;
