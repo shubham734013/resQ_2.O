@@ -218,8 +218,9 @@ export const updateDriverLocation = async (driverId: string, input: LocationInpu
       const driver = await operationalDriver(driverId, session);
       if (!driver.assignedAmbulanceId) throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED', 'Driver has no assigned ambulance.', 409);
       if (!['ONLINE', 'BUSY'].includes(driver.availabilityStatus)) throw new AppError('DRIVER_OFFLINE', 'Location updates require active duty.', 409);
-      const activeTrip = await activeTripForDriver(did, session);
+      const activeTrip = await TripModel.findOne({ driverId: did, status: { $in: ACTIVE_TRIP_STATUSES } }).select('_id ambulanceId').session(session).lean().exec();
       if (driver.availabilityStatus === 'BUSY' && !activeTrip) throw new AppError('DRIVER_BUSY_WITHOUT_TRIP', 'Driver is marked BUSY without an active trip; contact operations.', 409);
+      if (activeTrip && String(activeTrip.ambulanceId) !== String(driver.assignedAmbulanceId)) throw new AppError('DRIVER_AMBULANCE_MISMATCH', 'Active trip ambulance does not match the driver assignment.', 409);
       const ambulance = await AmbulanceModel.findOne({
         _id: driver.assignedAmbulanceId, providerId: driver.providerId,
         accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
