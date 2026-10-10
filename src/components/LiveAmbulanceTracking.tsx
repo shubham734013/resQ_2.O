@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Navigation, Radio, RadioTower, RefreshCw, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
+import { MapPin, Navigation, Radio, RefreshCw, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
 import { Button } from './common/Button';
 import { MapView } from './map/MapView';
 import { createTrackingSocket, subscribeTrackingRoom, type TrackingEnvelope } from '../services/trackingSocket';
@@ -56,6 +56,10 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       void subscribeTrackingRoom(socket, { type: 'emergency', id: emergencyRequestId })
         .then(refresh)
         .catch((error: unknown) => { if (!disposed) setSocketError(error instanceof Error ? error.message : 'Live subscription failed.'); });
+      if (subscribeHospitalOperations && snapshot?.hospital.id) {
+        void subscribeTrackingRoom(socket, { type: 'hospital-operations', id: snapshot.hospital.id })
+          .catch((error: unknown) => { if (!disposed) setSocketError(error instanceof Error ? error.message : 'Hospital realtime subscription failed.'); });
+      }
       refresh();
     });
     socket.on('disconnect', () => setConnected(false));
@@ -89,27 +93,11 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
     return () => {
       disposed = true;
       socket.emit('tracking:unsubscribe', { type: 'emergency', id: emergencyRequestId });
+      if (snapshot?.hospital.id && subscribeHospitalOperations) socket.emit('tracking:unsubscribe', { type: 'hospital-operations', id: snapshot.hospital.id });
       socket.disconnect();
       socket.removeAllListeners();
     };
-  }, [emergencyRequestId, queryClient]);
-
-  useEffect(() => {
-    if (!subscribeHospitalOperations || !snapshot?.hospital.id) return;
-    const socket = createTrackingSocket();
-    let disposed = false;
-    socket.on('connect', () => {
-      void subscribeTrackingRoom(socket, { type: 'hospital-operations', id: snapshot.hospital.id })
-        .catch((error: unknown) => { if (!disposed) setSocketError(error instanceof Error ? error.message : 'Hospital realtime subscription failed.'); });
-    });
-    return () => {
-      disposed = true;
-      socket.emit('tracking:unsubscribe', { type: 'hospital-operations', id: snapshot.hospital.id });
-      socket.disconnect();
-      socket.removeAllListeners();
-    };
-  }, [subscribeHospitalOperations, snapshot?.hospital.id]);
-
+  }, [emergencyRequestId, queryClient, subscribeHospitalOperations, snapshot?.hospital.id]);
   const routePhase = snapshot?.routeTarget ?? 'PICKUP';
   const location = snapshot?.location;
   const roundedLat = typeof location?.latitude === 'number' ? location.latitude.toFixed(3) : 'none';
