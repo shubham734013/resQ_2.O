@@ -100,7 +100,7 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
   }
 
   const ambulance = ambulanceId ? await AmbulanceModel.findById(ambulanceId).select('registrationNumber vehicleNumber').lean().exec() : null;
-  let created: HospitalCoordinationNotificationDocument;
+  let created: HospitalCoordinationNotificationDocument & { _id: Types.ObjectId };
   try {
     const docs = await HospitalCoordinationNotificationModel.create([{
       hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId, tripId: trip?._id, ambulanceId,
