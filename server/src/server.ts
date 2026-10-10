@@ -1,9 +1,11 @@
 import { app } from './app.js';
 import { connectDatabase, disconnectDatabase, sanitizeMongoUri } from './config/database.js';
 import { env } from './config/env.js';
+import { startDispatchWorker } from './services/dispatchService.js';
 
 const startServer = async (): Promise<void> => {
   await connectDatabase();
+  const stopDispatchWorker = startDispatchWorker();
   const server = app.listen(env.PORT, () => console.info(`ResQ API listening on port ${env.PORT}`));
 
   let isShuttingDown = false;
@@ -18,6 +20,7 @@ const startServer = async (): Promise<void> => {
     }, 10000);
     forceExitTimeout.unref();
 
+    stopDispatchWorker();
     server.close(async (err) => {
       if (err) {
         console.error('Error closing HTTP server:', err);
