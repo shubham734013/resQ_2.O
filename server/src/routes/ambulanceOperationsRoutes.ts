@@ -8,6 +8,7 @@ import {
  providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,
 } from '../schemas/ambulance.js';
 import * as c from '../controllers/ambulanceOperationsController.js';
+import * as dispatch from '../controllers/dispatchController.js';
 
 const validateQuery=(schema:z.ZodType)=>(req:Request,res:Response,next:NextFunction):void=>{const result=schema.safeParse(req.query);if(!result.success){next(result.error);return;}res.locals.validatedQuery=result.data;next();};
 
@@ -38,7 +39,13 @@ driver.get('/profile',c.driverProfile);
 driver.patch('/profile',validateBody(driverUpdateSchema.omit({password:true})),c.driverProfileUpdate);
 driver.get('/status',c.driverStatus);
 driver.patch('/status',validateBody(driverStatusSchema),c.driverStatusUpdate);
+driver.get('/duty',c.driverDutyStatus);
+driver.post('/duty/start',validateBody(ambulanceLocationUpdateSchema),c.driverDutyStart);
+driver.post('/duty/end',c.driverDutyEnd);
 driver.patch('/location',validateBody(ambulanceLocationUpdateSchema),c.driverLocationUpdate);
+driver.get('/dispatch-offers',dispatch.driverOffers);
+driver.post('/dispatch-offers/:id/accept',dispatch.driverAcceptOffer);
+driver.post('/dispatch-offers/:id/reject',dispatch.driverRejectOffer);
 driver.get('/requests',validateQuery(driverRequestQuerySchema),c.driverRequests);
 driver.get('/requests/:id',c.driverRequest);
 driver.post('/requests/:id/accept',c.driverAccept);
@@ -49,6 +56,7 @@ driver.post('/trips/:id/arrived-pickup',c.arrivedPickup);
 driver.post('/trips/:id/patient-picked-up',c.patientPickedUp);
 driver.post('/trips/:id/arrived-hospital',c.arrivedHospital);
 driver.post('/trips/:id/complete',c.completeTrip);
+driver.post('/trips/:id/cancel',c.cancelTrip);
 
 export const ambulanceProviderRouter=provider;
 export const ambulanceDriverRouter=driver;

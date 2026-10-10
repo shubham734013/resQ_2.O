@@ -1,3 +1,4 @@
+import { publishSocketEvent } from './trackingSocketService.js';
 import type { Response } from 'express';
 
 export interface RealtimeEventPayload {
@@ -64,11 +65,8 @@ export const broadcastEvent = (channel: string, event: string, data: unknown): v
 
   const deadIds: string[] = [];
   for (const [id, client] of clients.entries()) {
-    // Exact channel match, global wildcard, or operations listening channel
-    // Channel authorization is enforced before registration in realtimeRoutes.
-    // Keep delivery exact-match only so one hospital/driver cannot receive
-    // another tenant's events by sharing a channel prefix.
-    const shouldReceive = client.channel === channel || client.channel === 'operations';
+    // Exact channel match, operations listening channel, or wildcard
+    const shouldReceive = client.channel === channel || client.channel === 'operations' || client.channel === '*';
 
     if (shouldReceive) {
       try {
@@ -79,4 +77,5 @@ export const broadcastEvent = (channel: string, event: string, data: unknown): v
     }
   }
   deadIds.forEach((id) => clients.delete(id));
+  publishSocketEvent(channel, event, payload);
 };

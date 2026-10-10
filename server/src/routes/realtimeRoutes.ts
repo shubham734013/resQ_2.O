@@ -3,62 +3,60 @@ import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 import { authenticate } from '../middlewares/authenticate.js';
 import type { AuthenticatedRequest } from '../types/auth.js';
+import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { AmbulanceModel } from '../models/Ambulance.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { registerRealtimeClient, unregisterRealtimeClient } from '../services/realtimeService.js';
+import { AppError } from '../utils/AppError.js';
 
 export const realtimeRouter = Router();
 
-/**
- * Realtime streams are private. Never accept a client-selected wildcard or
- * trust a channel name without checking the authenticated identity.
- */
-realtimeRouter.get('/stream', authenticate, async (req: Request, res: Response): Promise<void> => {
-  const auth = (req as AuthenticatedRequest).auth;
-  if (!auth) {
-    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication is required' } });
-    return;
-  }
+const maySubscribe = async (req: AuthenticatedRequest, channel: string): Promise<boolean> => {
+  const auth = req.auth;
+  if (!auth) return false;
+  if (auth.role === 'ADMIN') return true;
+  if (channel === '*' || channel === 'operations' || !channel.includes(':')) return false;
+  const [kind, resourceId, ...rest] = channel.split(':');
+  if (!resourceId || rest.length > 0 || channel.length > 100 || !Types.ObjectId.isValid(resourceId)) return false;
 
-  const channel = typeof req.query.channel === 'string' ? req.query.channel.trim() : '';
-  if (!channel || channel === '*') {
-    res.status(400).json({ success: false, error: { code: 'INVALID_CHANNEL', message: 'A specific authorized realtime channel is required' } });
-    return;
-  }
-
-  let authorized = false;
-  if (channel === 'operations') {
-    authorized = auth.role === 'ADMIN';
-  } else if (channel.startsWith('hospital:')) {
-    authorized = auth.role === 'HOSPITAL' && channel === `hospital:${auth.id}`;
-  } else if (channel.startsWith('driver:')) {
-    authorized = auth.role === 'AMBULANCE_DRIVER' && channel === `driver:${auth.id}`;
-  } else if (channel.startsWith('provider:')) {
-    authorized = auth.role === 'AMBULANCE_PROVIDER' && channel === `provider:${auth.id}`;
-  } else if (channel.startsWith('emergency:')) {
-    const emergencyId = channel.slice('emergency:'.length);
-    if (Types.ObjectId.isValid(emergencyId)) {
-      const emergency = await EmergencyRequestModel.findById(emergencyId).select('userId hospitalId ambulanceProviderId driverId').lean().exec();
-      if (emergency) {
-        if (auth.role === 'ADMIN') authorized = true;
-        else if (auth.role === 'USER') authorized = String(emergency.userId) === auth.id;
-        else if (auth.role === 'HOSPITAL') authorized = String(emergency.hospitalId) === auth.id;
-        else if (auth.role === 'AMBULANCE_PROVIDER') authorized = String(emergency.ambulanceProviderId ?? '') === auth.id;
-        else if (auth.role === 'AMBULANCE_DRIVER') {
-          authorized = String(emergency.driverId ?? '') === auth.id;
-          if (!authorized) {
-            authorized = Boolean(await TripModel.exists({ emergencyRequestId: emergency._id, driverId: new Types.ObjectId(auth.id) }));
-          }
-        }
-      }
+  if (auth.role === 'AMBULANCE_DRIVER') {
+    if (kind === 'driver') return resourceId === auth.id;
+    if (kind === 'ambulance') {
+      const driver = await AmbulanceDriverModel.findOne({ _id: auth.id, accountStatus: 'ACTIVE' }).select('assignedAmbulanceId').lean().exec();
+      return Boolean(driver?.assignedAmbulanceId && String(driver.assignedAmbulanceId) === resourceId);
     }
+    if (kind === 'emergency') {
+      const emergency = await EmergencyRequestModel.findById(resourceId).select('driverId').lean().exec();
+      if (emergency && String(emergency.driverId ?? '') === auth.id) return true;
+      return Boolean(await TripModel.exists({ emergencyRequestId: new Types.ObjectId(resourceId), driverId: new Types.ObjectId(auth.id) }));
+    }
+    return false;
   }
-
-  if (!authorized) {
-    res.status(403).json({ success: false, error: { code: 'REALTIME_CHANNEL_FORBIDDEN', message: 'You are not authorized to subscribe to this realtime channel' } });
-    return;
+  if (auth.role === 'AMBULANCE_PROVIDER') {
+    if (kind === 'provider') return resourceId === auth.id;
+    if (kind === 'ambulance') return Boolean(await AmbulanceModel.exists({ _id: resourceId, providerId: auth.id }));
+    if (kind === 'driver') return Boolean(await AmbulanceDriverModel.exists({ _id: resourceId, providerId: auth.id }));
+    if (kind === 'emergency') return Boolean(await EmergencyRequestModel.exists({ _id: resourceId, ambulanceProviderId: auth.id }));
+    return false;
   }
+  if (auth.role === 'HOSPITAL') {
+    if (kind === 'hospital') return resourceId === auth.id;
+    if (kind === 'emergency') return Boolean(await EmergencyRequestModel.exists({ _id: resourceId, hospitalId: auth.id }));
+    return false;
+  }
+  if (auth.role === 'USER') {
+    if (kind === 'emergency') return Boolean(await EmergencyRequestModel.exists({ _id: resourceId, userId: auth.id }));
+  }
+  return false;
+};
 
+realtimeRouter.get('/stream', authenticate, async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const channel = typeof req.query.channel === 'string' && req.query.channel.trim() ? req.query.channel.trim() : '';
+  if (!channel || !(await maySubscribe(authReq, channel))) {
+    throw new AppError('REALTIME_CHANNEL_FORBIDDEN', 'You are not authorized to subscribe to this realtime channel.', 403);
+  }
   const clientId = randomUUID();
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');

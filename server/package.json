@@ -15,7 +15,9 @@
     "repair:test-data": "tsx src/scripts/repairTestData.ts",
     "enrich:hospital-coords": "tsx src/scripts/enrichHospitalCoordinates.ts",
     "diagnose:hospitals": "tsx src/scripts/diagnoseHospitalDirectory.ts",
-    "ensure:emergency-idempotency-index": "tsx src/scripts/ensureEmergencyIdempotencyIndex.ts"
+    "ensure:emergency-idempotency-index": "tsx src/scripts/ensureEmergencyIdempotencyIndex.ts",
+    "ensure:dispatch-indexes": "tsx src/scripts/ensureDispatchIndexes.ts",
+    "ensure:trip-reassignment-index": "tsx src/scripts/ensureTripReassignmentIndex.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -25,7 +27,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "7.7",
     "mongoose": "^9.0.0",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -37,6 +40,7 @@
     "eslint": "^9.39.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.3"
+    "typescript-eslint": "^8.46.3",
+    "socket.io-client": "^4.8.1"
   }
 }
