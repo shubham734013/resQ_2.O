@@ -70,10 +70,6 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
         if (!(await authorized(identity, request))) { ack?.({ ok: false, error: 'FORBIDDEN' }); return; }
         const room = roomFor(request);
         await socket.join(room);
-        if (request.type === 'emergency') {
-          const trip = await TripModel.findOne({ emergencyRequestId: new Types.ObjectId(request.id) }).select('_id status').lean().exec();
-          if (trip && !['COMPLETED', 'CANCELLED'].includes(trip.status) && await canAccessTrip(identity, trip._id)) await socket.join(`trip:${String(trip._id)}`);
-        }
         ack?.({ ok: true, room });
       })().catch(() => ack?.({ ok: false, error: 'SUBSCRIPTION_FAILED' }));
     });
@@ -83,10 +79,6 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
         const request = raw as Partial<RoomRequest>;
         if (!['emergency', 'trip', 'hospital-operations'].includes(String(request.type)) || typeof request.id !== 'string' || !validId(request.id)) { ack?.({ ok: false }); return; }
         await socket.leave(roomFor(request as RoomRequest));
-        if (request.type === 'emergency') {
-          const trip = await TripModel.findOne({ emergencyRequestId: new Types.ObjectId(request.id) }).select('_id').lean().exec();
-          if (trip) await socket.leave(`trip:${String(trip._id)}`);
-        }
         ack?.({ ok: true });
       })().catch(() => ack?.({ ok: false }));
     });
