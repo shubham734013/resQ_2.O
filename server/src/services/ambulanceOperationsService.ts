@@ -213,7 +213,9 @@ async function moveTrip(did:string,id:string,next:TripStatus){
     ]);
   }
   const out = tripOut(x);
+  // The same persisted trip transition is fanned out to every authorized view.
   broadcastEvent(`emergency:${x.emergencyRequestId}`, 'tracking:status', out);
+  broadcastEvent(`trip:${x._id}`, 'tracking:status', out);
   broadcastEvent(`hospital:${x.destinationHospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent('operations', 'tracking:status', out);
   return out;

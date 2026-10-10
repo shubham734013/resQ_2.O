@@ -294,8 +294,23 @@ export const updateDriverLocation = async (driverId: string, input: LocationInpu
   const completedTelemetry = telemetry as Record<string, unknown> | null;
   const completedAmbulanceId = ambulanceId as Types.ObjectId | null;
   if (!completedTelemetry || !completedAmbulanceId) throw new AppError('LOCATION_UPDATE_FAILED', 'Location update was not saved. Retry.', 409);
+  // Keep existing SSE events intact while publishing a minimal location payload to the authorized trip participants.
   broadcastEvent(`driver:${did}`, 'tracking:location:update', completedTelemetry);
   broadcastEvent(`ambulance:${completedAmbulanceId}`, 'tracking:location:update', completedTelemetry);
+  const activeTrip = await TripModel.findOne({ driverId: did, ambulanceId: completedAmbulanceId, status: { $in: ACTIVE_TRIP_STATUSES } })
+    .select('_id emergencyRequestId destinationHospitalId status').sort({ createdAt: -1 }).lean().exec();
+  if (activeTrip) {
+    const locationEvent = {
+      emergencyRequestId: String(activeTrip.emergencyRequestId), tripId: String(activeTrip._id),
+      tripStatus: activeTrip.status, ambulanceId: String(completedAmbulanceId),
+      latitude: completedTelemetry.latitude, longitude: completedTelemetry.longitude,
+      accuracyMeters: completedTelemetry.accuracyMeters, locationUpdatedAt: completedTelemetry.locationUpdatedAt,
+      sourceTimestamp: completedTelemetry.sourceTimestamp, freshness: 'FRESH', coordinatesAreLive: true,
+    };
+    broadcastEvent(`emergency:${activeTrip.emergencyRequestId}`, 'tracking:location', locationEvent);
+    broadcastEvent(`trip:${activeTrip._id}`, 'tracking:location', locationEvent);
+    // Hospital viewers subscribe to the authorized emergency room for per-trip GPS; the hospital-operations room carries coordination/status events, avoiding duplicate location delivery.
+  }
   return completedTelemetry;
 };
 
