@@ -268,6 +268,7 @@ export const patientPickedUp=async(did:string,id:string)=>{
 };
 export const arrivedHospital=async(did:string,id:string)=>moveTrip(did,id,'AT_HOSPITAL');
 export const completeTrip=async(did:string,id:string)=>moveTrip(did,id,'COMPLETED');
+export const cancelTrip=async(did:string,id:string)=>moveTrip(did,id,'CANCELLED');
 export const listProviderTrips=async(pid:string,q:TripQuery)=>{await operationalProvider(pid);const f:QueryFilter<TripDocument>={providerId:oid(pid,'provider')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.driver)f.driverId=oid(q.driver,'driver');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
 export const getProviderTrip=async(pid:string,id:string)=>{await operationalProvider(pid);const x=await TripModel.findOne({_id:oid(id,'trip'),providerId:oid(pid,'provider')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Trip not found',404);return tripOut(x);};
 export const getDriverProfile=async(id:string)=>driverOut(await operationalDriver(id));
