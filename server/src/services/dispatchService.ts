@@ -231,7 +231,7 @@ const notifyOffer = async (job: DispatchJobLean, attempt: DispatchAttemptDocumen
   });
 };
 
-const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchCandidate, actor?: { id: Types.ObjectId; role: 'ADMIN' }) => {
+export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchCandidate, actor?: { id: Types.ObjectId; role: 'ADMIN' }) => {
   const now = new Date();
   const deadlineAt = new Date(now.getTime() + DISPATCH_OFFER_TIMEOUT_MS);
   const attemptId = randomUUID();
