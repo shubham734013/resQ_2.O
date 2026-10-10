@@ -88,7 +88,7 @@ export const rankDispatchCandidates = (candidates: DispatchCandidate[]) => [...c
   return a.straightLineMeters - b.straightLineMeters;
 });
 const attemptFor = (job: DispatchJobLean, attemptId: string) => job.attempts.find((attempt) => attempt.attemptId === attemptId);
-const isFresh = (updatedAt: Date | undefined, now: Date) => Boolean(updatedAt && updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS && updatedAt.getTime() >= now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS);
+export const isDispatchLocationFresh = (updatedAt: Date | undefined, now: Date) => Boolean(updatedAt && updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS && updatedAt.getTime() >= now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS);\nconst isFresh = isDispatchLocationFresh;\nexport const isDispatchOfferAcceptable = (status: string, deadlineAt: Date | undefined, now: Date) => status === 'OFFERED' && Boolean(deadlineAt && deadlineAt.getTime() > now.getTime());
 const appendEvent = (event: string, reason?: string, actorId?: Types.ObjectId, actorRole: 'SYSTEM' | 'ADMIN' | 'AMBULANCE_DRIVER' | 'USER' = 'SYSTEM', attemptId?: string) => ({
   event, at: new Date(), actorId, actorRole, reason, attemptId,
 });
@@ -495,7 +495,7 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
     const existing = await TripModel.findById(jobBefore.acceptedTripId).lean().exec();
     if (existing) return { dispatchJobId: String(jid), tripId: String(existing._id), emergencyRequestId: String(existing.emergencyRequestId), status: 'ACCEPTED' as const, duplicate: true };
   }
-  if (jobBefore.status !== 'OFFERED' || String(jobBefore.currentDriverId) !== String(did) || !jobBefore.currentAttemptId) {
+  if (!isDispatchOfferAcceptable(jobBefore.status, jobBefore.deadlineAt, now) || String(jobBefore.currentDriverId) !== String(did) || !jobBefore.currentAttemptId) {
     throw new AppError('DISPATCH_OFFER_NOT_ACTIVE', 'This offer is no longer active for this driver', 409);
   }
   if (!jobBefore.deadlineAt || jobBefore.deadlineAt.getTime() <= now.getTime()) {
