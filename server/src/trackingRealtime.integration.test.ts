@@ -98,7 +98,6 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
 
     const { app } = await import('./app.js');
     const { initializeTrackingSockets } = await import('./services/trackingSocketService.js');
-    const { getEmergencyTrackingSnapshot } = await import('./services/trackingService.js');
     const { broadcastEvent } = await import('./services/realtimeService.js');
     server = createServer(app);
     stopSockets = initializeTrackingSockets(server);
