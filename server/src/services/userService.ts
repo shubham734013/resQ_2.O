@@ -42,7 +42,7 @@ export const addSavedFacility=async(userId:string,facilityId:string)=>{
     UserSavedFacilityModel.findOneAndUpdate(
       {userId:uid,hospitalId:fid},
       {$setOnInsert:{userId:uid,hospitalId:fid,createdAt:new Date()}},
-      {upsert:true,new:true}
+      {upsert:true,returnDocument: 'after'}
     ).exec(),
     UserModel.updateOne({_id:uid},{$addToSet:{savedFacilityIds:fid}}).exec(),
   ]);

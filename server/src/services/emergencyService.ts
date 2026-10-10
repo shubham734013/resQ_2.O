@@ -295,7 +295,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
       const patient = await HospitalPatientModel.findOneAndUpdate(
         { emergencyId: request._id },
         { $setOnInsert: { caseId: 'CASE-' + cryptoSafeCode(), hospitalId, emergencyId: request._id, emergencyType: input.situationType, coordinationStatus: 'INCOMING', receivedAt: now } },
-        { upsert: true, new: true, setDefaultsOnInsert: true, session },
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true, session },
       ).exec();
       if (!patient) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
       const updated = await EmergencyRequestModel.findOneAndUpdate(
@@ -311,7 +311,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
             },
           },
         },
-        { new: true, runValidators: true, session },
+        { returnDocument: 'after', runValidators: true, session },
       ).lean().exec();
       if (!updated) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
       await DispatchJobModel.findOneAndUpdate(
@@ -330,7 +330,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
             events: [{ event: 'DISPATCH_JOB_CREATED', at: now, actorRole: 'SYSTEM' }],
           },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true, session },
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true, session },
       ).exec();
       linked = updated as unknown as EmergencyRecord;
     });
@@ -438,7 +438,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
             },
           },
         },
-        { new: true, runValidators: true, session },
+        { returnDocument: 'after', runValidators: true, session },
       ).lean().exec();
       if (!updated) throw new AppError('STALE_EMERGENCY_UPDATE', 'Emergency request changed before cancellation could be applied', 409);
 
@@ -457,14 +457,14 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
               },
             },
           },
-          { new: true, runValidators: true, session },
+          { returnDocument: 'after', runValidators: true, session },
         ).lean().exec();
         if (!cancelledTrip) throw new AppError('TRIP_STATE_CONFLICT', 'Trip changed before cancellation could be applied', 409);
 
         const ambulance = await AmbulanceModel.findOneAndUpdate(
           { _id: activeTrip.ambulanceId, currentStatus: 'BUSY' },
           { $set: { currentStatus: 'AVAILABLE' } },
-          { new: true, session },
+          { returnDocument: 'after', session },
         ).lean().exec();
         if (!ambulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state could not be released safely', 409);
 
@@ -472,7 +472,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
           const driver = await AmbulanceDriverModel.findOneAndUpdate(
             { _id: activeTrip.driverId, availabilityStatus: 'BUSY' },
             { $set: { availabilityStatus: 'ONLINE' } },
-            { new: true, session },
+            { returnDocument: 'after', session },
           ).lean().exec();
           if (!driver) throw new AppError('DRIVER_STATE_CONFLICT', 'Driver state could not be released safely', 409);
         }
@@ -480,14 +480,14 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
         const ambulance = await AmbulanceModel.findOneAndUpdate(
           { _id: current.ambulanceId, currentStatus: 'BUSY' },
           { $set: { currentStatus: 'AVAILABLE' } },
-          { new: true, session },
+          { returnDocument: 'after', session },
         ).lean().exec();
         if (!ambulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state could not be released safely', 409);
         if (current.driverId) {
           const driver = await AmbulanceDriverModel.findOneAndUpdate(
             { _id: current.driverId, availabilityStatus: 'BUSY' },
             { $set: { availabilityStatus: 'ONLINE' } },
-            { new: true, session },
+            { returnDocument: 'after', session },
           ).lean().exec();
           if (!driver) throw new AppError('DRIVER_STATE_CONFLICT', 'Driver state could not be released safely', 409);
         }
@@ -496,7 +496,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
       const patient = await HospitalPatientModel.findOneAndUpdate(
         { emergencyId: requestId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
         { $set: { coordinationStatus: 'CANCELLED' }, $unset: { ambulanceId: 1, etaMinutes: 1 } },
-        { new: true, session },
+        { returnDocument: 'after', session },
       ).lean().exec();
       if (!patient) throw new AppError('PATIENT_CASE_CONFLICT', 'Hospital patient case could not be cancelled safely', 409);
 

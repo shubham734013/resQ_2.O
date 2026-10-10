@@ -16,7 +16,7 @@ const authSessionSchema = new Schema<AuthSessionDocument>({
   role: { type: String, required: true, index: true },
   tokenId: { type: String, required: true, unique: true, index: true },
   tokenHash: { type: String, required: true, select: false },
-  expiresAt: { type: Date, required: true, index: true },
+  expiresAt: { type: Date, required: true },
 }, { timestamps: true });
 
 authSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

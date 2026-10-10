@@ -37,7 +37,10 @@ export const MapView = ({
   alternativeRoutes = [],
   onSelectRoute,
   interactive = true,
+  isNavigating = false,
+  currentStepIndex = 0,
   onRecenter,
+  recenterTrigger = 0,
   className = '',
 }: MapViewProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -201,10 +204,27 @@ export const MapView = ({
           }
         }
 
-        if (allPoints.length > 1 && !activeRoute?.googlePath?.length) {
+        if (activeRoute?.googlePath?.length && !isNavigating) {
+          const bounds = new googleMaps.maps.LatLngBounds();
+          activeRoute.googlePath.forEach((point) => {
+            if (Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) {
+              bounds.extend(toGoogle(point.latitude, point.longitude));
+            }
+          });
+          allPoints.forEach((point) => bounds.extend(point));
+          mapRef.current.fitBounds(bounds);
+        } else if (allPoints.length > 1 && !isNavigating) {
           const bounds = new googleMaps.maps.LatLngBounds();
           allPoints.forEach((point) => bounds.extend(point));
           mapRef.current.fitBounds(bounds);
+        } else if (isNavigating) {
+          if (userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)) {
+            mapRef.current.setCenter(toGoogle(userLocation.latitude, userLocation.longitude));
+            mapRef.current.setZoom(17);
+          } else if (destination && Number.isFinite(destination.latitude) && Number.isFinite(destination.longitude)) {
+            mapRef.current.setCenter(toGoogle(destination.latitude, destination.longitude));
+            mapRef.current.setZoom(16);
+          }
         }
       } catch (overlayErr) {
         console.warn('Map overlay rendering error caught safely:', overlayErr);
@@ -212,7 +232,14 @@ export const MapView = ({
     };
     void renderOverlays();
     return () => { cancelled = true; };
-  }, [activeRoute, alternativeRoutes, destination, markers, status, userLocation]);
+  }, [activeRoute, alternativeRoutes, currentStepIndex, destination, isNavigating, markers, status, userLocation]);
+
+  useEffect(() => {
+    if (recenterTrigger && mapRef.current && status === 'ready') {
+      recenter();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recenterTrigger]);
 
   const changeZoom = (delta: number) => {
     const next = Math.min(20, Math.max(2, zoomLevel + delta));

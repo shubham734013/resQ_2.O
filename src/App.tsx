@@ -45,6 +45,7 @@ export function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/search" element={<SearchPage />} />
       <Route path="/facility/:id" element={<FacilityDetailPage />} />
+      <Route path="/route" element={<RouteNavigationPage />} />
       <Route path="/route/:facilityId" element={<RouteNavigationPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allowedRoles={['USER']} />}>

@@ -59,5 +59,6 @@ export interface MapViewProps {
   isNavigating?: boolean;
   currentStepIndex?: number;
   onRecenter?: () => void;
+  recenterTrigger?: number;
   className?: string;
 }

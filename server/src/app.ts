@@ -49,6 +49,7 @@ app.use('/api/v1/places',placesRouter);
 app.use('/api/v1/ambulance-provider',ambulanceProviderRouter);
 app.use('/api/v1/ambulance-driver',ambulanceDriverRouter);
 app.use('/api/v1/emergencies',emergencyRouter);
+app.use('/api/v1/emergency',emergencyRouter);
 app.use('/api/v1/realtime',realtimeRouter);
 app.use('/api/v1/tracking',trackingRouter);
 app.use((_req,res)=>{res.status(404).json({success:false,error:{code:'NOT_FOUND',message:'Route not found'}});});

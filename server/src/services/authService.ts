@@ -258,7 +258,7 @@ export const socialLogin = async (
       await ExternalIdentityModel.findOneAndUpdate(
         { provider, providerSubject: verified.providerSubject },
         { provider, providerSubject: verified.providerSubject, accountId: existing.id, role: existing.role, email: existing.email },
-        { upsert: true, new: true },
+        { upsert: true, returnDocument: 'after' },
       ).exec();
     } catch {
       // Ignore concurrent upsert collision
@@ -288,7 +288,7 @@ export const socialLogin = async (
       await ExternalIdentityModel.findOneAndUpdate(
         { provider, providerSubject: verified.providerSubject },
         { provider, providerSubject: verified.providerSubject, accountId: raceAccount.id, role: raceAccount.role, email: raceAccount.email },
-        { upsert: true, new: true },
+        { upsert: true, returnDocument: 'after' },
       ).exec();
       assertLoginAllowed(raceAccount.accountStatus);
       return createAuthResult(raceAccount);

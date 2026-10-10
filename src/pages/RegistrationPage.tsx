@@ -26,7 +26,12 @@ const getErrorMessage = (error: unknown): string => {
     if (error.code === 'PHONE_ALREADY_EXISTS') return 'An account with this phone number already exists.';
     if (error.code === 'REGISTRATION_NUMBER_ALREADY_EXISTS') return 'This registration number is already in use.';
     if (error.code === 'LICENSE_NUMBER_ALREADY_EXISTS') return 'This license number is already in use.';
-    if (error.status === 409 || error.status === 422) return error.message;
+    if (error.code === 'PROVIDER_NOT_FOUND') return 'No ambulance provider was found for this Provider ID. Copy the provider MongoDB _id exactly.';
+    if (error.code === 'PROVIDER_NOT_OPERATIONAL') return 'This provider is not yet approved. Driver registration requires the provider account to be ACTIVE and VERIFIED by an administrator.';
+    if (error.code === 'AMBULANCE_NOT_FOUND') return 'The assigned ambulance was not found under this provider. Check the ambulance ID or leave that optional field blank.';
+    if (error.code === 'VALIDATION_ERROR') return 'Some registration details are missing or invalid. Check your full name, email, phone, password (at least 8 characters), license number, and 24-character Provider ID.';
+    if (error.status === 404) return 'The registration endpoint was not found on the running API. Restart the ResQ backend on port 5001 and retry. If it continues, check that the frontend and backend use the same branch/version.';
+    if (error.status === 400 || error.status === 409 || error.status === 422) return error.message;
     if (error.status >= 500) return 'ResQ is temporarily unavailable. Please try again.';
   }
   return 'Registration could not be completed. Please review your details and try again.';
@@ -50,6 +55,14 @@ export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
     event.preventDefault(); setError(''); setCreatedUser(null);
     if (form.password.length < 8) { setError('Password must contain at least 8 characters.'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
+    if (kind === 'ambulance-driver' && !/^[a-fA-F0-9]{24}$/.test(form.providerId.trim())) {
+      setError('Provider ID must be the provider’s 24-character MongoDB _id.');
+      return;
+    }
+    if (kind === 'ambulance-driver' && form.assignedAmbulanceId.trim() && !/^[a-fA-F0-9]{24}$/.test(form.assignedAmbulanceId.trim())) {
+      setError('Assigned ambulance ID must be a 24-character MongoDB _id, or leave it blank.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (kind === 'user') {
