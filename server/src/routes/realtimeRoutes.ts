@@ -16,7 +16,7 @@ const maySubscribe = async (req: AuthenticatedRequest, channel: string): Promise
   if (auth.role === 'ADMIN') return true;
   if (channel === '*' || channel === 'operations' || !channel.includes(':')) return false;
   const [kind, resourceId, ...rest] = channel.split(':');
-  if (!resourceId || rest.length > 0) return false;
+  if (!resourceId || rest.length > 0 || channel.length > 100 || !/^[a-f0-9]{24}$/i.test(resourceId)) return false;
   if (auth.role === 'AMBULANCE_DRIVER') {
     if (kind === 'driver') return resourceId === auth.id;
     if (kind === 'ambulance') {
