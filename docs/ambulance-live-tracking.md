@@ -49,13 +49,13 @@ Events include `dispatch:accepted`, `dispatch:declined`, `tracking:status`, `tra
 
 CI runs frontend `npm run typecheck`, `npm run lint`, `npm run build`, and backend `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
 
-The current CI run completed successfully: 114 backend tests, 112 passed, 0 failed, 2 skipped. The skipped tests are pre-existing MongoDB-backed dispatch/duty concurrency tests that require dedicated replica-set database configuration.
+The last completed run before the new Socket.IO acceptance test passed 114 backend tests (112 passed, 0 failed, 2 skipped). The gated Socket.IO acceptance test is in `server/src/trackingRealtime.integration.test.ts` and runs when `TRACKING_TEST_MONGODB_URI` points to a dedicated database whose name contains `test` or `tracking`. Run it with a MongoDB replica set because the test starts the existing Express app, authenticates three sockets, checks room authorization and event delivery, compares user/hospital REST snapshots, and verifies terminal room cleanup/reconnect recovery. CI results for the latest test commit must be checked before treating it as green.
 
 ### Staging acceptance checklist
 
 - [ ] User and hospital snapshot responses for the same accepted emergency contain the same trip status and latest GPS timestamp.
 - [ ] Before acceptance, no driver name, vehicle identity, or GPS is returned to the user.
-- [ ] Correct owner can subscribe to an emergency; unrelated user, hospital, driver, and provider subscriptions are rejected.
+- [ ] Correct owner can subscribe to an emergency; unrelated user, hospital, driver, and provider subscriptions are rejected. The gated integration test covers user/hospital authorization and outsider denial.
 - [ ] Arbitrary room names, wildcard rooms, and global operations subscriptions are rejected.
 - [ ] Location events arrive only in the accepted trip's emergency, trip, and destination-hospital rooms.
 - [ ] GPS events older than the current snapshot are ignored by clients; stale coordinates are never labelled live.
