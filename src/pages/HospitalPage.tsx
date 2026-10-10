@@ -12,6 +12,7 @@ import {
 } from '../hooks/useHospitalManagement';
 import type { HospitalEmergencyStatus, HospitalEmergencySummary } from '../types/hospitalManagement';
 import { MapView } from '../components/map/MapView';
+import { LiveAmbulanceTracking } from '../components/LiveAmbulanceTracking';
 import { IncomingAmbulanceAlertPanel } from '../components/hospital/IncomingAmbulanceAlertPanel';
 
 const wrap = 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8';
@@ -212,6 +213,7 @@ const EmergencyDetail = ({ emergency, isLoading, isError, retry, onStatus, busy 
       <div className="space-y-3 text-sm"><h4 className="font-semibold">Location</h4><p>{emergency.location ?? 'Location label not provided'}</p>{hasCoordinates ? <p className="font-mono text-xs text-slate-500">{emergency.latitude}, {emergency.longitude}</p> : <p className="text-slate-500">Coordinates not available.</p>}<h4 className="pt-2 font-semibold">Patient</h4><p>{emergency.patientId ?? 'Patient reference not available'}</p></div>
       <div className="space-y-3 text-sm"><h4 className="font-semibold">Coordination</h4><p>Ambulance: {emergency.ambulanceId ?? 'Not assigned'}</p><p>Provider: {emergency.ambulanceProviderId ?? 'Not assigned'}</p><p>Driver: {emergency.driverId ?? 'Not assigned'}</p><p>ETA: {emergency.etaMinutes !== undefined ? `${emergency.etaMinutes} min` : 'Not available'}</p><div className="flex flex-wrap gap-2 pt-2">{nextStatus && <Button size="sm" disabled={busy} onClick={() => { if (window.confirm(`Change status to ${nextStatus}?`)) onStatus(nextStatus); }} icon={<Check className="h-4 w-4" />}>{busy ? 'Updating…' : `Move to ${nextStatus}`}</Button>}{emergency.status === 'PREPARING' && <span className="text-xs text-slate-500">Ambulance assignment remains in the existing ambulance operations workflow.</span>}</div></div>
     </div>
+    <div className="mt-4"><LiveAmbulanceTracking emergencyRequestId={emergency.id} subscribeHospitalOperations /></div>
     {hasCoordinates && <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
       <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600"><MapPinned className="h-4 w-4" /> Emergency location — Google Maps</div>
       <div className="h-64"><MapView center={{ latitude: emergency.latitude!, longitude: emergency.longitude! }} destination={{ latitude: emergency.latitude!, longitude: emergency.longitude!, name: emergency.requestCode, address: emergency.location, isEmergency: true }} interactive={false} className="h-full" /></div>
