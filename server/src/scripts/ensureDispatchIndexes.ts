@@ -52,7 +52,7 @@ try {
       const existingIndexes = await indexesFor(item.collection);
       const sameKey = existingIndexes.find((index) => JSON.stringify(index.key) === JSON.stringify(item.key));
       if (sameKey && (!item.unique || sameKey.unique === true)) continue;
-      await item.collection.createIndex(item.key as import('mongodb').IndexSpecification, { name: item.name, ...(item.unique ? { unique: true } : {}) });
+      await item.collection.createIndex(item.key as unknown as import('mongodb').IndexSpecification, { name: item.name, ...(item.unique ? { unique: true } : {}) });
     }
     console.info('Dispatch indexes are installed.');
   } else {
