@@ -350,11 +350,12 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
     await session.endSession();
   }
 
-  if (!linked) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
-  const out = output(linked);
+  const persisted = linked as EmergencyRecord | null;
+  if (!persisted) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
+  const out = output(persisted);
   broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent('operations', 'emergency:created', out);
-  return { ...out, dispatch: await dispatchSummary(linked._id) };
+  return { ...out, dispatch: await dispatchSummary(persisted._id) };
 };
 
 const cryptoSafeCode = () => randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
@@ -502,8 +503,9 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
     await session.endSession();
   }
 
-  if (!updatedRequest) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
-  const out = { ...output(updatedRequest), dispatch: await dispatchSummary(updatedRequest._id) };
+  const persistedCancellation = updatedRequest as EmergencyRecord | null;
+  if (!persistedCancellation) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
+  const out = { ...output(persistedCancellation), dispatch: await dispatchSummary(persistedCancellation._id) };
   broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', out);
   broadcastEvent('operations', 'emergency:cancelled', out);
