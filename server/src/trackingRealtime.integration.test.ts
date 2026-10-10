@@ -11,6 +11,7 @@ import { AmbulanceModel } from './models/Ambulance.js';
 import { AmbulanceDriverModel } from './models/AmbulanceDriver.js';
 import { EmergencyRequestModel } from './models/EmergencyRequest.js';
 import { TripModel } from './models/Trip.js';
+import { HospitalPatientModel } from './models/HospitalPatient.js';
 
 process.env.NODE_ENV ??= 'test';
 process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
@@ -76,8 +77,8 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
       _id: ambulanceId, registrationNumber: 'TRA-' + suffix, vehicleNumber: 'TRV-' + suffix,
       providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'BUSY',
       verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', currentLatitude: 26.9124, currentLongitude: 75.7873,
-      location: { type: 'Point', coordinates: [75.7873, 26.9124] }, locationUpdatedAt: new Date(),
-      locationSourceTimestamp: new Date(), locationAccuracyMeters: 7,
+      location: { type: 'Point', coordinates: [75.7873, 26.9124] }, locationUpdatedAt: new Date(Date.now() - 5000),
+      locationSourceTimestamp: new Date(Date.now() - 5000), locationAccuracyMeters: 7,
     });
     await AmbulanceDriverModel.create({
       _id: driverId, fullName: 'Tracking Test Driver', email: 'tracking-driver-' + suffix + '@example.test',
@@ -95,11 +96,16 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
       _id: tripId, emergencyRequestId: emergencyId, providerId, ambulanceId, driverId,
       destinationHospitalId: hospitalId, status: 'ACCEPTED', acceptedAt: new Date(),
     });
+    await HospitalPatientModel.create({
+      caseId: 'TRKC-' + suffix.slice(-8).toUpperCase(), hospitalId, emergencyId, ambulanceId,
+      coordinationStatus: 'INCOMING', emergencyType: 'accident', receivedAt: new Date(),
+    });
 
     const { app } = await import('./app.js');
     const { initializeTrackingSockets } = await import('./services/trackingSocketService.js');
     const { broadcastEvent } = await import('./services/realtimeService.js');
     const { updateDriverLocation } = await import('./services/driverDutyService.js');
+    const { arrivedPickup, patientPickedUp, arrivedHospital, completeTrip } = await import('./services/ambulanceOperationsService.js');
     server = createServer(app);
     stopSockets = initializeTrackingSockets(server);
     await new Promise<void>((resolve) => server!.listen(0, resolve));
@@ -156,9 +162,17 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await delay(100);
     assert.equal(outsiderReceived, false, 'GPS must not leak to an unrelated user');
     assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, true, 'authorized user may explicitly subscribe to their trip');
+    await arrivedPickup(String(driverId), String(tripId));
+    await patientPickedUp(String(driverId), String(tripId));
+    await arrivedHospital(String(driverId), String(tripId));
+    assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'AT_HOSPITAL', 'hospital coordination changes only after authoritative arrival action');
     const terminalStatus = new Promise<{ data: { status: string } }>((resolve) => userSocket.once('tracking:status', resolve));
-    broadcastEvent('trip:' + tripId, 'tracking:status', { id: String(tripId), emergencyRequestId: String(emergencyId), status: 'COMPLETED' });
+    await completeTrip(String(driverId), String(tripId));
     assert.equal((await terminalStatus).data.status, 'COMPLETED');
+    assert.equal((await TripModel.findById(tripId).lean().exec())?.status, 'COMPLETED');
+    assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.currentStatus, 'AVAILABLE');
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.availabilityStatus, 'ONLINE');
+    assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'RESOLVED');
     await delay(50);
     let tripRoomLocationReceived = false;
     userSocket.on('tracking:location', () => { tripRoomLocationReceived = true; });
@@ -170,12 +184,17 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     assert.equal((await subscribe(reconnectingSocket, { type: 'emergency', id: String(emergencyId) })).ok, true);
     const recovered = await fetch(url + '/api/v1/tracking/emergencies/' + emergencyId, { headers: { Cookie: 'resq_access_token=' + encodeURIComponent(userToken) } });
     assert.equal(recovered.status, 200, 'REST snapshot recovers authoritative state after reconnect');
+    const recoveredSnapshot = (await recovered.json() as { data: { trackingActive: boolean; trip: { status: string }; location: unknown } }).data;
+    assert.equal(recoveredSnapshot.trip.status, 'COMPLETED');
+    assert.equal(recoveredSnapshot.trackingActive, false);
+    assert.equal(recoveredSnapshot.location, null, 'completed trips must not expose a live or last-known vehicle location');
   } finally {
     sockets.forEach((socket) => socket.disconnect());
     if (stopSockets) await stopSockets();
     else if (server?.listening) await new Promise<void>((resolve) => server!.close(() => resolve()));
     await Promise.all([
       TripModel.deleteMany({ _id: tripId }),
+      HospitalPatientModel.deleteMany({ emergencyId }),
       EmergencyRequestModel.deleteMany({ _id: emergencyId }),
       AmbulanceDriverModel.deleteMany({ _id: driverId }),
       AmbulanceModel.deleteMany({ _id: ambulanceId }),
