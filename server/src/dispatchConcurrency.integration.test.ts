@@ -8,7 +8,7 @@ import { HospitalModel } from './models/Hospital.js';
 import { EmergencyRequestModel } from './models/EmergencyRequest.js';
 import { DispatchJobModel } from './models/DispatchJob.js';
 import { TripModel } from './models/Trip.js';
-import { acceptDispatchOffer, reserveAndOffer, type DispatchCandidate } from './services/dispatchService.js';
+import { acceptDispatchOffer, rejectDispatchOffer, processDispatchTick, retryDispatchJob, reserveAndOffer, type DispatchCandidate } from './services/dispatchService.js';
 
 const uri = process.env.DISPATCH_TEST_MONGODB_URI;
 const enabled = Boolean(uri && /test|dispatch/i.test(new URL(uri).pathname));
@@ -82,14 +82,45 @@ test('concurrent reservations and duplicate acceptances create one active trip',
     assert.equal(String(offered.currentAmbulanceId), String(ambulanceId));
     assert.equal(String(offered.currentDriverId), String(driverId));
 
+    const rejected = await rejectDispatchOffer(String(driverId), String(offered._id));
+    assert.equal(rejected.status, 'REJECTED');
+    const afterReject = await DispatchJobModel.findById(offered._id).lean().exec();
+    assert.equal(afterReject?.status, 'PENDING');
+    assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.dispatchReservationId, undefined);
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.dispatchReservationId, undefined);
+
+    const otherJobId = jobIds.find((jobId) => String(jobId) !== String(offered._id))!;
+    await DispatchJobModel.updateOne({ _id: otherJobId, status: 'SEARCHING' }, {
+      $set: { status: 'PENDING', nextAttemptAt: new Date() }, $unset: { leaseToken: 1, leaseUntil: 1 },
+    }).exec();
+    await processDispatchTick();
+    const timedOutOffer = await DispatchJobModel.findOne({ _id: { $in: jobIds }, status: 'OFFERED' }).lean().exec();
+    assert.ok(timedOutOffer, 'the next eligible dispatch job should receive the released resources');
+    await DispatchJobModel.updateOne({ _id: timedOutOffer._id, status: 'OFFERED' }, { $set: { deadlineAt: new Date(Date.now() - 1000) } }).exec();
+    await processDispatchTick();
+    const timedOutJob = await DispatchJobModel.findById(timedOutOffer._id).lean().exec();
+    assert.ok(['EXHAUSTED', 'PENDING'].includes(timedOutJob?.status ?? ''), 'expired offer must be persisted and released before retry');
+    assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.dispatchReservationId, undefined);
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.dispatchReservationId, undefined);
+
+    const retried = await retryDispatchJob(String(userId), String(timedOutOffer._id));
+    assert.equal(retried.status, 'PENDING');
+    const leaseToken = 'integration-lease-' + suffix;
+    await DispatchJobModel.updateOne({ _id: timedOutOffer._id, status: 'PENDING' }, {
+      $set: { status: 'SEARCHING', leaseToken, leaseUntil: new Date(Date.now() + 30000) },
+    }).exec();
+    const retryJob = await DispatchJobModel.findById(timedOutOffer._id).lean().exec();
+    assert.ok(retryJob);
+    const retryOffer = await reserveAndOffer(retryJob as unknown as Parameters<typeof reserveAndOffer>[0], candidate);
+    assert.ok(retryOffer);
     const acceptances = await Promise.allSettled([
-      acceptDispatchOffer(String(driverId), String(offered._id)),
-      acceptDispatchOffer(String(driverId), String(offered._id)),
+      acceptDispatchOffer(String(driverId), String(timedOutOffer._id)),
+      acceptDispatchOffer(String(driverId), String(timedOutOffer._id)),
     ]);
     assert.ok(acceptances.some((result) => result.status === 'fulfilled'), 'one acceptance should succeed or be safely idempotent');
-    assert.equal(await TripModel.countDocuments({ emergencyRequestId: offered.emergencyRequestId }), 1, 'exactly one trip must be persisted');
+    assert.equal(await TripModel.countDocuments({ emergencyRequestId: timedOutOffer.emergencyRequestId }), 1, 'exactly one trip must be persisted');
     const [savedJob, savedAmbulance, savedDriver] = await Promise.all([
-      DispatchJobModel.findById(offered._id).lean().exec(),
+      DispatchJobModel.findById(timedOutOffer._id).lean().exec(),
       AmbulanceModel.findById(ambulanceId).lean().exec(),
       AmbulanceDriverModel.findById(driverId).lean().exec(),
     ]);
