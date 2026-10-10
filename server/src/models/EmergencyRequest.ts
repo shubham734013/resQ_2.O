@@ -16,9 +16,11 @@ export interface EmergencyStatusHistoryEntry {
 
 export interface EmergencyRequestDocument {
   requestCode: string;
+  idempotencyKey?: string;
   userId: Types.ObjectId;
   hospitalId: Types.ObjectId;
   situationType: string;
+  category?: string;
   reportedAt: Date;
   location?: string;
   latitude?: number;
@@ -30,6 +32,7 @@ export interface EmergencyRequestDocument {
   driverId?: Types.ObjectId;
   patientId?: Types.ObjectId;
   etaMinutes?: number;
+  routeDistanceMeters?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,9 +47,11 @@ const statusHistorySchema = new Schema<EmergencyStatusHistoryEntry>({
 
 const schema = new Schema<EmergencyRequestDocument>({
   requestCode: { type: String, required: true, unique: true, index: true },
+  idempotencyKey: { type: String, required: false, trim: true },
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
   situationType: { type: String, required: true, trim: true },
+  category: { type: String, enum: ['accident_injury', 'severe_bleeding', 'breathing_difficulty', 'chest_pain', 'stroke_symptoms', 'unconscious_person', 'burn', 'other'], required: false },
   reportedAt: { type: Date, required: true, default: Date.now, index: true },
   location: String,
   latitude: Number,
@@ -58,8 +63,10 @@ const schema = new Schema<EmergencyRequestDocument>({
   driverId: { type: Schema.Types.ObjectId, ref: 'AmbulanceDriver', index: true },
   patientId: { type: Schema.Types.ObjectId, ref: 'HospitalPatient', index: true },
   etaMinutes: Number,
+  routeDistanceMeters: Number,
 }, { timestamps: true });
 
+schema.index({ idempotencyKey: 1 }, { unique: true, sparse: true, name: 'emergency_idempotency_key_unique' });
 schema.index({ userId: 1, createdAt: -1 });
 schema.index({ hospitalId: 1, status: 1, reportedAt: -1 });
 schema.index({ hospitalId: 1, reportedAt: -1 });
