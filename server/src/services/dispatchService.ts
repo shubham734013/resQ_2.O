@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { startSession, Types, type QueryFilter } from 'mongoose';
-import { DispatchJobModel, type DispatchJobDocument, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
+import { DispatchJobModel, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
