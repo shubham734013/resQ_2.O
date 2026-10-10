@@ -16,6 +16,7 @@ process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
 process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
 
 const { acceptDispatchOffer, rejectDispatchOffer, processDispatchTick, retryDispatchJob, reserveAndOffer } = await import('./services/dispatchService.js');
+const { cancelUserEmergencyRequest } = await import('./services/emergencyService.js');
 type DispatchCandidate = import('./services/dispatchService.js').DispatchCandidate;
 
 const uri = process.env.DISPATCH_TEST_MONGODB_URI;
@@ -108,6 +109,7 @@ test('concurrent reservations and duplicate acceptances create one active trip',
     await processDispatchTick();
     const timedOutJob = await DispatchJobModel.findById(timedOutOffer._id).lean().exec();
     assert.ok(['EXHAUSTED', 'PENDING'].includes(timedOutJob?.status ?? ''), 'expired offer must be persisted and released before retry');
+    await assert.rejects(() => acceptDispatchOffer(String(driverId), String(timedOutOffer._id)), 'expired offer must not be accepted later');
     assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.dispatchReservationId, undefined);
     assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.dispatchReservationId, undefined);
 
@@ -137,6 +139,23 @@ test('concurrent reservations and duplicate acceptances create one active trip',
     assert.equal(savedDriver?.availabilityStatus, 'BUSY');
     assert.equal(savedAmbulance?.dispatchReservationId, undefined);
     assert.equal(savedDriver?.dispatchReservationId, undefined);
+    await assert.rejects(
+      () => cancelUserEmergencyRequest(String(new Types.ObjectId()), String(timedOutOffer.emergencyRequestId)),
+      'a different user must not cancel this emergency',
+    );
+    const cancelled = await cancelUserEmergencyRequest(String(userId), String(timedOutOffer.emergencyRequestId));
+    assert.equal(cancelled.status, 'CANCELLED');
+    const [cancelledJob, cancelledTrip, releasedAmbulance, releasedDriver] = await Promise.all([
+      DispatchJobModel.findById(timedOutOffer._id).lean().exec(),
+      TripModel.findOne({ emergencyRequestId: timedOutOffer.emergencyRequestId }).lean().exec(),
+      AmbulanceModel.findById(ambulanceId).lean().exec(),
+      AmbulanceDriverModel.findById(driverId).lean().exec(),
+    ]);
+    assert.equal(cancelledJob?.status, 'CANCELLED');
+    assert.equal(cancelledJob?.attempts.find((attempt) => attempt.attemptId === cancelledJob.currentAttemptId)?.status, 'ACCEPTED', 'cancellation must preserve the accepted attempt outcome');
+    assert.equal(cancelledTrip?.status, 'CANCELLED');
+    assert.equal(releasedAmbulance?.currentStatus, 'AVAILABLE');
+    assert.equal(releasedDriver?.availabilityStatus, 'ONLINE');
   } finally {
     await TripModel.deleteMany({ emergencyRequestId: { $in: requestIds } });
     await DispatchJobModel.deleteMany({ _id: { $in: jobIds } });
