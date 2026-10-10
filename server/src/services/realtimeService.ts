@@ -65,12 +65,10 @@ export const broadcastEvent = (channel: string, event: string, data: unknown): v
   const deadIds: string[] = [];
   for (const [id, client] of clients.entries()) {
     // Exact channel match, global wildcard, or operations listening channel
-    const shouldReceive =
-      client.channel === channel ||
-      client.channel === '*' ||
-      client.channel === 'operations' ||
-      (channel.startsWith('hospital:') && client.channel.startsWith('hospital:')) ||
-      (channel.startsWith('emergency:') && client.channel === channel);
+    // Channel authorization is enforced before registration in realtimeRoutes.
+    // Keep delivery exact-match only so one hospital/driver cannot receive
+    // another tenant's events by sharing a channel prefix.
+    const shouldReceive = client.channel === channel || client.channel === 'operations';
 
     if (shouldReceive) {
       try {
