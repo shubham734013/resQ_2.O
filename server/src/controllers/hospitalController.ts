@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../types/auth.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import * as service from '../services/hospitalService.js';
+import * as coordination from '../services/hospitalCoordinationService.js';
 
 const hospitalId = (req: Request): string => {
   const auth = (req as AuthenticatedRequest).auth;
@@ -40,11 +41,11 @@ export const listAmbulancesController = async (req: Request, res: Response): Pro
 export const getAmbulanceController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.getAmbulance(hospitalId(req), id(req)));
 
 export const listCoordinationNotificationsController = async (req: Request, res: Response): Promise<void> =>
-  sendSuccess(res, await service.listHospitalCoordinationNotifications(hospitalId(req), query(res)));
+  sendSuccess(res, await coordination.listHospitalCoordinationNotifications(hospitalId(req), query(res)));
 export const acknowledgeCoordinationNotificationController = async (req: Request, res: Response): Promise<void> => {
   const auth = (req as AuthenticatedRequest).auth;
   if (!auth || auth.role !== 'HOSPITAL') throw new Error('Hospital authentication required');
-  sendSuccess(res, await service.acknowledgeHospitalCoordinationNotification(hospitalId(req), id(req), auth.id));
+  sendSuccess(res, await coordination.acknowledgeHospitalCoordinationNotification(hospitalId(req), id(req), auth.id));
 };
 export const getCoordinationDetailController = async (req: Request, res: Response): Promise<void> =>
-  sendSuccess(res, await service.getHospitalCoordinationDetail(hospitalId(req), id(req)));
+  sendSuccess(res, await coordination.getHospitalCoordinationDetail(hospitalId(req), id(req)));
