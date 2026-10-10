@@ -15,7 +15,7 @@ export interface AmbulanceDocument {
   currentLatitude?: number;
   currentLongitude?: number;
   location?: AmbulanceLocation;
-  locationUpdatedAt?: Date;
+  locationUpdatedAt?: Date;\n  dispatchReservationId?: Types.ObjectId;\n  dispatchReservationExpiresAt?: Date;
   serviceArea?: string;
   verificationStatus: VerificationStatus;
   accountStatus: AccountStatus;
@@ -36,7 +36,7 @@ const schema = new Schema<AmbulanceDocument>({
     type: { type: String, enum: ['Point'], required: false },
     coordinates: { type: [Number], required: false },
   },
-  locationUpdatedAt: Date,
+  locationUpdatedAt: Date,\n  dispatchReservationId: { type: Schema.Types.ObjectId, ref: 'DispatchJob', index: true },\n  dispatchReservationExpiresAt: Date,
   serviceArea: String,
   verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING', index: true },
   accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
