@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Clock,
@@ -14,7 +14,6 @@ import {
   AlertOctagon,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import type { Facility } from '../../types/facility';
 import { emergencyApi } from '../../services/emergencyApi';
 import { Button } from '../common/Button';
@@ -51,7 +50,7 @@ export const CoordinationStatus = ({
 
   const data = request.data;
   const requestSubmitted = Boolean(emergencyRequestId);
-  const ready = Boolean(data) || (requestSubmitted && !request.isError);
+  const ready = Boolean(data) || requestSubmitted;
   const isCancellable =
     ready &&
     data?.status &&
@@ -155,6 +154,12 @@ export const CoordinationStatus = ({
           <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 flex items-start gap-2 text-xs text-rose-800">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+        {request.isError && requestSubmitted && (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+            The request ID is retained, but its latest status could not be loaded. Your request has not been cancelled.
+            <button type="button" onClick={() => void request.refetch()} className="ml-2 font-semibold underline">Retry status</button>
           </div>
         )}
 
