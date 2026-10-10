@@ -30,7 +30,7 @@ const assertId = (value: string, name: string) => {
 
 const dispatchSummary = async (requestId: Types.ObjectId | string) => {
   const job = await DispatchJobModel.findOne({ emergencyRequestId: requestId }).select('status attempts deadlineAt exhaustedAt escalatedAt escalationReason currentDriverId').lean().exec();
-  if (!job) return { status: 'PENDING' as const, attemptCount: 0, message: 'Dispatch job is being recovered by the worker.' };
+  if (!job) return null;
   return {
     status: job.status,
     attemptCount: job.attempts.length,
@@ -353,8 +353,9 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   const persisted = linked as EmergencyRecord | null;
   if (!persisted) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
   const out = output(persisted);
-  broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', out);
-  broadcastEvent('operations', 'emergency:created', out);
+  const queueRefresh = { event: 'QUEUE_REFRESH', requestStatus: out.status, timestamp: new Date().toISOString() };
+  broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', queueRefresh);
+  broadcastEvent('operations', 'emergency:created', { event: 'QUEUE_REFRESH', timestamp: queueRefresh.timestamp });
   return { ...out, dispatch: await dispatchSummary(persisted._id) };
 };
 
@@ -506,9 +507,10 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
   const persistedCancellation = updatedRequest as EmergencyRecord | null;
   if (!persistedCancellation) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
   const out = { ...output(persistedCancellation), dispatch: await dispatchSummary(persistedCancellation._id) };
-  broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', out);
-  broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', out);
-  broadcastEvent('operations', 'emergency:cancelled', out);
+  const statusRefresh = { event: 'STATUS_REFRESH', status: out.status, timestamp: new Date().toISOString() };
+  broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', statusRefresh);
+  broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', statusRefresh);
+  broadcastEvent('operations', 'emergency:cancelled', { event: 'QUEUE_REFRESH', timestamp: statusRefresh.timestamp });
   return out;
 };
 
