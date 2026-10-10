@@ -85,7 +85,7 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
   const ambulanceId = trip?.ambulanceId;
   let effectiveType = type;
   if (type === 'AMBULANCE_ASSIGNED' && ambulanceId && trip) {
-    const assignmentTypes = ['AMBULANCE_ASSIGNED', 'AMBULANCE_REASSIGNED'];
+    const assignmentTypes: HospitalCoordinationNotificationType[] = ['AMBULANCE_ASSIGNED', 'AMBULANCE_REASSIGNED'];
     const currentTripAssignment = await HospitalCoordinationNotificationModel.findOne({
       hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId, tripId: trip._id, ambulanceId,
       type: { $in: assignmentTypes },
