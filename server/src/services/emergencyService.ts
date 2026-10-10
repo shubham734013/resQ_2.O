@@ -4,6 +4,8 @@ import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { TripModel } from '../models/Trip.js';
+import { DispatchJobModel } from '../models/DispatchJob.js';
+import { cancelDispatchForEmergencyInSession } from './dispatchService.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { broadcastEvent } from './realtimeService.js';
@@ -26,6 +28,21 @@ const assertId = (value: string, name: string) => {
   return new Types.ObjectId(value);
 };
 
+const dispatchSummary = async (requestId: Types.ObjectId | string) => {
+  const job = await DispatchJobModel.findOne({ emergencyRequestId: requestId }).select('status attempts deadlineAt exhaustedAt escalatedAt escalationReason currentDriverId').lean().exec();
+  if (!job) return null;
+  return {
+    status: job.status,
+    attemptCount: job.attempts.length,
+    deadlineAt: job.deadlineAt,
+    exhaustedAt: job.exhaustedAt,
+    escalatedAt: job.escalatedAt,
+    escalationReason: job.escalationReason,
+    ...(job.status === 'EXHAUSTED' || job.status === 'ESCALATED'
+      ? { message: 'No eligible driver is currently available. Call 112 if this is urgent.' , emergencyCallNumber: '112' }
+      : {}),
+  };
+};
 const output = (request: EmergencyRecord) => ({
   id: String(request._id),
   requestCode: request.requestCode,
@@ -222,7 +239,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
         existing.latitude !== input.latitude || existing.longitude !== input.longitude) {
       throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
     }
-    return output(existing as EmergencyRecord);
+    return { ...output(existing as EmergencyRecord), dispatch: await dispatchSummary(existing._id) };
   }
 
   const hospital = await HospitalModel.findOne({
@@ -282,10 +299,38 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
       if (!patient) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
       const updated = await EmergencyRequestModel.findOneAndUpdate(
         { _id: request._id, status: 'RECEIVED', patientId: { $exists: false } },
-        { $set: { patientId: patient._id } },
+        {
+          $set: { patientId: patient._id, status: 'AMBULANCE_COORDINATION' },
+          $push: {
+            statusHistory: {
+              status: 'AMBULANCE_COORDINATION',
+              changedAt: now,
+              previousStatus: 'RECEIVED',
+              actorRole: 'SYSTEM',
+            },
+          },
+        },
         { new: true, runValidators: true, session },
       ).lean().exec();
       if (!updated) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
+      await DispatchJobModel.findOneAndUpdate(
+        { emergencyRequestId: request._id },
+        {
+          $setOnInsert: {
+            emergencyRequestId: request._id,
+            hospitalId,
+            userId: userObjectId,
+            category: requestedCategory,
+            pickupLatitude: input.latitude,
+            pickupLongitude: input.longitude,
+            status: 'PENDING',
+            generation: 1,
+            attempts: [],
+            events: [{ event: 'DISPATCH_JOB_CREATED', at: now, actorRole: 'SYSTEM' }],
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true, session },
+      ).exec();
       linked = updated as unknown as EmergencyRecord;
     });
   } catch (error) {
@@ -297,7 +342,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
             duplicate.latitude !== input.latitude || duplicate.longitude !== input.longitude) {
           throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
         }
-        return output(duplicate as EmergencyRecord);
+        return { ...output(duplicate as EmergencyRecord), dispatch: await dispatchSummary(duplicate._id) };
       }
     }
     throw error;
@@ -305,11 +350,13 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
     await session.endSession();
   }
 
-  if (!linked) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
-  const out = output(linked);
-  broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', out);
-  broadcastEvent('operations', 'emergency:created', out);
-  return out;
+  const persisted = linked as EmergencyRecord | null;
+  if (!persisted) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
+  const out = output(persisted);
+  const queueRefresh = { event: 'QUEUE_REFRESH', requestStatus: out.status, timestamp: new Date().toISOString() };
+  broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', queueRefresh);
+  broadcastEvent('operations', 'emergency:created', { event: 'QUEUE_REFRESH', timestamp: queueRefresh.timestamp });
+  return { ...out, dispatch: await dispatchSummary(persisted._id) };
 };
 
 const cryptoSafeCode = () => randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
@@ -338,7 +385,7 @@ export const listUserEmergencyRequests = async (
   ]);
 
   return {
-    items: items.map(output),
+    items: await Promise.all(items.map(async (item) => ({ ...output(item), dispatch: await dispatchSummary(item._id) }))),
     pagination: { page: query.page, limit: query.limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / query.limit) },
   };
 };
@@ -348,7 +395,7 @@ export const getUserEmergencyRequest = async (userId: string, emergencyId: strin
   const requestId = assertId(emergencyId, 'emergency');
   const request = await EmergencyRequestModel.findOne({ _id: requestId, userId: userObjectId }).lean().exec();
   if (!request) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
-  return output(request);
+  return { ...output(request), dispatch: await dispatchSummary(request._id) };
 };
 
 export const cancelUserEmergencyRequest = async (userId: string, emergencyId: string) => {
@@ -450,17 +497,20 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
       ).lean().exec();
       if (!patient) throw new AppError('PATIENT_CASE_CONFLICT', 'Hospital patient case could not be cancelled safely', 409);
 
+      await cancelDispatchForEmergencyInSession(requestId, userObjectId, session);
       updatedRequest = updated;
     });
   } finally {
     await session.endSession();
   }
 
-  if (!updatedRequest) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
-  const out = output(updatedRequest);
-  broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', out);
-  broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', out);
-  broadcastEvent('operations', 'emergency:cancelled', out);
+  const persistedCancellation = updatedRequest as EmergencyRecord | null;
+  if (!persistedCancellation) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
+  const out = { ...output(persistedCancellation), dispatch: await dispatchSummary(persistedCancellation._id) };
+  const statusRefresh = { event: 'STATUS_REFRESH', status: out.status, timestamp: new Date().toISOString() };
+  broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', statusRefresh);
+  broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', statusRefresh);
+  broadcastEvent('operations', 'emergency:cancelled', { event: 'QUEUE_REFRESH', timestamp: statusRefresh.timestamp });
   return out;
 };
 

@@ -4,6 +4,7 @@ import { AmbulanceProviderModel, type AmbulanceProviderDocument } from '../model
 import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel, type EmergencyRequestDocument } from '../models/EmergencyRequest.js';
+import { DispatchJobModel } from '../models/DispatchJob.js';
 import { TripModel, type TripDocument } from '../models/Trip.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { HospitalModel } from '../models/Hospital.js';
@@ -67,8 +68,8 @@ export const listDrivers=async(pid:string,q:DriverQuery)=>{await operationalProv
 export const getDriver=async(pid:string,id:string)=>{await operationalProvider(pid);const x=await AmbulanceDriverModel.findOne({_id:oid(id,'driver'),providerId:oid(pid,'provider')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
 export const createDriver=async(pid:string,input:z.infer<typeof S.driverCreateSchema>)=>{await operationalProvider(pid);if(await AmbulanceDriverModel.exists({$or:[{email:input.email.toLowerCase()},{licenseNumber:input.licenseNumber}]}))throw new AppError('DRIVER_ALREADY_EXISTS','Driver email or license number already exists',409);const passwordHash=await bcrypt.hash(input.password,12);const x=await AmbulanceDriverModel.create({...input,email:input.email.toLowerCase(),passwordHash,providerId:oid(pid,'provider'),licenseVerificationStatus:'PENDING',accountStatus:'PENDING',availabilityStatus:'OFFLINE'});return driverOut(x.toObject());};
 export const updateDriver=async(pid:string,id:string,input:z.infer<typeof S.driverUpdateSchema>)=>{await operationalProvider(pid);const {password,...profileUpdate}=input;const update:Partial<AmbulanceDriverDocument>={...profileUpdate};if(password)update.passwordHash=await bcrypt.hash(password,12);const x=await AmbulanceDriverModel.findOneAndUpdate({_id:oid(id,'driver'),providerId:oid(pid,'provider')},{$set:update},{new:true,runValidators:true}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
-export const assignDriver=async(pid:string,aid:string,did:string)=>{await operationalProvider(pid);const p=oid(pid,'provider'),aId=oid(aid,'ambulance'),dId=oid(did,'driver');const [a,d]=await Promise.all([AmbulanceModel.findOne({_id:aId,providerId:p}).exec(),AmbulanceDriverModel.findOne({_id:dId,providerId:p}).exec()]);if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);if(!d)throw new AppError('NOT_FOUND','Driver not found',404);active(d.accountStatus);verified(d.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');if(d.assignedAmbulanceId&&String(d.assignedAmbulanceId)!==String(aId))throw new AppError('DRIVER_ALREADY_ASSIGNED','Driver is assigned to another ambulance',409);const current=await AmbulanceDriverModel.findOne({assignedAmbulanceId:aId,_id:{$ne:dId}}).exec();if(current)throw new AppError('AMBULANCE_ALREADY_ASSIGNED','Ambulance already has a driver',409);d.assignedAmbulanceId=aId;await d.save();return driverOut(d.toObject());};
-export const unassignDriver=async(pid:string,aid:string)=>{await operationalProvider(pid);const p=oid(pid,'provider');const a=await AmbulanceModel.findOne({_id:oid(aid,'ambulance'),providerId:p}).exec();if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);const d=await AmbulanceDriverModel.findOne({assignedAmbulanceId:a._id,providerId:p}).exec();if(!d)return {unassigned:true};d.assignedAmbulanceId=undefined;d.availabilityStatus='OFFLINE';await d.save();return {unassigned:true};};
+export const assignDriver=async(pid:string,aid:string,did:string)=>{await operationalProvider(pid);const p=oid(pid,'provider'),aId=oid(aid,'ambulance'),dId=oid(did,'driver');const [a,d]=await Promise.all([AmbulanceModel.findOne({_id:aId,providerId:p}).exec(),AmbulanceDriverModel.findOne({_id:dId,providerId:p}).exec()]);if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);if(!d)throw new AppError('NOT_FOUND','Driver not found',404);const now=new Date();if((a.dispatchReservationId&&a.dispatchReservationExpiresAt&&a.dispatchReservationExpiresAt>now)||(d.dispatchReservationId&&d.dispatchReservationExpiresAt&&d.dispatchReservationExpiresAt>now))throw new AppError('DISPATCH_RESERVATION_ACTIVE','Driver or ambulance is reserved for an active dispatch offer',409);active(d.accountStatus);verified(d.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');if(d.assignedAmbulanceId&&String(d.assignedAmbulanceId)!==String(aId))throw new AppError('DRIVER_ALREADY_ASSIGNED','Driver is assigned to another ambulance',409);const current=await AmbulanceDriverModel.findOne({assignedAmbulanceId:aId,_id:{$ne:dId}}).exec();if(current)throw new AppError('AMBULANCE_ALREADY_ASSIGNED','Ambulance already has a driver',409);d.assignedAmbulanceId=aId;await d.save();return driverOut(d.toObject());};
+export const unassignDriver=async(pid:string,aid:string)=>{await operationalProvider(pid);const p=oid(pid,'provider');const a=await AmbulanceModel.findOne({_id:oid(aid,'ambulance'),providerId:p}).exec();if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);const d=await AmbulanceDriverModel.findOne({assignedAmbulanceId:a._id,providerId:p}).exec();if(!d)return {unassigned:true};const now=new Date();if((a.dispatchReservationId&&a.dispatchReservationExpiresAt&&a.dispatchReservationExpiresAt>now)||(d.dispatchReservationId&&d.dispatchReservationExpiresAt&&d.dispatchReservationExpiresAt>now))throw new AppError('DISPATCH_RESERVATION_ACTIVE','Driver or ambulance is reserved for an active dispatch offer',409);d.assignedAmbulanceId=undefined;d.availabilityStatus='OFFLINE';await d.save();return {unassigned:true};};
 const requestFilter=(pid:string,q:RequestQuery)=>{const p=oid(pid,'provider');const f:QueryFilter<EmergencyRequestDocument>={status:'AMBULANCE_COORDINATION',$or:[{ambulanceProviderId:p},{ambulanceProviderId:{$exists:false}}]};if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.driver)f.driverId=oid(q.driver,'driver');if(q.status&&q.status!=='AMBULANCE_COORDINATION')f.status=q.status;if(q.search)f.$and=[{$or:[{requestCode:new RegExp(escape(q.search),'i')},{situationType:new RegExp(escape(q.search),'i')}]}];if(q.from||q.to)f.reportedAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};return f;};
 export const listProviderRequests = async (pid: string, q: RequestQuery) => {
   await operationalProvider(pid);
@@ -92,8 +93,9 @@ export const getProviderRequest = async (pid: string, id: string) => {
 };
 export const assignRequest = async (pid: string, rid: string, aid: string) => {
   await operationalProvider(pid);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(rid, 'request') })) throw new AppError('DISPATCH_ENGINE_MANAGED', 'This request is controlled by the automatic dispatch engine. Use dispatch job operations instead of legacy direct assignment.', 409);
   const p = oid(pid, 'provider'), aId = oid(aid, 'ambulance');
-  const a = await AmbulanceModel.findOne({ _id: aId, providerId: p, currentStatus: 'AVAILABLE', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE' }).exec();
+  const a = await AmbulanceModel.findOne({ _id: aId, providerId: p, currentStatus: 'AVAILABLE', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationId: null }, { dispatchReservationExpiresAt: { $lte: new Date() } }] }).exec();
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Ambulance is unavailable or not verified', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(rid, 'request'), status: 'AMBULANCE_COORDINATION', ambulanceId: { $exists: false }, $or: [{ ambulanceProviderId: { $exists: false } }, { ambulanceProviderId: p }] }, { $set: { ambulanceProviderId: p, ambulanceId: aId } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is already assigned', 409);
@@ -125,6 +127,8 @@ export const getDriverRequest = async (did: string, id: string) => {
 };
 export const acceptRequest = async (did: string, id: string) => {
   const d = await operationalDriver(did);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(id, 'request') })) throw new AppError('DISPATCH_OFFER_REQUIRED', 'This request must be accepted through its authenticated, unexpired dispatch offer.', 409);
+  if (d.dispatchReservationId && d.dispatchReservationExpiresAt && d.dispatchReservationExpiresAt > new Date()) throw new AppError('DISPATCH_RESERVATION_ACTIVE', 'Driver is reserved for an active dispatch offer.', 409);
   if (d.availabilityStatus === 'OFFLINE' || !d.assignedAmbulanceId) throw new AppError('DRIVER_UNAVAILABLE', 'Driver is offline or has no assigned ambulance', 409);
   const a = await AmbulanceModel.findOne({ _id: d.assignedAmbulanceId, providerId: d.providerId, currentStatus: 'BUSY', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE' }).exec();
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Assigned ambulance is not operational', 409);
@@ -142,6 +146,7 @@ export const acceptRequest = async (did: string, id: string) => {
 };
 export const rejectRequest = async (did: string, id: string) => {
   const d = await operationalDriver(did);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(id, 'request') })) throw new AppError('DISPATCH_OFFER_REQUIRED', 'This request must be rejected through its authenticated dispatch offer.', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(id, 'request'), status: 'AMBULANCE_COORDINATION', driverId: { $exists: false }, ambulanceId: d.assignedAmbulanceId }, { $unset: { ambulanceId: 1, ambulanceProviderId: 1 } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is no longer available', 409);
   const a = d.assignedAmbulanceId ? await AmbulanceModel.findOne({ _id: d.assignedAmbulanceId, providerId: d.providerId }).exec() : null;
@@ -229,7 +234,7 @@ export const updateDriverLocation=async(did:string,input:z.infer<typeof S.ambula
   if(d.availabilityStatus==='OFFLINE') throw new AppError('DRIVER_OFFLINE','Location updates are allowed only while the driver is on duty',409);
   const a=await AmbulanceModel.findOneAndUpdate(
     {_id:d.assignedAmbulanceId,providerId:d.providerId,verificationStatus:'VERIFIED',accountStatus:'ACTIVE'},
-    {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:input.timestamp}},
+    {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:new Date()}},
     {new:true}
   ).lean().exec();
   if(!a) throw new AppError('AMBULANCE_UNAVAILABLE','Assigned ambulance is not operational',409);
