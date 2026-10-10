@@ -65,12 +65,7 @@ export const broadcastEvent = (channel: string, event: string, data: unknown): v
   const deadIds: string[] = [];
   for (const [id, client] of clients.entries()) {
     // Exact channel match, global wildcard, or operations listening channel
-    const shouldReceive =
-      client.channel === channel ||
-      client.channel === '*' ||
-      client.channel === 'operations' ||
-      (channel.startsWith('hospital:') && client.channel.startsWith('hospital:')) ||
-      (channel.startsWith('emergency:') && client.channel === channel);
+    const shouldReceive = client.channel === channel || client.channel === '*' || client.channel === 'operations';
 
     if (shouldReceive) {
       try {
