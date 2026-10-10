@@ -417,8 +417,6 @@ const expireOrReleaseOffer = async (job: DispatchJobLean, reason: string, outcom
   } finally {
     await session.endSession();
   }
-  if (updated) {
-  }
 };
 
 const candidateStillEligible = async (job: DispatchJobLean, attempt: DispatchAttemptDocument) => {
