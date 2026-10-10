@@ -565,9 +565,11 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
   if (!jobBefore) throw new AppError('DISPATCH_NOT_FOUND', 'Dispatch job not found', 404);
   if (jobBefore.status === 'ACCEPTED' && jobBefore.currentDriverId && String(jobBefore.currentDriverId) === String(did) && jobBefore.acceptedTripId) {
     const existing = await TripModel.findById(jobBefore.acceptedTripId).lean().exec();
-    try { await recordHospitalCoordinationEvent({ emergencyId: String(existing.emergencyRequestId), tripId: String(existing._id), type: 'AMBULANCE_ASSIGNED' }); }
-    catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
-    if (existing) return { dispatchJobId: String(jid), tripId: String(existing._id), emergencyRequestId: String(existing.emergencyRequestId), status: 'ACCEPTED' as const, duplicate: true };
+    if (existing) {
+      try { await recordHospitalCoordinationEvent({ emergencyId: String(existing.emergencyRequestId), tripId: String(existing._id), type: 'AMBULANCE_ASSIGNED' }); }
+      catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
+      return { dispatchJobId: String(jid), tripId: String(existing._id), emergencyRequestId: String(existing.emergencyRequestId), status: 'ACCEPTED' as const, duplicate: true };
+    }
   }
   if (!isDispatchOfferAcceptable(jobBefore.status, jobBefore.deadlineAt, now) || String(jobBefore.currentDriverId) !== String(did) || !jobBefore.currentAttemptId) {
     throw new AppError('DISPATCH_OFFER_NOT_ACTIVE', 'This offer is no longer active for this driver', 409);
