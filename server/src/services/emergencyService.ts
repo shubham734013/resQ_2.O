@@ -4,6 +4,8 @@ import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { TripModel } from '../models/Trip.js';
+import { DispatchJobModel } from '../models/DispatchJob.js';
+import { cancelDispatchForEmergencyInSession } from './dispatchService.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { broadcastEvent } from './realtimeService.js';
@@ -282,10 +284,38 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
       if (!patient) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
       const updated = await EmergencyRequestModel.findOneAndUpdate(
         { _id: request._id, status: 'RECEIVED', patientId: { $exists: false } },
-        { $set: { patientId: patient._id } },
+        {
+          $set: { patientId: patient._id, status: 'AMBULANCE_COORDINATION' },
+          $push: {
+            statusHistory: {
+              status: 'AMBULANCE_COORDINATION',
+              changedAt: now,
+              previousStatus: 'RECEIVED',
+              actorRole: 'SYSTEM',
+            },
+          },
+        },
         { new: true, runValidators: true, session },
       ).lean().exec();
       if (!updated) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
+      await DispatchJobModel.findOneAndUpdate(
+        { emergencyRequestId: request._id },
+        {
+          $setOnInsert: {
+            emergencyRequestId: request._id,
+            hospitalId,
+            userId: userObjectId,
+            category: requestedCategory,
+            pickupLatitude: input.latitude,
+            pickupLongitude: input.longitude,
+            status: 'PENDING',
+            generation: 1,
+            attempts: [],
+            events: [{ event: 'DISPATCH_JOB_CREATED', at: now, actorRole: 'SYSTEM' }],
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true, session },
+      ).exec();
       linked = updated as unknown as EmergencyRecord;
     });
   } catch (error) {
@@ -450,6 +480,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
       ).lean().exec();
       if (!patient) throw new AppError('PATIENT_CASE_CONFLICT', 'Hospital patient case could not be cancelled safely', 409);
 
+      await cancelDispatchForEmergencyInSession(requestId, userObjectId, session);
       updatedRequest = updated;
     });
   } finally {
