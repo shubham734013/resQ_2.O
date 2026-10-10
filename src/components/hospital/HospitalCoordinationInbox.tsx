@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, ChevronDown, ChevronUp, CircleAlert, RefreshCw, Wifi, WifiOff } from 'lucide-react';
-import { Button } from './common/Button';
-import { StatusBadge } from './common/StatusBadge';
-import { LiveAmbulanceTracking } from './LiveAmbulanceTracking';
+import { Button } from '../common/Button';
+import { StatusBadge } from '../common/StatusBadge';
+import { LiveAmbulanceTracking } from '../LiveAmbulanceTracking';
 import {
   hospitalKeys, useAcknowledgeHospitalCoordinationNotification, useHospitalCoordinationDetail,
   useHospitalCoordinationNotifications, useHospitalEmergencyStatusMutation, useHospitalProfile,
-} from '../hooks/useHospitalManagement';
-import type { HospitalCoordinationNotification, HospitalEmergencyStatus } from '../types/hospitalManagement';
-import { createTrackingSocket, subscribeTrackingRoom, type TrackingEnvelope } from '../services/trackingSocket';
+} from '../../hooks/useHospitalManagement';
+import type { HospitalCoordinationNotification, HospitalEmergencyStatus } from '../../types/hospitalManagement';
+import { createTrackingSocket, subscribeTrackingRoom, type TrackingEnvelope } from '../../services/trackingSocket';
 
 const label = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
