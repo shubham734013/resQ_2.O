@@ -19,12 +19,15 @@ const validRequest = {
   longitude: 75.7873,
 };
 
-test('SOS creation requires a known emergency category and valid confirmed coordinates', () => {
+test('SOS creation validates category when supplied and requires valid confirmed coordinates', () => {
   assert.equal(createEmergencyRequestSchema.safeParse(validRequest).success, true);
   assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, latitude: 91 }).success, false);
   assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, longitude: -181 }).success, false);
   assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, latitude: undefined }).success, false);
-  assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, situationType: 'made up category' }).success, false);
+  assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, situationType: 'A' }).success, false);
+  assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, category: 'not-a-category' }).success, false);
+  assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, category: 'stroke_symptoms' }).success, false);
+  assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, category: 'chest_pain' }).success, true);
   assert.equal(createEmergencyRequestSchema.safeParse({ ...validRequest, hospitalId: 'bad-id' }).success, false);
 });
 
