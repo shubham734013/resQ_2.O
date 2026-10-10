@@ -7,6 +7,7 @@ import type { AuthenticatedIdentity } from '../types/auth.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { AppError } from '../utils/AppError.js';
+import { canAccessTrackingSnapshot } from './trackingService.js';
 
 type RoomRequest = { type: 'emergency' | 'trip' | 'hospital-operations'; id: string };
 type Envelope = { channel: string; event: string; data: unknown; timestamp: string };
@@ -29,25 +30,14 @@ const canAccessTrip = async (identity: AuthenticatedIdentity, tripId: Types.Obje
   if (identity.role === 'ADMIN') return true;
   const trip = await TripModel.findById(tripId).select('driverId providerId destinationHospitalId emergencyRequestId').lean().exec();
   if (!trip) return false;
-  if (identity.role === 'AMBULANCE_DRIVER') return Boolean(trip.driverId && String(trip.driverId) === identity.id);
-  if (identity.role === 'AMBULANCE_PROVIDER') return String(trip.providerId) === identity.id;
-  if (identity.role === 'HOSPITAL') return String(trip.destinationHospitalId) === identity.id;
-  if (identity.role === 'USER') {
-    const emergency = await EmergencyRequestModel.findById(trip.emergencyRequestId).select('userId').lean().exec();
-    return Boolean(emergency && String(emergency.userId) === identity.id);
-  }
-  return false;
+  const emergency = await EmergencyRequestModel.findById(trip.emergencyRequestId).select('userId hospitalId ambulanceProviderId').lean().exec();
+  return Boolean(emergency && canAccessTrackingSnapshot(identity, emergency, trip));
 };
 const canAccessEmergency = async (identity: AuthenticatedIdentity, id: Types.ObjectId): Promise<boolean> => {
-  if (identity.role === 'ADMIN') return true;
   const emergency = await EmergencyRequestModel.findById(id).select('userId hospitalId ambulanceProviderId').lean().exec();
   if (!emergency) return false;
-  if (identity.role === 'USER') return String(emergency.userId) === identity.id;
-  if (identity.role === 'HOSPITAL') return String(emergency.hospitalId) === identity.id;
   const trip = await TripModel.findOne({ emergencyRequestId: id }).select('driverId providerId').lean().exec();
-  if (identity.role === 'AMBULANCE_DRIVER') return Boolean(trip?.driverId && String(trip.driverId) === identity.id);
-  if (identity.role === 'AMBULANCE_PROVIDER') return Boolean((trip?.providerId && String(trip.providerId) === identity.id) || (emergency.ambulanceProviderId && String(emergency.ambulanceProviderId) === identity.id));
-  return false;
+  return canAccessTrackingSnapshot(identity, emergency, trip);
 };
 const authorized = async (identity: AuthenticatedIdentity, request: RoomRequest): Promise<boolean> => {
   if (!validId(request.id)) return false;
