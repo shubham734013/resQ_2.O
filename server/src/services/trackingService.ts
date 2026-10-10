@@ -22,7 +22,7 @@ const coordinates = (place: { latitude?: number; longitude?: number; location?: 
   const longitude = typeof place.longitude === 'number' ? place.longitude : place.location?.coordinates?.[0];
   return typeof latitude === 'number' && typeof longitude === 'number' ? { latitude, longitude } : null;
 };
-const authorized = (identity: AuthenticatedIdentity, emergency: { _id: Types.ObjectId; userId: Types.ObjectId; hospitalId: Types.ObjectId; ambulanceProviderId?: Types.ObjectId }, trip: { driverId?: Types.ObjectId; providerId: Types.ObjectId } | null) => {
+export const canAccessTrackingSnapshot = (identity: AuthenticatedIdentity, emergency: { _id: Types.ObjectId; userId: Types.ObjectId; hospitalId: Types.ObjectId; ambulanceProviderId?: Types.ObjectId }, trip: { driverId?: Types.ObjectId; providerId: Types.ObjectId } | null): boolean => {
   if (identity.role === 'ADMIN') return true;
   if (identity.role === 'USER') return String(emergency.userId) === identity.id;
   if (identity.role === 'HOSPITAL') return String(emergency.hospitalId) === identity.id;
@@ -30,12 +30,20 @@ const authorized = (identity: AuthenticatedIdentity, emergency: { _id: Types.Obj
   if (identity.role === 'AMBULANCE_PROVIDER') return Boolean((trip && String(trip.providerId) === identity.id) || (emergency.ambulanceProviderId && String(emergency.ambulanceProviderId) === identity.id));
   return false;
 };
+export const trackingLocationIsFresh = (updatedAt: Date | string | null | undefined, now = new Date()): boolean => {
+  if (!updatedAt) return false;
+  const timestamp = new Date(updatedAt).getTime();
+  const age = now.getTime() - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age <= env.DRIVER_LOCATION_STALE_AFTER_MS;
+};
+export const routeTargetForTripStatus = (status: string): 'PICKUP' | 'HOSPITAL' =>
+  ['PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'].includes(status) ? 'HOSPITAL' : 'PICKUP';
 
 export const getEmergencyTrackingSnapshot = async (identity: AuthenticatedIdentity, emergencyId: string) => {
   const emergency = await EmergencyRequestModel.findById(idOf(emergencyId, 'emergency')).lean().exec();
   if (!emergency) throw new AppError('NOT_FOUND', 'Emergency request not found.', 404);
   const trip = await TripModel.findOne({ emergencyRequestId: emergency._id }).sort({ createdAt: -1 }).lean().exec();
-  if (!authorized(identity, emergency, trip)) throw new AppError('TRACKING_FORBIDDEN', 'You are not authorized to view this emergency tracking session.', 403);
+  if (!canAccessTrackingSnapshot(identity, emergency, trip)) throw new AppError('TRACKING_FORBIDDEN', 'You are not authorized to view this emergency tracking session.', 403);
 
   const hospitalDoc = await HospitalModel.findById(emergency.hospitalId).select('name address city state latitude longitude location phone').lean().exec();
   const hospitalCoordinates = coordinates(hospitalDoc);
@@ -53,7 +61,7 @@ export const getEmergencyTrackingSnapshot = async (identity: AuthenticatedIdenti
       const hasCoords = typeof vehicle.currentLatitude === 'number' && typeof vehicle.currentLongitude === 'number';
       const updatedAt = vehicle.locationUpdatedAt ? new Date(vehicle.locationUpdatedAt) : null;
       const ageMs = updatedAt ? Date.now() - updatedAt.getTime() : Number.POSITIVE_INFINITY;
-      const fresh = ageMs >= 0 && ageMs <= env.DRIVER_LOCATION_STALE_AFTER_MS;
+      const fresh = trackingLocationIsFresh(updatedAt);
       location = {
         latitude: hasCoords ? vehicle.currentLatitude : null,
         longitude: hasCoords ? vehicle.currentLongitude : null,
@@ -77,7 +85,7 @@ export const getEmergencyTrackingSnapshot = async (identity: AuthenticatedIdenti
     ambulance: accepted ? ambulance : null,
     location: accepted ? location : null,
     trackingActive: Boolean(trackingActive && accepted),
-    routeTarget: trip && ['PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'].includes(trip.status) ? 'HOSPITAL' : 'PICKUP',
+    routeTarget: trip ? routeTargetForTripStatus(trip.status) : 'PICKUP',
     serverTime: new Date().toISOString(),
   };
 };
