@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Types } from 'mongoose';
 import type { AuthenticatedIdentity } from './types/auth.js';
-import { canAccessTrackingSnapshot, routeTargetForTripStatus, trackingLocationIsFresh } from './services/trackingService.js';
+process.env.NODE_ENV ??= 'test';
+process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
+process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
+process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough';
+process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
+process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
+const { canAccessTrackingSnapshot, routeTargetForTripStatus, trackingLocationIsFresh } = await import('./services/trackingService.js');
 
 const identity = (id: string, role: AuthenticatedIdentity['role']): AuthenticatedIdentity => ({
   id, email: role.toLowerCase() + '@example.test', role, accountStatus: 'ACTIVE',
