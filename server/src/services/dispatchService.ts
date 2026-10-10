@@ -12,6 +12,18 @@ import { calculateGoogleRoutes } from './mapsService.js';
 import { broadcastEvent } from './realtimeService.js';
 import { AppError } from '../utils/AppError.js';
 
+export const DISPATCH_ALLOWED_TRANSITIONS = {
+  PENDING: ['SEARCHING', 'CANCELLED'],
+  SEARCHING: ['OFFERED', 'EXHAUSTED', 'PENDING', 'CANCELLED'],
+  OFFERED: ['PENDING', 'ACCEPTED', 'CANCELLED'],
+  ACCEPTED: ['CANCELLED'],
+  EXHAUSTED: ['PENDING', 'ESCALATED', 'CANCELLED'],
+  CANCELLED: [],
+  ESCALATED: ['PENDING', 'CANCELLED'],
+} as const;
+export const isAllowedDispatchTransition = (from: keyof typeof DISPATCH_ALLOWED_TRANSITIONS, to: string) =>
+  (DISPATCH_ALLOWED_TRANSITIONS[from] as readonly string[]).includes(to);
+
 export const DISPATCH_OFFER_TIMEOUT_MS = 25_000;
 export const DISPATCH_LOCATION_FRESHNESS_MS = 90_000;
 export const DISPATCH_SEARCH_RADIUS_METERS = 100_000;
@@ -22,7 +34,7 @@ const DRIVER_LOCATION_MAX_FUTURE_SKEW_MS = 5_000;
 
 type Coordinates = { latitude: number; longitude: number };
 type RouteRank = { source: 'DRIVING' | 'STRAIGHT_LINE_FALLBACK'; distanceMeters: number; etaSeconds?: number };
-type Candidate = {
+export type DispatchCandidate = {
   providerId: Types.ObjectId;
   ambulanceId: Types.ObjectId;
   driverId: Types.ObjectId;
@@ -70,7 +82,7 @@ const routeRank = async (origin: Coordinates, destination: Coordinates, straight
   }
   return { source: 'STRAIGHT_LINE_FALLBACK', distanceMeters: Math.round(straightLineMeters) };
 };
-export const rankDispatchCandidates = (candidates: Candidate[]) => [...candidates].sort((a, b) => {
+export const rankDispatchCandidates = (candidates: DispatchCandidate[]) => [...candidates].sort((a, b) => {
   if (a.route.source !== b.route.source) return a.route.source === 'DRIVING' ? -1 : 1;
   if (a.route.source === 'DRIVING' && b.route.source === 'DRIVING') return (a.route.etaSeconds ?? Number.MAX_SAFE_INTEGER) - (b.route.etaSeconds ?? Number.MAX_SAFE_INTEGER);
   return a.straightLineMeters - b.straightLineMeters;
@@ -98,7 +110,7 @@ const releaseReservationInSession = async (jobId: Types.ObjectId, ambulanceId?: 
   }
 };
 
-const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types.ObjectId): Promise<Candidate[]> => {
+const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types.ObjectId): Promise<DispatchCandidate[]> => {
   const now = new Date();
   const providerIds = (await AmbulanceProviderModel.find({ accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).select('_id').lean().exec()).map((provider) => provider._id);
   if (!providerIds.length) return [];
@@ -143,7 +155,7 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
   }
   const attemptedDrivers = new Set(job.attempts.filter((attempt) => attempt.generation === job.generation).map((attempt) => String(attempt.driverId)));
   const pickup = { latitude: job.pickupLatitude, longitude: job.pickupLongitude };
-  const pool: Candidate[] = [];
+  const pool: DispatchCandidate[] = [];
   for (const ambulance of ambulances) {
     const driver = driversByAmbulance.get(String(ambulance._id));
     if (!driver || busyAmbulanceIds.has(String(ambulance._id)) || busyDriverIds.has(String(driver._id))) continue;
@@ -217,7 +229,7 @@ const notifyOffer = async (job: DispatchJobLean, attempt: DispatchAttemptDocumen
   });
 };
 
-const reserveAndOffer = async (job: DispatchJobLean, candidate: Candidate, actor?: { id: Types.ObjectId; role: 'ADMIN' }) => {
+const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchCandidate, actor?: { id: Types.ObjectId; role: 'ADMIN' }) => {
   const now = new Date();
   const deadlineAt = new Date(now.getTime() + DISPATCH_OFFER_TIMEOUT_MS);
   const attemptId = randomUUID();
@@ -427,6 +439,7 @@ const candidateStillEligible = async (job: DispatchJobLean, attempt: DispatchAtt
 };
 
 export const processDispatchTick = async () => {
+  await recoverOrphanedDispatchJobs();
   const now = new Date();
   const expired = await DispatchJobModel.find({ status: 'OFFERED', deadlineAt: { $lte: now } }).limit(50).lean().exec() as DispatchJobLean[];
   for (const job of expired) await expireOrReleaseOffer(job, 'Driver acceptance deadline expired.', 'EXPIRED');
@@ -437,8 +450,13 @@ export const processDispatchTick = async () => {
     if (attempt && !(await candidateStillEligible(job, attempt))) await expireOrReleaseOffer(job, 'Driver, provider, ambulance, location, or reservation became ineligible during the offer.', 'UNAVAILABLE');
   }
 
-  const claimed = await claimJob();
-  if (claimed) {
+  const claimedJobs: DispatchJobLean[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const claimed = await claimJob();
+    if (!claimed) break;
+    claimedJobs.push(claimed);
+  }
+  await Promise.all(claimedJobs.map(async (claimed) => {
     try {
       await searchAndOffer(claimed);
     } catch (error) {
@@ -449,7 +467,7 @@ export const processDispatchTick = async () => {
         $push: { events: appendEvent('SEARCH_RETRY_SCHEDULED', reason) },
       }).exec();
     }
-  }
+  }));
 };
 
 export const startDispatchWorker = () => {
