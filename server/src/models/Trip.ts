@@ -33,7 +33,7 @@ const historySchema=new Schema<TripStatusHistoryEntry>({
   previousStatus:{type:String,enum:TRIP_STATUSES},
 },{_id:false});
 const schema=new Schema<TripDocument>({
-  emergencyRequestId:{type:Schema.Types.ObjectId,ref:'EmergencyRequest',required:true,index:true},
+  emergencyRequestId:{type:Schema.Types.ObjectId,ref:'EmergencyRequest',required:true},
   providerId:{type:Schema.Types.ObjectId,ref:'AmbulanceProvider',required:true,index:true},
   ambulanceId:{type:Schema.Types.ObjectId,ref:'Ambulance',required:true,index:true},
   driverId:{type:Schema.Types.ObjectId,ref:'AmbulanceDriver',index:true},
@@ -43,7 +43,6 @@ const schema=new Schema<TripDocument>({
   acceptedAt:Date,arrivedAtPickupAt:Date,patientPickedUpAt:Date,arrivedAtHospitalAt:Date,completedAt:Date,
 },{timestamps:true});
 schema.index({emergencyRequestId:1,createdAt:-1});
-schema.index({emergencyRequestId:1},{unique:true,name:'trip_one_active_per_emergency',partialFilterExpression:{status:{$in:['ASSIGNED','ACCEPTED','TO_PICKUP','AT_PICKUP','PATIENT_ONBOARD','TO_HOSPITAL','AT_HOSPITAL']}}});
 schema.index({providerId:1,status:1,createdAt:-1});
 schema.index({driverId:1,status:1,createdAt:-1});
 schema.index({ambulanceId:1,status:1,createdAt:-1});
