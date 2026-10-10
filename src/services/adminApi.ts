@@ -76,7 +76,7 @@ export const adminApi = {
   emergencies: (params: Omit<AdminListParams, 'status'> & { status?: string; hospital?: string; provider?: string; ambulance?: string; driver?: string; situation?: string }) => request<AdminList<AdminEmergencyListItem>>(`/admin/emergencies${query(params as unknown as AdminListParams)}`),
   emergency: (id:string) => request<AdminEmergencyListItem>(`/admin/emergencies/${encodeURIComponent(id)}`),
   emergencySummary: () => request<Record<string,number>>('/admin/emergencies/summary'),
-  dispatchJobs: (params: { status?: AdminDispatchJob['status']; limit?: number } = {}) => request<AdminDispatchJob[]>(`/admin/dispatch-jobs${query(params)}`),
+  dispatchJobs: (params: { status?: AdminDispatchJob['status']; limit?: number } = {}) => { const search = new URLSearchParams(); if (params.status) search.set('status', params.status); if (params.limit !== undefined) search.set('limit', String(params.limit)); const suffix = search.toString(); return request<AdminDispatchJob[]>(`/admin/dispatch-jobs${suffix ? '?' + suffix : ''}`); },
   retryDispatchJob: (id: string) => request<{id:string;status:string;generation:number;queued:boolean}>(`/admin/dispatch-jobs/${encodeURIComponent(id)}/retry`, {method:'POST'}),
   manualAssignDispatchJob: (id: string, driverId: string) => request<{dispatchJobId:string;driverId:string;status:string;deadlineAt:string}>(`/admin/dispatch-jobs/${encodeURIComponent(id)}/manual-assign`, {method:'POST',body:JSON.stringify({driverId})}),
   escalateDispatchJob: (id: string, reason: string) => request<{dispatchJobId:string;emergencyRequestId:string;status:string;reason:string;emergencyCallNumber:string}>(`/admin/dispatch-jobs/${encodeURIComponent(id)}/escalate`, {method:'POST',body:JSON.stringify({reason})}),
