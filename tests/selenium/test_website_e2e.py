@@ -50,7 +50,7 @@ class ResQWebsiteE2ETests(unittest.TestCase):
 
     def open_path(self, path: str) -> None:
         self.driver.get(f"{BASE_URL}{path}")
-        self.wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
+        self.wait.until(lambda d: d.execute_script("return document.readyState") in ("interactive", "complete"))
 
     def assert_page_not_blank(self) -> None:
         body = self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
