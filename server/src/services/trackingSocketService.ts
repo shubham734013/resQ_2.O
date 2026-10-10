@@ -7,7 +7,7 @@ import type { AuthenticatedIdentity } from '../types/auth.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { AppError } from '../utils/AppError.js';
-import { canAccessTrackingSnapshot } from './trackingService.js';
+import { canAccessTrackingSnapshot } from './trackingAuthorization.js';
 
 type RoomRequest = { type: 'emergency' | 'trip' | 'hospital-operations'; id: string };
 type Envelope = { channel: string; event: string; data: unknown; timestamp: string };
