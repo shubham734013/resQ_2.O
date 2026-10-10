@@ -8,7 +8,7 @@ const date = z.string().datetime().transform((value) => new Date(value));
 
 export const createEmergencyRequestSchema = z.object({
   hospitalId: objectId,
-  situationType: z.enum(EMERGENCY_SITUATION_LABELS),
+  situationType: z.string().trim().min(2).max(120),
   location: z.string().trim().min(2).max(300).optional(),
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
