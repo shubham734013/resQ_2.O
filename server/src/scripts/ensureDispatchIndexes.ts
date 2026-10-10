@@ -15,7 +15,7 @@ const requiredIndexes = [
 
 type IndexInfo = { name?: string; key: Record<string, unknown>; unique?: boolean };
 const indexesFor = async <T extends { indexes: () => Promise<unknown[]> }>(collection: T): Promise<IndexInfo[]> => {
-  try { return await collection.indexes(); }
+  try { return await collection.indexes() as IndexInfo[]; }
   catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 26) return [];
     throw error;
@@ -52,7 +52,7 @@ try {
       const existingIndexes = await indexesFor(item.collection);
       const sameKey = existingIndexes.find((index) => JSON.stringify(index.key) === JSON.stringify(item.key));
       if (sameKey && (!item.unique || sameKey.unique === true)) continue;
-      await item.collection.createIndex(item.key, { name: item.name, ...(item.unique ? { unique: true } : {}) });
+      await item.collection.createIndex(item.key as import('mongodb').IndexSpecification, { name: item.name, ...(item.unique ? { unique: true } : {}) });
     }
     console.info('Dispatch indexes are installed.');
   } else {
