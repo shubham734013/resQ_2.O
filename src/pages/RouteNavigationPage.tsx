@@ -175,7 +175,7 @@ export const RouteNavigationPage = () => {
           <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
             {permissionState !== 'granted'
               ? 'Enable location access to calculate a real driving route, or navigate directly in Google Maps.'
-              : <>Unable to compute a driving route to <strong className="text-slate-800">{facility.name}</strong> right now. You can launch Google Maps directions directly.</>}
+              : <>Unable to compute a driving route to <strong className="text-slate-800">{facility.name}</strong>. {routeError instanceof Error ? routeError.message : 'Check the server-side Google Routes API configuration and retry.'} You can also launch Google Maps directions directly.</>}
           </p>
         </div>
         <div className="pt-2 flex flex-col gap-2">
