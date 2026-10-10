@@ -67,6 +67,16 @@ jobs:
           cat /tmp/resq-vite-preview.log
           exit 1
 
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Set up ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      - name: Export Chrome binary path
+        run: echo "CHROME_BIN=${{ steps.setup-chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+
       - name: Install Selenium
         run: python -m pip install --upgrade pip selenium
 
