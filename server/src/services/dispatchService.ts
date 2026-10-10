@@ -145,15 +145,51 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
     { dispatchReservationId: null },
     { dispatchReservationExpiresAt: { $lte: now } },
   ] };
-  const ambulanceFilter: QueryFilter<AmbulanceDocument> = {
+  const ambulanceBaseFilter: QueryFilter<AmbulanceDocument> = {
     providerId: { $in: providerIds },
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
     currentStatus: 'AVAILABLE',
     locationUpdatedAt: { $gte: new Date(now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS), $lte: new Date(now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS) },
-    ...reservationAvailable,
   };
-  const ambulances = await AmbulanceModel.find(ambulanceFilter).select('_id providerId currentLatitude currentLongitude location locationUpdatedAt currentStatus accountStatus verificationStatus dispatchReservationId dispatchReservationExpiresAt').limit(500).lean().exec();
+  const ambulanceFilter: QueryFilter<AmbulanceDocument> = { ...ambulanceBaseFilter, ...reservationAvailable };
+  type AmbulanceCandidateRecord = {
+    _id: Types.ObjectId; providerId: Types.ObjectId; currentLatitude?: number; currentLongitude?: number;
+    location?: { coordinates?: number[] }; locationUpdatedAt?: Date; currentStatus?: string;
+    accountStatus?: string; verificationStatus?: string; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
+  };
+  const pickupPoint = { type: 'Point' as const, coordinates: [job.pickupLongitude, job.pickupLatitude] };
+  let geoAmbulances: AmbulanceCandidateRecord[] = [];
+  try {
+    geoAmbulances = await AmbulanceModel.aggregate<AmbulanceCandidateRecord>([
+      { $geoNear: {
+        near: pickupPoint,
+        distanceField: 'dispatchStraightLineMeters',
+        maxDistance: DISPATCH_SEARCH_RADIUS_METERS,
+        spherical: true,
+        key: 'location',
+        query: ambulanceFilter,
+      } },
+      { $limit: 500 },
+      { $project: { _id: 1, providerId: 1, currentLatitude: 1, currentLongitude: 1, location: 1, locationUpdatedAt: 1, currentStatus: 1, accountStatus: 1, verificationStatus: 1, dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } },
+    ]).exec();
+  } catch {
+    // Keep dispatch available for older deployments while the explicit index rollout is pending.
+  }
+  const legacyAmbulances = await AmbulanceModel.find({
+    ...ambulanceBaseFilter,
+    $and: [
+      reservationAvailable,
+      { $or: [
+        { 'location.coordinates': { $exists: false } },
+        { 'location.coordinates.0': { $exists: false } },
+        { 'location.type': { $ne: 'Point' } },
+      ] },
+    ],
+  }).select('_id providerId currentLatitude currentLongitude location locationUpdatedAt currentStatus accountStatus verificationStatus dispatchReservationId dispatchReservationExpiresAt').sort({ locationUpdatedAt: -1 }).limit(500).lean().exec() as unknown as AmbulanceCandidateRecord[];
+  const ambulanceMap = new Map<string, AmbulanceCandidateRecord>();
+  for (const ambulance of [...geoAmbulances, ...legacyAmbulances]) ambulanceMap.set(String(ambulance._id), ambulance);
+  const ambulances = [...ambulanceMap.values()];
   if (!ambulances.length) return [];
   const ambulanceIds = ambulances.map((ambulance) => ambulance._id);
   const driverFilter: QueryFilter<AmbulanceDriverDocument> = {
