@@ -19,7 +19,7 @@ interface GoogleRoute {
   polyline?: { encodedPolyline?: string };
   legs?: Array<{ steps?: GoogleStep[] }>;
 }
-interface GoogleRoutesResponse { routes?: GoogleRoute[]; }
+interface GoogleRoutesResponse { routes?: GoogleRoute[]; error?: { status?: string; message?: string; code?: number }; }
 
 const decodePolyline = (encoded: string): Array<{ latitude: number; longitude: number }> => {
   const points: Array<{ latitude: number; longitude: number }> = [];
@@ -94,8 +94,23 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
   });
 
   const payload = await response.json().catch(() => null) as GoogleRoutesResponse | null;
-  if (!response.ok) throw new AppError('ROUTE_REQUEST_FAILED', 'Google could not calculate a route right now', 502);
-  if (!payload?.routes?.length) throw new AppError('ROUTE_NOT_FOUND', 'No route was found between the selected locations', 404);
+  if (!response.ok) {
+    // Keep provider diagnostics in server logs without exposing the API key or coordinates.
+    console.error('[maps] Google Routes API rejected a route request', {
+      httpStatus: response.status,
+      providerStatus: payload?.error?.status ?? 'UNKNOWN',
+      providerCode: payload?.error?.code,
+      providerMessage: payload?.error?.message?.slice(0, 300),
+    });
+    throw new AppError('ROUTE_REQUEST_FAILED', 'Google could not calculate a route right now', 502);
+  }
+  if (!payload?.routes?.length) {
+    console.warn('[maps] Google Routes API returned no routes for a valid request', {
+      providerStatus: payload?.error?.status ?? 'NO_ROUTE',
+      providerMessage: payload?.error?.message?.slice(0, 300),
+    });
+    throw new AppError('ROUTE_NOT_FOUND', 'No route was found between the selected locations', 404);
+  }
 
   const routes = payload.routes.map((route, index) => {
     const distanceMeters = route.distanceMeters ?? 0;
