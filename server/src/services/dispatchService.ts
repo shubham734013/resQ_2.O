@@ -572,10 +572,11 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
         _id: job.emergencyRequestId, status: 'AMBULANCE_COORDINATION', ambulanceId: { $exists: false },
       }, { $set: { ambulanceProviderId: attempt.providerId, ambulanceId: attempt.ambulanceId, driverId: did } }, { new: true, session }).lean().exec();
       if (!updatedRequest) throw new AppError('EMERGENCY_ASSIGNMENT_CONFLICT', 'Another dispatch action assigned this emergency first', 409);
+      const acceptanceGuardTime = new Date();
       const updatedJob = await DispatchJobModel.findOneAndUpdate({
-        _id: jid, status: 'OFFERED', currentAttemptId: attempt.attemptId, currentDriverId: did, deadlineAt: { $gt: now },
+        _id: jid, status: 'OFFERED', currentAttemptId: attempt.attemptId, currentDriverId: did, deadlineAt: { $gt: acceptanceGuardTime },
       }, {
-        $set: { status: 'ACCEPTED', acceptedTripId: trip._id, 'attempts.$[attempt].status': 'ACCEPTED', 'attempts.$[attempt].respondedAt': now },
+        $set: { status: 'ACCEPTED', acceptedTripId: trip._id, 'attempts.$[attempt].status': 'ACCEPTED', 'attempts.$[attempt].respondedAt': acceptanceGuardTime },
         $unset: { deadlineAt: 1, leaseUntil: 1, leaseToken: 1 },
         $push: { events: appendEvent('OFFER_ACCEPTED', undefined, did, 'AMBULANCE_DRIVER', attempt.attemptId) },
       }, { new: true, session, arrayFilters: [{ 'attempt.attemptId': attempt.attemptId }] }).lean().exec();
