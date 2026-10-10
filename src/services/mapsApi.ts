@@ -2,17 +2,33 @@ import type { AmbulanceMapItem, FacilityMapItem, PlaceSearchResult, RouteRequest
 
 const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
 
+type ApiIssue = { path?: Array<string | number>; message?: string };
+type ApiErrorPayload = { code?: string; message?: string; details?: ApiIssue[] };
+
 class MapsApiError extends Error {
   public readonly status: number;
   public readonly code: string;
+  public readonly details: ApiIssue[];
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, details: ApiIssue[] = []) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
     this.name = 'MapsApiError';
   }
 }
+
+const formatApiError = (error: ApiErrorPayload | undefined, fallback: string): string => {
+  const message = error?.message?.trim() || fallback;
+  const issues = error?.details
+    ?.map((issue) => {
+      const path = issue.path?.length ? issue.path.join('.') : 'request';
+      return path + ': ' + (issue.message?.trim() || 'invalid value');
+    })
+    .filter(Boolean);
+  return issues?.length ? message + ' (' + issues.join('; ') + ')' : message;
+};
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(API_BASE_URL + path, {
@@ -23,9 +39,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload && typeof payload === 'object' && 'error' in payload
-      ? (payload as { error?: { code?: string; message?: string } }).error
+      ? (payload as { error?: ApiErrorPayload }).error
       : undefined;
-    throw new MapsApiError(response.status, error?.code ?? 'REQUEST_FAILED', error?.message ?? 'The map request could not be completed.');
+    throw new MapsApiError(
+      response.status,
+      error?.code ?? 'REQUEST_FAILED',
+      formatApiError(error, 'The map request could not be completed.'),
+      Array.isArray(error?.details) ? error.details : [],
+    );
   }
   if (!payload || typeof payload !== 'object' || !('data' in payload)) {
     throw new MapsApiError(response.status, 'INVALID_RESPONSE', 'The server returned an invalid map response.');
@@ -46,8 +67,16 @@ export const mapsApi = {
     request<{ items: AmbulanceMapItem[]; updatedAt: string }>(
       '/ambulances/nearby?latitude=' + latitude + '&longitude=' + longitude + '&radius=' + radius,
     ),
-  route: (input: RouteRequest) =>
-    request<RouteResult>('/maps/routes', { method: 'POST', body: JSON.stringify(input) }),
+  route: (input: RouteRequest) => {
+    // Send only fields accepted by the strict backend schema; never pass UI metadata through.
+    const body: RouteRequest = {
+      origin: { latitude: Number(input.origin.latitude), longitude: Number(input.origin.longitude) },
+      destination: { latitude: Number(input.destination.latitude), longitude: Number(input.destination.longitude) },
+      travelMode: input.travelMode ?? 'DRIVE',
+      routingPreference: input.routingPreference ?? 'TRAFFIC_AWARE',
+    };
+    return request<RouteResult>('/maps/routes', { method: 'POST', body: JSON.stringify(body) });
+  },
 
   geocode: (address: string) =>
     request<{ placeId: string; formattedAddress: string; latitude: number; longitude: number }>(
