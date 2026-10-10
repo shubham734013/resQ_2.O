@@ -31,6 +31,7 @@ const output = (request: EmergencyRecord) => ({
   requestCode: request.requestCode,
   hospitalId: String(request.hospitalId),
   situationType: request.situationType,
+  category: request.category ?? categoryIdForSituation(request.situationType),
   reportedAt: request.reportedAt,
   location: request.location,
   latitude: request.latitude,
@@ -213,9 +214,11 @@ export const discoverEmergencyHospitals = async (userId: string, query: Emergenc
 export const createEmergencyRequest = async (userId: string, input: CreateEmergencyInput, idempotencyKey: string) => {
   const userObjectId = assertId(userId, 'user');
   const hospitalId = assertId(input.hospitalId, 'hospital');
+  const requestedCategory = input.category ?? categoryIdForSituation(input.situationType);
   const existing = await EmergencyRequestModel.findOne({ userId: userObjectId, idempotencyKey }).lean().exec();
   if (existing) {
     if (String(existing.hospitalId) !== String(hospitalId) || existing.situationType !== input.situationType ||
+        (existing.category ?? categoryIdForSituation(existing.situationType)) !== requestedCategory ||
         existing.latitude !== input.latitude || existing.longitude !== input.longitude) {
       throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
     }
@@ -231,7 +234,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   if (!hospital) {
     throw new AppError('HOSPITAL_NOT_OPERATIONAL', 'The selected hospital is not currently eligible for emergency coordination. Refresh the hospital list or choose another destination.', 409);
   }
-  if (!hospitalMatchesSituation(hospital, input.situationType)) {
+  if (!hospitalMatchesSituation(hospital, requestedCategory)) {
     throw new AppError('HOSPITAL_CAPABILITY_MISMATCH', 'The selected hospital does not declare a capability matching this emergency type. Choose a different verified hospital.', 409);
   }
   const destination = hospitalCoordinate(hospital);
@@ -251,7 +254,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
         verificationStatus: 'VERIFIED',
         emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
       }).select('_id hospitalType services capabilities location latitude longitude').session(session).lean().exec() as unknown as EmergencyHospitalCandidate | null;
-      if (!currentHospital || !hospitalMatchesSituation(currentHospital, input.situationType) || !hospitalCoordinate(currentHospital)) {
+      if (!currentHospital || !hospitalMatchesSituation(currentHospital, requestedCategory) || !hospitalCoordinate(currentHospital)) {
         throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Hospital eligibility changed before the request was saved. Refresh hospitals and choose an eligible destination.', 409);
       }
       const request = new EmergencyRequestModel({
@@ -260,6 +263,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
         userId: userObjectId,
         hospitalId,
         situationType: input.situationType,
+        category: requestedCategory,
         reportedAt: now,
         location: input.location,
         latitude: input.latitude,
@@ -289,6 +293,7 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
       const duplicate = await EmergencyRequestModel.findOne({ userId: userObjectId, idempotencyKey }).lean().exec();
       if (duplicate) {
         if (String(duplicate.hospitalId) !== String(hospitalId) || duplicate.situationType !== input.situationType ||
+            (duplicate.category ?? categoryIdForSituation(duplicate.situationType)) !== requestedCategory ||
             duplicate.latitude !== input.latitude || duplicate.longitude !== input.longitude) {
           throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
         }
