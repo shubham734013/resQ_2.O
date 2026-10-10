@@ -58,12 +58,26 @@ export const RouteNavigationPage = () => {
 
   const externalDirectionsUrl = useMemo(() => {
     if (!facility) return '';
-    if (typeof facility.latitude === 'number' && typeof facility.longitude === 'number' && Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude)) {
-      return `https://www.google.com/maps/dir/?api=1&destination=${facility.latitude},${facility.longitude}`;
+    const params = new URLSearchParams({ api: '1', travelmode: 'driving' });
+    if (location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
+      params.set('origin', `${location.latitude},${location.longitude}`);
     }
-    const destQuery = [facility.name, facility.address].filter(Boolean).join(', ');
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destQuery)}`;
-  }, [facility]);
+    if (
+      typeof facility.latitude === 'number'
+      && typeof facility.longitude === 'number'
+      && Number.isFinite(facility.latitude)
+      && Number.isFinite(facility.longitude)
+      && facility.latitude >= -90
+      && facility.latitude <= 90
+      && facility.longitude >= -180
+      && facility.longitude <= 180
+    ) {
+      params.set('destination', `${facility.latitude},${facility.longitude}`);
+    } else {
+      params.set('destination', [facility.name, facility.address].filter(Boolean).join(', '));
+    }
+    return `https://www.google.com/maps/dir/?${params.toString()}`;
+  }, [facility, location]);
 
   const alternativeRoutes = useMemo(() => {
     return availableRoutes.filter((r) => r.id !== activeRoute?.id);
