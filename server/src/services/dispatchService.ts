@@ -241,8 +241,8 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
     await session.withTransaction(async () => {
       const currentJob = await DispatchJobModel.findOne({
         _id: job._id,
-        status: actor ? { $in: ['EXHAUSTED', 'PENDING'] } : 'SEARCHING',
-        ...(actor ? {} : { leaseToken: job.leaseToken }),
+        status: 'SEARCHING',
+        leaseToken: job.leaseToken,
       }).session(session).lean().exec() as DispatchJobLean | null;
       if (!currentJob) throw new AppError('DISPATCH_STATE_CONFLICT', 'Dispatch job changed before a driver could be reserved', 409);
       const request = await EmergencyRequestModel.findOne({
@@ -301,8 +301,8 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
 
       const attempt: DispatchAttemptDocument = {
         attemptId,
-        generation: actor ? currentJob.generation + (currentJob.status === 'EXHAUSTED' ? 1 : 0) : currentJob.generation,
-        attemptNumber: currentJob.attempts.filter((entry) => entry.generation === (actor ? currentJob.generation + (currentJob.status === 'EXHAUSTED' ? 1 : 0) : currentJob.generation)).length + 1,
+        generation: currentJob.generation,
+        attemptNumber: currentJob.attempts.filter((entry) => entry.generation === currentJob.generation).length + 1,
         providerId: candidate.providerId,
         ambulanceId: candidate.ambulanceId,
         driverId: candidate.driverId,
@@ -316,7 +316,7 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
       const update = await DispatchJobModel.findOneAndUpdate({
         _id: currentJob._id,
         status: currentJob.status,
-        ...(actor ? {} : { leaseToken: job.leaseToken }),
+        leaseToken: job.leaseToken,
       }, {
         $set: {
           status: 'OFFERED',
@@ -627,11 +627,12 @@ export const retryDispatchJob = async (adminId: string, dispatchJobId: string) =
   const jid = id(dispatchJobId, 'dispatch job');
   const aid = id(adminId, 'admin');
   const now = new Date();
-  const job = await DispatchJobModel.findOneAndUpdate({ _id: jid, status: { $in: ['EXHAUSTED', 'ESCALATED'] } }, {
-    $set: { status: 'PENDING', generation: { $add: ['$generation', 1] }, nextAttemptAt: now },
+  const current = await DispatchJobModel.findOne({ _id: jid, status: { $in: ['EXHAUSTED', 'ESCALATED'] } }).lean().exec() as DispatchJobLean | null;
+  const job = current ? await DispatchJobModel.findOneAndUpdate({ _id: jid, status: current.status, generation: current.generation }, {
+    $set: { status: 'PENDING', generation: current.generation + 1, nextAttemptAt: now },
     $unset: { exhaustedAt: 1, escalatedAt: 1, escalationReason: 1 },
     $push: { events: appendEvent('MANUAL_RETRY', 'Administrator requested a new dispatch generation', aid, 'ADMIN') },
-  }, { new: true }).lean().exec() as DispatchJobLean | null;
+  }, { new: true }).lean().exec() as DispatchJobLean | null : null;
   if (!job) throw new AppError('DISPATCH_NOT_RETRYABLE', 'Only exhausted or escalated dispatch jobs can be retried', 409);
   return { id: String(job._id), status: job.status, generation: job.generation, queued: true };
 };
@@ -686,13 +687,20 @@ export const escalateDispatchJob = async (adminId: string, dispatchJobId: string
 
 export const cancelDispatchForEmergencyInSession = async (emergencyRequestId: Types.ObjectId, actorId: Types.ObjectId, session: import('mongoose').ClientSession) => {
   const job = await DispatchJobModel.findOne({ emergencyRequestId }).session(session).lean().exec() as DispatchJobLean | null;
-  if (!job || ['ACCEPTED', 'CANCELLED'].includes(job.status)) return;
+  if (!job || job.status === 'CANCELLED') return;
+  const set: Record<string, unknown> = { status: 'CANCELLED' };
+  const options: { session: import('mongoose').ClientSession; arrayFilters?: Array<Record<string, unknown>> } = { session };
+  if (job.currentAttemptId) {
+    set['attempts.$[attempt].status'] = 'CANCELLED';
+    set['attempts.$[attempt].respondedAt'] = new Date();
+    set['attempts.$[attempt].reason'] = 'Emergency request cancelled by user';
+    options.arrayFilters = [{ 'attempt.attemptId': job.currentAttemptId }];
+  }
   await DispatchJobModel.updateOne({ _id: job._id, status: job.status }, {
-    $set: { status: 'CANCELLED' },
+    $set: set,
     $unset: { deadlineAt: 1, leaseUntil: 1, leaseToken: 1, nextAttemptAt: 1 },
     $push: { events: appendEvent('DISPATCH_CANCELLED', 'Emergency request was cancelled by the user', actorId, 'USER', job.currentAttemptId) },
-    ...(job.currentAttemptId ? { $set: { status: 'CANCELLED', 'attempts.$[attempt].status': 'CANCELLED', 'attempts.$[attempt].respondedAt': new Date(), 'attempts.$[attempt].reason': 'Emergency request cancelled by user' } } : {}),
-  }, { session, arrayFilters: job.currentAttemptId ? [{ 'attempt.attemptId': job.currentAttemptId }] : [] }).exec();
+  }, options).exec();
   await releaseReservationInSession(job._id, job.currentAmbulanceId, job.currentDriverId, session);
   broadcastEvent('operations', 'dispatch:cancelled', { dispatchJobId: String(job._id), emergencyRequestId: String(emergencyRequestId) });
 };
