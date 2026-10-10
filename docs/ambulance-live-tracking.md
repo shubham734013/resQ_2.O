@@ -27,7 +27,7 @@ Clients may request one room at a time using `tracking:subscribe` with `{ type, 
 - `trip:<id>`: trip's driver/provider, emergency owner, destination hospital, or admin.
 - `hospital-operations:<hospitalId>`: only that hospital identity (or admin).
 
-Events include `dispatch:accepted`, `dispatch:declined`, `tracking:status`, `tracking:location`, and `hospital:incoming-patient`. Socket payloads are minimized; the legacy SSE payloads are preserved. Location events are emitted only for active accepted trips and only to the emergency, trip, and destination-hospital channels. Terminal trip status is delivered before trip-room membership is removed.
+Events include `dispatch:accepted`, `dispatch:declined`, `tracking:status`, `tracking:location`, and `hospital:incoming-patient`. Socket payloads are minimized; the legacy SSE payloads are preserved. Location events are emitted only for active accepted trips to the emergency and trip rooms. Hospital staff viewing that emergency receive the same GPS through the authorized emergency room; the hospital-operations room carries hospital coordination/status events to avoid duplicate GPS deliveries. Terminal trip status is delivered before trip-room membership is removed.
 
 ## Trip navigation
 
