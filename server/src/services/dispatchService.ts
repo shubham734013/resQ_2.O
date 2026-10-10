@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { startSession, Types } from 'mongoose';
+import { startSession, Types, type QueryFilter } from 'mongoose';
 import { DispatchJobModel, type DispatchJobDocument, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
-import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { calculateGoogleRoutes } from './mapsService.js';
@@ -608,7 +608,7 @@ export const retryDispatchJob = async (adminId: string, dispatchJobId: string) =
   const aid = id(adminId, 'admin');
   const now = new Date();
   const job = await DispatchJobModel.findOneAndUpdate({ _id: jid, status: { $in: ['EXHAUSTED', 'ESCALATED'] } }, {
-    $set: { status: 'PENDING', generation: 1, nextAttemptAt: now },
+    $set: { status: 'PENDING', generation: { $add: ['$generation', 1] }, nextAttemptAt: now },
     $unset: { exhaustedAt: 1, escalatedAt: 1, escalationReason: 1 },
     $push: { events: appendEvent('MANUAL_RETRY', 'Administrator requested a new dispatch generation', aid, 'ADMIN') },
   }, { new: true }).lean().exec() as DispatchJobLean | null;
