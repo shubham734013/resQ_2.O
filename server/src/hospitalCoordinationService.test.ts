@@ -2,9 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HospitalCoordinationNotificationModel } from './models/HospitalCoordinationNotification.js';
 import { HospitalPatientModel } from './models/HospitalPatient.js';
-import { hospitalNotificationTypeForTripStatus } from './services/hospitalCoordinationService.js';
 
-test('trip lifecycle maps to distinct durable hospital milestones', () => {
+test('trip lifecycle maps to distinct durable hospital milestones', async () => {
+  process.env.NODE_ENV ??= 'test';
+  process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
+  process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
+  process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough';
+  process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
+  process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
+  const { hospitalNotificationTypeForTripStatus } = await import('./services/hospitalCoordinationService.js');
   assert.equal(hospitalNotificationTypeForTripStatus('ACCEPTED'), 'AMBULANCE_ASSIGNED');
   assert.equal(hospitalNotificationTypeForTripStatus('AT_PICKUP'), 'AMBULANCE_AT_PICKUP');
   assert.equal(hospitalNotificationTypeForTripStatus('PATIENT_ONBOARD'), 'PATIENT_PICKED_UP');
