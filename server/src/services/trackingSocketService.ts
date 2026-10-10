@@ -81,8 +81,8 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
         const room = roomFor(request);
         await socket.join(room);
         if (request.type === 'emergency') {
-          const trip = await TripModel.findOne({ emergencyRequestId: new Types.ObjectId(request.id) }).select('_id').lean().exec();
-          if (trip && await canAccessTrip(identity, trip._id)) await socket.join(`trip:${String(trip._id)}`);
+          const trip = await TripModel.findOne({ emergencyRequestId: new Types.ObjectId(request.id) }).select('_id status').lean().exec();
+          if (trip && !['COMPLETED', 'CANCELLED'].includes(trip.status) && await canAccessTrip(identity, trip._id)) await socket.join(`trip:${String(trip._id)}`);
         }
         ack?.({ ok: true, room });
       })().catch(() => ack?.({ ok: false, error: 'SUBSCRIPTION_FAILED' }));
@@ -93,6 +93,10 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
         const request = raw as Partial<RoomRequest>;
         if (!['emergency', 'trip', 'hospital-operations'].includes(String(request.type)) || typeof request.id !== 'string' || !validId(request.id)) { ack?.({ ok: false }); return; }
         await socket.leave(roomFor(request as RoomRequest));
+        if (request.type === 'emergency') {
+          const trip = await TripModel.findOne({ emergencyRequestId: new Types.ObjectId(request.id) }).select('_id').lean().exec();
+          if (trip) await socket.leave(`trip:${String(trip._id)}`);
+        }
         ack?.({ ok: true });
       })().catch(() => ack?.({ ok: false }));
     });
@@ -106,5 +110,12 @@ export const publishSocketEvent = (channel: string, event: string, envelope: Env
   if (/^emergency:[a-f0-9]{24}$/i.test(channel)) room = channel;
   else if (/^trip:[a-f0-9]{24}$/i.test(channel)) room = channel;
   else if (/^hospital:[a-f0-9]{24}$/i.test(channel)) room = channel.replace(/^hospital:/, 'hospital-operations:');
-  if (room) io.to(room).emit(event, envelope);
+  if (room) {
+    io.to(room).emit(event, envelope);
+    const status = envelope.data && typeof envelope.data === 'object' && 'status' in envelope.data ? String((envelope.data as { status: unknown }).status) : '';
+    if (room.startsWith('trip:') && event === 'tracking:status' && ['COMPLETED', 'CANCELLED'].includes(status)) {
+      // Deliver the terminal state once, then remove every socket from the trip room.
+      void io.in(room).socketsLeave(room);
+    }
+  }
 };
