@@ -27,8 +27,8 @@ const roomFor = (request: RoomRequest) => request.type === 'hospital-operations'
 
 const canAccessTrip = async (identity: AuthenticatedIdentity, tripId: Types.ObjectId): Promise<boolean> => {
   if (identity.role === 'ADMIN') return true;
-  const trip = await TripModel.findById(tripId).select('driverId providerId destinationHospitalId emergencyRequestId').lean().exec();
-  if (!trip) return false;
+  const trip = await TripModel.findById(tripId).select('driverId providerId destinationHospitalId emergencyRequestId status').lean().exec();
+  if (!trip || ['COMPLETED', 'CANCELLED'].includes(trip.status)) return false;
   const emergency = await EmergencyRequestModel.findById(trip.emergencyRequestId).select('userId hospitalId ambulanceProviderId').lean().exec();
   return Boolean(emergency && canAccessTrackingSnapshot(identity, emergency, trip));
 };
