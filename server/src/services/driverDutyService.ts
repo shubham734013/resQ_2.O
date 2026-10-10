@@ -225,8 +225,8 @@ export const endDriverDuty = async (driverId: string) => {
         result = { ambulanceId: ambulance._id, status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
         return;
       }
-      if (driver.availabilityStatus !== 'ONLINE') {
-        throw new AppError('DUTY_STATE_CONFLICT', 'Only an available on-duty driver can end duty.', 409);
+      if (!['ONLINE', 'BUSY'].includes(driver.availabilityStatus)) {
+        throw new AppError('DUTY_STATE_CONFLICT', 'Driver duty state changed. Refresh status and retry.', 409);
       }
       if (!['AVAILABLE', 'OFFLINE', 'MAINTENANCE', 'BUSY'].includes(ambulance.currentStatus)) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance is not in a safe state for duty termination; contact operations.', 409);
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
