@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock, Hospital, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Clock, Hospital, RefreshCw, MapPin, Wifi, WifiOff, ShieldCheck } from 'lucide-react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/common/Button';
@@ -19,6 +19,19 @@ interface LayoutContext {
   refreshLocation: () => void;
   isUpdating: boolean;
 }
+
+const geolocationErrorMessage = (error: GeolocationPositionError) => {
+  if (error.code === error.PERMISSION_DENIED) return 'Location permission was denied. Enable location access in your browser settings to start or continue duty.';
+  if (error.code === error.POSITION_UNAVAILABLE) return 'Your device could not determine its location. Move to an area with GPS reception and retry.';
+  return 'GPS did not respond in time. ResQ will retry automatically while you remain on duty.';
+};
+const getCurrentGpsFix = () => new Promise<GeolocationPosition>((resolve, reject) => {
+  if (!navigator.geolocation) {
+    reject(new Error('This browser does not support GPS location. Open ResQ in a browser with Geolocation support.'));
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+});
 
 const navigationFor=(route:RouteOptionItem)=>({
  instruction:route.instructions[0]?.instruction ?? 'Follow the highlighted route',
@@ -88,11 +101,17 @@ export const AmbulancePage=()=>{
  const {currentLocation,location,permissionState,refreshLocation}=useOutletContext<LayoutContext>();
  const routeMode=pathname.replace('/ambulance','').replace(/^\//,'');
  const profile=useQuery({queryKey:['ambulance-driver','profile'],queryFn:ambulanceDriverApi.getProfile});
- const status=useQuery({queryKey:['ambulance-driver','status'],queryFn:ambulanceDriverApi.getStatus});
+ const status=useQuery({queryKey:['ambulance-driver','status'],queryFn:ambulanceDriverApi.getStatus,refetchInterval:5000,refetchOnWindowFocus:true});
  const requests=useQuery({queryKey:['ambulance-driver','requests'],queryFn:()=>ambulanceDriverApi.getRequests({limit:20})});
  const offers=useQuery({queryKey:['ambulance-driver','dispatch-offers'],queryFn:ambulanceDriverApi.getDispatchOffers,refetchInterval:2000,refetchOnWindowFocus:true});
  const trips=useQuery({queryKey:['ambulance-driver','trips'],queryFn:()=>ambulanceDriverApi.getTrips({limit:20})});
  const activeTrip=useMemo(()=>trips.data?.items.find(t=>!['COMPLETED','CANCELLED'].includes(t.status))??null,[trips.data?.items]);
+ const [locationHealth,setLocationHealth]=useState<'PAUSED'|'TRACKING'|'RETRYING'|'ERROR'>('PAUSED');
+ const [locationError,setLocationError]=useState('');
+ const [lastLocationSentAt,setLastLocationSentAt]=useState<number|null>(null);
+ const [gpsPermissionDenied,setGpsPermissionDenied]=useState(false);
+ const lastGpsSentAtRef=useRef(0);
+ const locationRequestInFlightRef=useRef(false);
 
  useEffect(() => {
    if (!location || status.data?.status === 'OFFLINE') return;
@@ -117,8 +136,52 @@ export const AmbulancePage=()=>{
  const origin=location?{latitude:location.latitude,longitude:location.longitude}:null;
  const route=useAmbulanceRoute(origin,destination);
  const routeItem=route.routes[0]??null;
- const invalidate=()=>Promise.all([qc.invalidateQueries({queryKey:['ambulance-driver']})]);
- const statusMutation=useMutation({mutationFn:(s:string)=>ambulanceDriverApi.updateStatus(s),onSuccess:invalidate});
+ const invalidate=useCallback(()=>Promise.all([qc.invalidateQueries({queryKey:['ambulance-driver']})]),[qc]);
+ const startDutyMutation=useMutation({
+   mutationFn:(fix:{latitude:number;longitude:number;accuracy:number;timestamp:number})=>ambulanceDriverApi.startDuty(fix),
+   onSuccess:async()=>{lastGpsSentAtRef.current=Date.now();setGpsPermissionDenied(false);setLocationError('');setLocationHealth('RETRYING');await invalidate();}
+ });
+ const endDutyMutation=useMutation({
+   mutationFn:()=>ambulanceDriverApi.endDuty(),
+   onSuccess:async()=>{setLocationHealth('PAUSED');setLocationError('');lastGpsSentAtRef.current=0;await invalidate();}
+ });
+ const startDuty=async()=>{
+   setLocationError('');setGpsPermissionDenied(false);
+   try {
+     const position=await getCurrentGpsFix();
+     await startDutyMutation.mutateAsync({latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy,timestamp:position.timestamp});
+   } catch(error) {
+     if(error && typeof error==='object' && 'code' in error && (error as GeolocationPositionError).code===1) setGpsPermissionDenied(true);
+     setLocationHealth('ERROR');
+     setLocationError(error instanceof Error ? error.message : 'Unable to start duty. Check GPS permission and retry.');
+   }
+ };
+ useEffect(()=>{
+   const dutyStatus=status.data?.status;
+   if(dutyStatus!=='ONLINE'&&dutyStatus!=='BUSY'){setLocationHealth('PAUSED');return;}
+   if(!navigator.geolocation){setLocationHealth('ERROR');setLocationError('This browser does not support GPS. Live tracking is unavailable.');return;}
+   const intervalMs=Math.min(5000,Math.max(3000,status.data?.trackingIntervalMs??4000));
+   let watchId:number|undefined;
+   let permissionFailureHandled=false;
+   setLocationHealth('RETRYING');
+   watchId=navigator.geolocation.watchPosition(position=>{
+     setGpsPermissionDenied(false);
+     const now=Date.now();
+     if(now-lastGpsSentAtRef.current<intervalMs||locationRequestInFlightRef.current)return;
+     lastGpsSentAtRef.current=now;
+     locationRequestInFlightRef.current=true;
+     void ambulanceDriverApi.updateLocation({latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy,timestamp:position.timestamp})
+       .then(()=>{setLastLocationSentAt(Date.now());setLocationError('');setLocationHealth('TRACKING');})
+       .catch(error=>{setLocationError(error instanceof Error?error.message:'GPS update failed. ResQ will retry.');setLocationHealth('RETRYING');lastGpsSentAtRef.current=0;})
+       .finally(()=>{locationRequestInFlightRef.current=false;});
+   },error=>{
+     if(error.code===error.PERMISSION_DENIED){
+       setGpsPermissionDenied(true);setLocationHealth('ERROR');setLocationError(geolocationErrorMessage(error));
+       if(!permissionFailureHandled&&dutyStatus==='ONLINE'){permissionFailureHandled=true;void ambulanceDriverApi.endDuty().then(()=>invalidate()).catch(()=>setLocationError('Location permission was revoked. Duty could not be ended automatically; end duty manually when safe.'));}
+     }else{setLocationHealth('RETRYING');setLocationError(geolocationErrorMessage(error));}
+   },{enableHighAccuracy:true,maximumAge:0,timeout:12000});
+   return()=>{if(watchId!==undefined)navigator.geolocation.clearWatch(watchId);};
+ },[status.data?.status,status.data?.trackingIntervalMs,invalidate]);
  const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance/navigation');}});
  const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance');}});
  const pickup=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedPickup(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
@@ -167,5 +230,26 @@ export const AmbulancePage=()=>{
 
  if(routeMode==='trips') return <AmbulanceLayout><div className="mx-auto w-full max-w-3xl px-4 py-8"><h1 className="text-2xl font-bold">Trip history</h1><div className="mt-5 space-y-3">{(trips.data?.items??[]).map(t=><div className="rounded-lg border border-slate-200 bg-white p-4" key={t.id}><div className="flex justify-between"><span className="font-semibold">{t.status}</span><span className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleString()}</span></div><p className="mt-2 text-sm text-slate-500">Request {t.emergencyRequestId}</p></div>)}</div></div></AmbulanceLayout>;
 
- return <AmbulanceLayout><div className="flex flex-1 flex-col"><div className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ambulance driver</p><h1 className="mt-1 text-3xl font-bold">{profile.data?.fullName??'Driver'}</h1></div><AmbulanceStatus status={status.data?.status==='ONLINE'?'available':status.data?.status==='BUSY'?'busy':'offline'}/></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Status</p><p className="mt-1 font-semibold">{status.data?.status??'OFFLINE'}</p></div><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Pending requests</p><p className="mt-1 text-2xl font-bold">{offers.data?.length??0}</p></div><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Active trip</p><p className="mt-1 font-semibold">{activeTrip?.status??'None'}</p></div></div><div className="mt-5 h-[42vh] min-h-[280px] overflow-hidden rounded-lg border border-slate-200"><MapView userLocation={currentLocation} center={origin??undefined} interactive className="h-full w-full"/></div>{permissionState!=='granted'&&<div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Location access is required for real navigation. <button className="font-semibold underline" onClick={refreshLocation}>Enable location</button></div>}<div className="mt-4 flex gap-2">{status.data?.status==='ONLINE'?<Button variant="secondary" onClick={()=>statusMutation.mutate('OFFLINE')} disabled={statusMutation.isPending}>Go Offline</Button>:<Button onClick={()=>statusMutation.mutate('ONLINE')} disabled={statusMutation.isPending}>Go Online</Button>}<Button variant="secondary" onClick={()=>void invalidate()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh</Button></div>{incomingOffer&&<div className="mt-5 rounded-lg border border-rose-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-rose-600">Dispatch offer</p><h2 className="mt-1 text-xl font-bold">{incomingOffer.request?.requestCode??'Emergency request'}</h2><p className="mt-1 text-sm text-slate-500">{incomingOffer.request?.situationType??incomingOffer.request?.category}</p><p className="mt-1 text-xs text-slate-500">Server deadline: {new Date(incomingOffer.deadlineAt).toLocaleTimeString()}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate('/ambulance/request')}>Review and respond</Button></div>}{activeTrip&&<div className="mt-4 rounded-lg border border-slate-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-slate-500">Current trip</p><p className="mt-1 text-xl font-bold">{activeTrip.status}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate(activeTrip.status==='AT_PICKUP'||activeTrip.status==='AT_HOSPITAL'?'/ambulance/trip':'/ambulance/navigation')}>Continue Trip</Button></div>}</div></div></AmbulanceLayout>;
+ return <AmbulanceLayout><div className="flex flex-1 flex-col"><div className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ambulance driver</p><h1 className="mt-1 text-3xl font-bold">{profile.data?.fullName??'Driver'}</h1></div><AmbulanceStatus status={status.data?.status==='ONLINE'?'available':status.data?.status==='BUSY'?'busy':'offline'}/></div><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+ <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Duty state</p><p className="mt-1 font-semibold">{status.data?.dutyState??'OFF_DUTY'}</p><p className="mt-1 text-xs text-slate-500">{status.data?.status==='BUSY'?'Trip controls availability':status.data?.status==='ONLINE'?'Available for dispatch':'Not accepting dispatch offers'}</p></div>
+ <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">GPS freshness</p><p className="mt-1 font-semibold">{status.data?.location?.freshness??'NO FIX'}</p><p className="mt-1 text-xs text-slate-500">{status.data?.location?.updatedAt?new Date(status.data.location.updatedAt).toLocaleTimeString():'No saved GPS fix'}</p></div>
+ <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Incoming offers</p><p className="mt-1 text-2xl font-bold">{offers.data?.length??0}</p></div>
+ <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Active trip</p><p className="mt-1 font-semibold">{activeTrip?.status??'None'}</p></div>
+ </div>
+ <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+  <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-start gap-3"><div className="rounded-lg bg-slate-100 p-2"><ShieldCheck className="h-5 w-5"/></div><div><h2 className="font-semibold">Assigned ambulance</h2>{status.data?.assignedAmbulance?<><p className="mt-1 text-sm text-slate-800">{status.data.assignedAmbulance.vehicleNumber} · {status.data.assignedAmbulance.registrationNumber}</p><p className="text-xs text-slate-500">{status.data.assignedAmbulance.ambulanceType} · {status.data.assignedAmbulance.status} · {status.data.assignedAmbulance.verificationStatus}</p></>:<p className="mt-1 text-sm text-rose-700">No ambulance assigned. Ask your provider to assign an eligible ambulance before starting duty.</p>}</div></div>
+  <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{locationHealth==='TRACKING'&&status.data?.location?.coordinatesAreLive?<Wifi className="h-4 w-4"/>:<WifiOff className="h-4 w-4"/>}{locationHealth==='TRACKING'&&status.data?.location?.coordinatesAreLive?'GPS connected':locationHealth==='RETRYING'?'Reconnecting GPS':locationHealth==='ERROR'?'GPS unavailable':'Tracking paused'}</div>
+  </div>
+  {status.data?.location && <p className="mt-3 flex items-center gap-2 text-xs text-slate-500"><MapPin className="h-4 w-4"/>{status.data.location.coordinatesAreLive?'Current GPS fix': 'Last known position — not live'} · accuracy {typeof status.data.location.accuracyMeters==='number'?Math.round(status.data.location.accuracyMeters)+' m':'unknown'}</p>}
+  {lastLocationSentAt&&<p className="mt-1 text-xs text-slate-500">Last update sent from this device: {new Date(lastLocationSentAt).toLocaleTimeString()} · every {Math.round((status.data?.trackingIntervalMs??4000)/1000)} seconds while active</p>}
+  {locationError&&<p role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{locationError}</p>}
+  {gpsPermissionDenied&&<p className="mt-2 text-sm text-rose-700">GPS permission is denied. Change browser site settings and retry. Live dispatch eligibility requires a fresh location.</p>}
+  <div className="mt-4 flex flex-wrap gap-2">
+   {status.data?.status==='ONLINE'?<Button variant="secondary" onClick={()=>endDutyMutation.mutate()} disabled={!status.data.canEndDuty||endDutyMutation.isPending}>{endDutyMutation.isPending?'Ending duty…':'End duty'}</Button>:status.data?.status==='BUSY'?<Button variant="secondary" disabled>On active trip — duty cannot end</Button>:<Button onClick={()=>void startDuty()} disabled={!status.data?.canStartDuty||startDutyMutation.isPending}>{startDutyMutation.isPending?'Confirming GPS and starting…':'Start duty'}</Button>}
+   <Button variant="secondary" onClick={()=>void invalidate()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh status</Button>
+  </div>
+  {status.isError&&<p role="alert" className="mt-3 text-sm text-rose-700">Could not load authoritative duty state. Refresh before starting or ending duty.</p>}
+  {startDutyMutation.isError&&<p role="alert" className="mt-2 text-sm text-rose-700">{startDutyMutation.error instanceof Error?startDutyMutation.error.message:'Could not start duty.'}</p>}
+  {endDutyMutation.isError&&<p role="alert" className="mt-2 text-sm text-rose-700">{endDutyMutation.error instanceof Error?endDutyMutation.error.message:'Could not end duty.'}</p>}
+ </div><div className="mt-5 h-[42vh] min-h-[280px] overflow-hidden rounded-lg border border-slate-200"><MapView userLocation={currentLocation} center={origin??undefined} interactive className="h-full w-full"/></div>{permissionState!=='granted'&&<div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Location access is required for real navigation. <button className="font-semibold underline" onClick={refreshLocation}>Enable location</button></div>}<div className="mt-4 flex gap-2">{status.data?.status==='ONLINE'?<Button variant="secondary" onClick={()=>statusMutation.mutate('OFFLINE')} disabled={statusMutation.isPending}>Go Offline</Button>:<Button onClick={()=>statusMutation.mutate('ONLINE')} disabled={statusMutation.isPending}>Go Online</Button>}<Button variant="secondary" onClick={()=>void invalidate()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh</Button></div>{incomingOffer&&<div className="mt-5 rounded-lg border border-rose-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-rose-600">Dispatch offer</p><h2 className="mt-1 text-xl font-bold">{incomingOffer.request?.requestCode??'Emergency request'}</h2><p className="mt-1 text-sm text-slate-500">{incomingOffer.request?.situationType??incomingOffer.request?.category}</p><p className="mt-1 text-xs text-slate-500">Server deadline: {new Date(incomingOffer.deadlineAt).toLocaleTimeString()}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate('/ambulance/request')}>Review and respond</Button></div>}{activeTrip&&<div className="mt-4 rounded-lg border border-slate-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-slate-500">Current trip</p><p className="mt-1 text-xl font-bold">{activeTrip.status}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate(activeTrip.status==='AT_PICKUP'||activeTrip.status==='AT_HOSPITAL'?'/ambulance/trip':'/ambulance/navigation')}>Continue Trip</Button></div>}</div></div></AmbulanceLayout>;
 };
