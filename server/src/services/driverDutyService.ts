@@ -309,7 +309,7 @@ export const updateDriverLocation = async (driverId: string, input: LocationInpu
     };
     broadcastEvent(`emergency:${activeTrip.emergencyRequestId}`, 'tracking:location', locationEvent);
     broadcastEvent(`trip:${activeTrip._id}`, 'tracking:location', locationEvent);
-    broadcastEvent(`hospital:${activeTrip.destinationHospitalId}`, 'tracking:location', locationEvent);
+    // Hospital viewers subscribe to the authorized emergency room for per-trip GPS; the hospital-operations room carries coordination/status events, avoiding duplicate location delivery.
   }
   return completedTelemetry;
 };
