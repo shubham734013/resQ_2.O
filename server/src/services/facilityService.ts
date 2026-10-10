@@ -22,6 +22,8 @@ type HospitalFacility = {
   country?: string;
   phone?: string;
   location?: { type: 'Point'; coordinates: [number, number] };
+  latitude?: number;
+  longitude?: number;
 };
 
 type Category =
@@ -52,8 +54,12 @@ const categoryFor = (hospital: Pick<HospitalFacility, 'hospitalType' | 'services
 
 export const hospitalToFacility = (hospital: HospitalFacility, distanceMeters?: unknown) => {
   const coordinates = hospital.location?.coordinates;
-  const latitude = Array.isArray(coordinates) && typeof coordinates[1] === 'number' ? coordinates[1] : undefined;
-  const longitude = Array.isArray(coordinates) && typeof coordinates[0] === 'number' ? coordinates[0] : undefined;
+  const locationLatitude = Array.isArray(coordinates) && typeof coordinates[1] === 'number' ? coordinates[1] : undefined;
+  const locationLongitude = Array.isArray(coordinates) && typeof coordinates[0] === 'number' ? coordinates[0] : undefined;
+  const validLatitude = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= -90 && value <= 90;
+  const validLongitude = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= -180 && value <= 180;
+  const latitude = validLatitude(locationLatitude) ? locationLatitude : validLatitude(hospital.latitude) ? hospital.latitude : undefined;
+  const longitude = validLongitude(locationLongitude) ? locationLongitude : validLongitude(hospital.longitude) ? hospital.longitude : undefined;
   const meters = typeof distanceMeters === 'number' && Number.isFinite(distanceMeters) ? distanceMeters : undefined;
   return {
     id: String(hospital._id),
