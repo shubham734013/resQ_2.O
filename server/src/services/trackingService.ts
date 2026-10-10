@@ -22,10 +22,10 @@ const coordinates = (place: { latitude?: number; longitude?: number; location?: 
   const longitude = typeof place.longitude === 'number' ? place.longitude : place.location?.coordinates?.[0];
   return typeof latitude === 'number' && typeof longitude === 'number' ? { latitude, longitude } : null;
 };
-export const canAccessTrackingSnapshot = (identity: AuthenticatedIdentity, emergency: { _id: Types.ObjectId; userId: Types.ObjectId; hospitalId: Types.ObjectId; ambulanceProviderId?: Types.ObjectId }, trip: { driverId?: Types.ObjectId; providerId: Types.ObjectId } | null): boolean => {
+export const canAccessTrackingSnapshot = (identity: AuthenticatedIdentity, emergency: { _id: Types.ObjectId; userId: Types.ObjectId; hospitalId: Types.ObjectId; ambulanceProviderId?: Types.ObjectId }, trip: { driverId?: Types.ObjectId; providerId: Types.ObjectId; destinationHospitalId?: Types.ObjectId } | null): boolean => {
   if (identity.role === 'ADMIN') return true;
   if (identity.role === 'USER') return String(emergency.userId) === identity.id;
-  if (identity.role === 'HOSPITAL') return String(emergency.hospitalId) === identity.id;
+  if (identity.role === 'HOSPITAL') return String(emergency.hospitalId) === identity.id && (!trip?.destinationHospitalId || String(trip.destinationHospitalId) === identity.id);
   if (identity.role === 'AMBULANCE_DRIVER') return Boolean(trip?.driverId && String(trip.driverId) === identity.id);
   if (identity.role === 'AMBULANCE_PROVIDER') return Boolean((trip && String(trip.providerId) === identity.id) || (emergency.ambulanceProviderId && String(emergency.ambulanceProviderId) === identity.id));
   return false;
@@ -43,6 +43,7 @@ export const getEmergencyTrackingSnapshot = async (identity: AuthenticatedIdenti
   const emergency = await EmergencyRequestModel.findById(idOf(emergencyId, 'emergency')).lean().exec();
   if (!emergency) throw new AppError('NOT_FOUND', 'Emergency request not found.', 404);
   const trip = await TripModel.findOne({ emergencyRequestId: emergency._id }).sort({ createdAt: -1 }).lean().exec();
+  if (trip && String(trip.destinationHospitalId) !== String(emergency.hospitalId)) throw new AppError('TRACKING_INTEGRITY_ERROR', 'Trip destination does not match the emergency coordination hospital.', 409);
   if (!canAccessTrackingSnapshot(identity, emergency, trip)) throw new AppError('TRACKING_FORBIDDEN', 'You are not authorized to view this emergency tracking session.', 403);
 
   const hospitalDoc = await HospitalModel.findById(emergency.hospitalId).select('name address city state latitude longitude location phone').lean().exec();
