@@ -49,12 +49,14 @@ export const HospitalCoordinationInbox = () => {
       currentSocket.on('disconnect', () => { if (!disposed) setRealtime('RECONNECTING'); });
       currentSocket.on('connect_error', () => { if (!disposed) setRealtime('RECONNECTING'); });
       currentSocket.on('hospital:coordination-notification', onNotification);
+      currentSocket.on('hospital:coordination-notification-acknowledged', refreshHospitalState);
       currentSocket.on('hospital:incoming-patient', refreshHospitalState);
       currentSocket.on('tracking:status', refreshHospitalState);
       if (currentSocket.connected) subscribe();
       return () => {
         disposed = true;
         currentSocket.off('hospital:coordination-notification', onNotification);
+        currentSocket.off('hospital:coordination-notification-acknowledged', refreshHospitalState);
         currentSocket.off('hospital:incoming-patient', refreshHospitalState);
         currentSocket.off('tracking:status', refreshHospitalState);
         currentSocket.disconnect();
