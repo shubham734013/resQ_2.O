@@ -113,8 +113,8 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
   });
   const activeRoute: RouteOptionItem | null = useMemo(() => {
     const route = routeQuery.data?.routes[0];
-    return route ? trackingRouteOption(route) : null;
-  }, [routeQuery.data]);
+    return route && !routeQuery.isError ? trackingRouteOption(route) : null;
+  }, [routeQuery.data, routeQuery.isError]);
 
   const markers: MapMarker[] = useMemo(() => {
     if (!snapshot) return [];
