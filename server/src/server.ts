@@ -25,20 +25,20 @@ const startServer = async (): Promise<void> => {
     forceExitTimeout.unref();
 
     stopDispatchWorker();
-    await stopTrackingSockets();
-    server.close(async (err) => {
-      if (err) {
-        console.error('Error closing HTTP server:', err);
-      }
-      try {
-        await disconnectDatabase();
-      } catch (dbErr: unknown) {
-        const msg = dbErr instanceof Error ? sanitizeMongoUri(dbErr.message) : 'Unknown db disconnect error';
-        console.error('Error during database disconnect:', msg);
-      }
-      clearTimeout(forceExitTimeout);
-      process.exit(0);
-    });
+    try {
+      // Socket.IO owns and closes this same HTTP server; do not create or close a second server.
+      await stopTrackingSockets();
+    } catch (socketErr: unknown) {
+      console.error('Error closing Socket.IO:', socketErr instanceof Error ? socketErr.message : 'Unknown Socket.IO close error');
+    }
+    try {
+      await disconnectDatabase();
+    } catch (dbErr: unknown) {
+      const msg = dbErr instanceof Error ? sanitizeMongoUri(dbErr.message) : 'Unknown db disconnect error';
+      console.error('Error during database disconnect:', msg);
+    }
+    clearTimeout(forceExitTimeout);
+    process.exit(0);
   };
 
   process.on('SIGINT', () => void shutdown('SIGINT'));
