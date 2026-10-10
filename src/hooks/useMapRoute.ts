@@ -13,6 +13,16 @@ const isValidCoordinate = (latitude: unknown, longitude: unknown): latitude is n
   && longitude >= -180
   && longitude <= 180;
 
+const retryTransientFailure = (failureCount: number, error: unknown): boolean => {
+  // A 4xx response is a deterministic client/request error. Retrying the same payload
+  // only creates duplicate failed requests; retry network errors and server failures once.
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === 'number' && status >= 400 && status < 500) return false;
+  }
+  return failureCount < 1;
+};
+
 const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][number]): RouteOptionItem => ({
   id: route.id,
   name: route.recommended ? 'Fastest route' : 'Alternative route',
@@ -52,7 +62,7 @@ export function useMapRoute(facility: Facility | null, location: UserLocation | 
     queryFn: () => mapsApi.geocode(destinationAddress),
     enabled: Boolean(facility && !destination && destinationAddress.length >= 2),
     staleTime: 24 * 60 * 60 * 1000,
-    retry: 1,
+    retry: retryTransientFailure,
   });
 
   const resolvedDestination = destination ?? (
@@ -75,7 +85,7 @@ export function useMapRoute(facility: Facility | null, location: UserLocation | 
     }),
     enabled: Boolean(origin && resolvedDestination),
     staleTime: 30_000,
-    retry: 1,
+    retry: retryTransientFailure,
   });
 
   const refetchRoute = async () => {
