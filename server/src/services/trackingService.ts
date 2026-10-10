@@ -1,3 +1,5 @@
+import { canAccessTrackingSnapshot } from './trackingAuthorization.js';
+export { canAccessTrackingSnapshot } from './trackingAuthorization.js';
 import { Types } from 'mongoose';
 import type { AuthenticatedIdentity } from '../types/auth.js';
 import { env } from '../config/env.js';
@@ -20,14 +22,6 @@ const coordinates = (place: { latitude?: number; longitude?: number; location?: 
   const latitude = typeof place.latitude === 'number' ? place.latitude : place.location?.coordinates?.[1];
   const longitude = typeof place.longitude === 'number' ? place.longitude : place.location?.coordinates?.[0];
   return typeof latitude === 'number' && typeof longitude === 'number' ? { latitude, longitude } : null;
-};
-export const canAccessTrackingSnapshot = (identity: AuthenticatedIdentity, emergency: { _id: Types.ObjectId; userId: Types.ObjectId; hospitalId: Types.ObjectId; ambulanceProviderId?: Types.ObjectId }, trip: { driverId?: Types.ObjectId; providerId: Types.ObjectId; destinationHospitalId?: Types.ObjectId } | null): boolean => {
-  if (identity.role === 'ADMIN') return true;
-  if (identity.role === 'USER') return String(emergency.userId) === identity.id;
-  if (identity.role === 'HOSPITAL') return String(emergency.hospitalId) === identity.id && (!trip?.destinationHospitalId || String(trip.destinationHospitalId) === identity.id);
-  if (identity.role === 'AMBULANCE_DRIVER') return Boolean(trip?.driverId && String(trip.driverId) === identity.id);
-  if (identity.role === 'AMBULANCE_PROVIDER') return Boolean((trip && String(trip.providerId) === identity.id) || (emergency.ambulanceProviderId && String(emergency.ambulanceProviderId) === identity.id));
-  return false;
 };
 export const trackingLocationIsFresh = (updatedAt: Date | string | null | undefined, now = new Date()): boolean => {
   if (!updatedAt) return false;
