@@ -176,12 +176,18 @@ export const endDriverDuty = async (driverId: string) => {
       const driver = await AmbulanceDriverModel.findById(did).session(session).lean().exec();
       if (!driver) throw new AppError('DRIVER_NOT_FOUND', 'Driver not found.', 404);
       const driverTrip = await activeTripForDriver(did, session);
-      if (driver.availabilityStatus === 'BUSY' || driverTrip) {
+      if (driverTrip) {
         throw new AppError('DRIVER_ON_ACTIVE_TRIP', 'Complete or hand over the active trip before ending duty.', 409);
       }
       if (!driver.assignedAmbulanceId) {
         if (driver.availabilityStatus === 'OFFLINE') {
           result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
+          return;
+        }
+        if (driver.availabilityStatus === 'ONLINE' || driver.availabilityStatus === 'BUSY') {
+          const changed = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, availabilityStatus: driver.availabilityStatus }, { $set: { availabilityStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
+          if (!changed) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh and retry.', 409);
+          result = { status: 'OFFLINE', dutyState: 'OFF_DUTY' };
           return;
         }
         throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED', 'No assigned ambulance is available to end duty safely.', 409);
@@ -194,7 +200,10 @@ export const endDriverDuty = async (driverId: string) => {
           result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
           return;
         }
-        throw new AppError('AMBULANCE_NOT_FOUND', 'Assigned ambulance record is unavailable; contact operations to reconcile duty.', 409);
+        const changed = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] } }, { $set: { availabilityStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
+        if (!changed) throw new AppError('DUTY_STATE_CONFLICT', 'Assigned ambulance is missing and duty could not be reconciled.', 409);
+        result = { status: 'OFFLINE', dutyState: 'OFF_DUTY' };
+        return;
       }
       if (await activeTripForAmbulance(ambulance._id, session)) {
         throw new AppError('AMBULANCE_ON_ACTIVE_TRIP', 'Ambulance has an active trip.', 409);
@@ -207,6 +216,9 @@ export const endDriverDuty = async (driverId: string) => {
             $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }],
           }, { $set: { currentStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
           if (!correctedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state changed while reconciling off-duty status.', 409);
+        } else if (ambulance.currentStatus === 'BUSY') {
+          const correctedAmbulance = await AmbulanceModel.findOneAndUpdate({ _id: ambulance._id, providerId: driver.providerId, currentStatus: 'BUSY', $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }] }, { $set: { currentStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
+          if (!correctedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state changed while reconciling off-duty status.', 409);
         } else if (!['OFFLINE', 'MAINTENANCE'].includes(ambulance.currentStatus)) {
           throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state is inconsistent with an off-duty driver; contact operations.', 409);
         }
@@ -216,14 +228,14 @@ export const endDriverDuty = async (driverId: string) => {
       if (driver.availabilityStatus !== 'ONLINE') {
         throw new AppError('DUTY_STATE_CONFLICT', 'Only an available on-duty driver can end duty.', 409);
       }
-      if (!['AVAILABLE', 'OFFLINE', 'MAINTENANCE'].includes(ambulance.currentStatus)) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance is not in a safe state for duty termination; contact operations.', 409);
+      if (!['AVAILABLE', 'OFFLINE', 'MAINTENANCE', 'BUSY'].includes(ambulance.currentStatus)) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance is not in a safe state for duty termination; contact operations.', 409);
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
-        _id: did, availabilityStatus: 'ONLINE', assignedAmbulanceId: ambulance._id, providerId: driver.providerId,
+        _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] }, assignedAmbulanceId: ambulance._id, providerId: driver.providerId,
       }, { $set: { availabilityStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
       if (!changedDriver) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh status and retry.', 409);
-      if (ambulance.currentStatus === 'AVAILABLE') {
+      if (ambulance.currentStatus === 'AVAILABLE' || ambulance.currentStatus === 'BUSY') {
         const changedAmbulance = await AmbulanceModel.findOneAndUpdate({
-          _id: ambulance._id, providerId: driver.providerId, currentStatus: 'AVAILABLE',
+          _id: ambulance._id, providerId: driver.providerId, currentStatus: ambulance.currentStatus,
           $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }],
         }, { $set: { currentStatus: 'OFFLINE' } }, { new: true, session }).lean().exec();
         if (!changedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance changed state while ending duty. Refresh and retry.', 409);
@@ -322,7 +334,7 @@ export const getDriverDutyStatus = async (driverId: string) => {
       provider?.accountStatus === 'ACTIVE' && provider.verificationStatus === 'VERIFIED' &&
       driver.availabilityStatus === 'OFFLINE' && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer &&
       !hasReservation(driver, now) && Boolean(ambulance && ambulance.accountStatus === 'ACTIVE' && ambulance.verificationStatus === 'VERIFIED' && ['OFFLINE', 'AVAILABLE'].includes(ambulance.currentStatus) && !hasReservation(ambulance, now)),
-    canEndDuty: driver.availabilityStatus === 'ONLINE' && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer && !hasReservation(driver, now) && Boolean(!ambulance || !hasReservation(ambulance, now)),
+    canEndDuty: ['ONLINE', 'BUSY'].includes(driver.availabilityStatus) && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer && !hasReservation(driver, now) && Boolean(!ambulance || !hasReservation(ambulance, now)),
   };
 };
 
