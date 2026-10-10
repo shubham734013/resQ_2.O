@@ -102,7 +102,8 @@ export const getTripNavigationRoute = async (identity: AuthenticatedIdentity, tr
   if (typeof destination.latitude !== 'number' || typeof destination.longitude !== 'number') throw new AppError('DESTINATION_COORDINATES_MISSING', 'Navigation destination coordinates are unavailable.', 409);
   const origin = { latitude: snapshot.location.latitude, longitude: snapshot.location.longitude };
   // Quantization and a 20-second TTL avoid a Google Routes request for every 3–5 second GPS fix.
-  const key = [tripId, snapshot.routeTarget, origin.latitude.toFixed(3), origin.longitude.toFixed(3), destination.latitude.toFixed(5), destination.longitude.toFixed(5)].join(':');
+  // One cached route per trip/phase caps route API calls at one per 20 seconds even if GPS crosses several grid cells.
+  const key = [tripId, snapshot.routeTarget].join(':');
   const now = Date.now();
   const cached = routeCache.get(key);
   if (cached && cached.expiresAt > now) return cached.promise;
