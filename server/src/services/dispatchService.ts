@@ -331,7 +331,9 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
   } finally {
     await session.endSession();
   }
-  return result;
+  const completed = result as { job: DispatchJobLean; attempt: DispatchAttemptDocument } | null;
+  if (!completed) throw new AppError('DISPATCH_OFFER_FAILED', 'Offer could not be committed', 500);
+  return completed;
 };
 
 const markExhausted = async (job: DispatchJobLean, reason: string) => {
@@ -589,8 +591,9 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
   } finally {
     await session.endSession();
   }
-  if (!result) throw new AppError('DISPATCH_ACCEPT_FAILED', 'Offer acceptance could not be committed', 500);
-  return { dispatchJobId: String(jid), ...result, status: 'ACCEPTED' };
+  const acceptedResult = result as { tripId: string; emergencyRequestId: string; hospitalId: string; requestCode: string; etaMinutes?: number; routeSource: string } | null;
+  if (!acceptedResult) throw new AppError('DISPATCH_ACCEPT_FAILED', 'Offer acceptance could not be committed', 500);
+  return { dispatchJobId: String(jid), ...acceptedResult, status: 'ACCEPTED' };
 };
 
 export const rejectDispatchOffer = async (driverId: string, dispatchJobId: string) => {
