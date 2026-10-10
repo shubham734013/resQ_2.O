@@ -3,6 +3,16 @@ import { mapsApi } from '../services/mapsApi';
 import type { Facility, UserLocation } from '../types/facility';
 import type { RouteOptionItem } from '../types/route';
 
+const isValidCoordinate = (latitude: unknown, longitude: unknown): latitude is number =>
+  typeof latitude === 'number'
+  && Number.isFinite(latitude)
+  && latitude >= -90
+  && latitude <= 90
+  && typeof longitude === 'number'
+  && Number.isFinite(longitude)
+  && longitude >= -180
+  && longitude <= 180;
+
 const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][number]): RouteOptionItem => ({
   id: route.id,
   name: route.recommended ? 'Fastest route' : 'Alternative route',
@@ -25,26 +35,66 @@ const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][
 });
 
 export function useMapRoute(facility: Facility | null, location: UserLocation | null) {
-  const origin = location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
+  const origin = location && isValidCoordinate(location.latitude, location.longitude)
     ? { latitude: location.latitude, longitude: location.longitude }
     : null;
-  const destination = facility && Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude)
+  const destination = facility && isValidCoordinate(facility.latitude, facility.longitude)
     ? { latitude: facility.latitude, longitude: facility.longitude }
     : null;
+  const destinationAddress = facility
+    ? [facility.name, facility.address].filter((part) => typeof part === 'string' && part.trim()).join(', ')
+    : '';
+
+  // Some directory records have an address but no persisted coordinates. Geocode those
+  // records instead of silently disabling route calculation and showing a false route error.
+  const geocodedDestinationQuery = useQuery({
+    queryKey: ['facility-route-geocode', facility?.id, destinationAddress],
+    queryFn: () => mapsApi.geocode(destinationAddress),
+    enabled: Boolean(facility && !destination && destinationAddress.length >= 2),
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+  });
+
+  const resolvedDestination = destination ?? (
+    geocodedDestinationQuery.data
+      && isValidCoordinate(geocodedDestinationQuery.data.latitude, geocodedDestinationQuery.data.longitude)
+      ? {
+          latitude: geocodedDestinationQuery.data.latitude,
+          longitude: geocodedDestinationQuery.data.longitude,
+        }
+      : null
+  );
 
   const query = useQuery({
-    queryKey: ['google-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
+    queryKey: ['google-route', origin?.latitude, origin?.longitude, resolvedDestination?.latitude, resolvedDestination?.longitude],
     queryFn: () => mapsApi.route({
       origin: origin as { latitude: number; longitude: number },
-      destination: destination as { latitude: number; longitude: number },
+      destination: resolvedDestination as { latitude: number; longitude: number },
       travelMode: 'DRIVE',
       routingPreference: 'TRAFFIC_AWARE',
     }),
-    enabled: Boolean(origin && destination),
+    enabled: Boolean(origin && resolvedDestination),
     staleTime: 30_000,
     retry: 1,
   });
 
+  const refetchRoute = async () => {
+    if (!destination && !geocodedDestinationQuery.data) {
+      // Once geocoding resolves, the query above becomes enabled and computes the route.
+      return geocodedDestinationQuery.refetch();
+    }
+    return query.refetch();
+  };
+
   const routes = query.data?.routes.map(toRouteItem) ?? [];
-  return { ...query, routes };
+  const isGeocodingDestination = geocodedDestinationQuery.isLoading;
+  const geocodingFailed = geocodedDestinationQuery.isError;
+  return {
+    ...query,
+    routes,
+    isLoading: query.isLoading || isGeocodingDestination,
+    isError: query.isError || geocodingFailed,
+    error: query.error ?? geocodedDestinationQuery.error,
+    refetch: refetchRoute,
+  };
 }
