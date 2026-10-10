@@ -1,8 +1,9 @@
 export interface GoogleLatLngLiteral { lat: number; lng: number; }
-export interface GoogleMapOptions { center: GoogleLatLngLiteral; zoom: number; mapId?: string; streetViewControl?: boolean; mapTypeControl?: boolean; fullscreenControl?: boolean; clickableIcons?: boolean; }
-export interface GoogleMapInstance { setCenter(center: GoogleLatLngLiteral): void; setZoom(zoom: number): void; fitBounds(bounds: GoogleLatLngBounds): void; }
+export interface GoogleMapOptions { center: GoogleLatLngLiteral; zoom: number; mapId?: string; streetViewControl?: boolean; mapTypeControl?: boolean; fullscreenControl?: boolean; clickableIcons?: boolean; heading?: number; tilt?: number; }
+export interface GoogleMapInstance { setCenter(center: GoogleLatLngLiteral): void; setZoom(zoom: number): void; fitBounds(bounds: GoogleLatLngBounds): void; setHeading?(heading: number): void; setTilt?(tilt: number): void; panTo?(latLng: GoogleLatLngLiteral): void; getHeading?(): number; getTilt?(): number; getZoom?(): number; getCenter?(): GoogleLatLngLiteral; }
 export interface GoogleLatLngBounds { extend(point: GoogleLatLngLiteral): void; }
-export interface GooglePolylineOptions { map?: GoogleMapInstance; path: GoogleLatLngLiteral[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number; clickable?: boolean; }
+export interface GooglePolylineOptions { map?: GoogleMapInstance; path: GoogleLatLngLiteral[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number; clickable?: boolean; zIndex?: number; }
 export interface GooglePolyline { setMap(map: GoogleMapInstance | null): void; }
 export interface GoogleAdvancedMarker { map: GoogleMapInstance | null; addListener(event: string, handler: () => void): { remove: () => void }; }
-export interface GoogleMapsApi { maps: { importLibrary(name: 'maps' | 'marker' | 'places' | 'geometry'): Promise<Record<string, unknown>>; Map: new (element: HTMLElement, options: GoogleMapOptions) => GoogleMapInstance; LatLngBounds: new () => GoogleLatLngBounds; Polyline: new (options: GooglePolylineOptions) => GooglePolyline; }; }
+export interface GoogleTrafficLayer { setMap(map: GoogleMapInstance | null): void; }
+export interface GoogleMapsApi { maps: { importLibrary(name: 'maps' | 'marker' | 'places' | 'geometry'): Promise<Record<string, unknown>>; Map: new (element: HTMLElement, options: GoogleMapOptions) => GoogleMapInstance; LatLngBounds: new () => GoogleLatLngBounds; Polyline: new (options: GooglePolylineOptions) => GooglePolyline; TrafficLayer?: new () => GoogleTrafficLayer; }; }

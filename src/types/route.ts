@@ -43,6 +43,18 @@ export interface MapMarker {
   subtitle?: string;
   isEmergency?: boolean;
   isSelected?: boolean;
+  type?: 'USER' | 'AMBULANCE' | 'HOSPITAL' | 'DEFAULT';
+  metadata?: {
+    emergencyStatus?: string;
+    vehiclePlate?: string;
+    isAvailable?: boolean;
+    hospitalType?: string;
+    badgeText?: string;
+    subtitle?: string;
+    heading?: number;
+    rating?: number;
+    address?: string;
+  };
   onClick?: () => void;
 }
 

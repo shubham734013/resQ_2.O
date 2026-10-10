@@ -7,6 +7,7 @@ import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitive
 import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
 import { EmergencyTable } from '../components/admin/AdminTables';
 import { Button } from '../components/common/Button';
+import { MapView } from '../components/map/MapView';
 import {
   useAdminAmbulances,
   useAdminDrivers,
@@ -64,13 +65,197 @@ export const AdminUsersPage = () => {
 function ApprovalActions({ id, verification, accountStatus, verify, changeStatus }: { id: string; verification: AdminVerificationStatus; accountStatus: AdminAccountStatus; verify: (id: string, status: AdminVerificationStatus) => void; changeStatus: (id: string, status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'>) => void }) { return <div className="flex flex-wrap gap-2"><Status value={`V: ${verification}`} /><Status value={`A: ${accountStatus}`} />{verification !== 'VERIFIED' && <ConfirmAction label="Verify" onConfirm={() => verify(id, 'VERIFIED')} />}{verification !== 'REJECTED' && <ConfirmAction label="Reject" onConfirm={() => verify(id, 'REJECTED')} />}{accountStatus !== 'ACTIVE' ? <ConfirmAction label="Activate" onConfirm={() => changeStatus(id, 'ACTIVE')} /> : <ConfirmAction label="Suspend" onConfirm={() => changeStatus(id, 'SUSPENDED')} />}</div>; }
 
 export const AdminHospitalsPage = () => {
-  const [search, setSearch] = useState(''); const [page, setPage] = useState(1); const q = useAdminHospitals({ page, limit: 20, search }); const verification = useUpdateHospitalVerification(); const status = useUpdateHospitalStatus();
-  return <Section><AdminPage title="Hospital network" description="Real registrations with separate verification and account status."><Panel title="Hospitals"><div className="p-4"><Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Hospital, registration number, email or phone" /></div>{q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No hospitals found." /> : <><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Hospital</th><th>Type</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((h: AdminHospital) => <tr key={h.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{h.name}</b><div className="text-xs text-slate-500">{h.registrationNumber} · {h.email}</div></td><td>{h.hospitalType}</td><td>{h.city ?? '—'}, {h.state ?? '—'}</td><td><Status value={h.verificationStatus} /><div className="mt-1"><Status value={h.accountStatus} /></div></td><td><ApprovalActions id={h.id} verification={h.verificationStatus} accountStatus={h.accountStatus} verify={(id,v) => verification.mutate({ id, verificationStatus: v })} changeStatus={(id,s) => status.mutate({ id, status: s })} /></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage} /></>}</Panel></AdminPage></Section>;
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const q = useAdminHospitals({ page, limit: 20, search });
+  const verification = useUpdateHospitalVerification();
+  const status = useUpdateHospitalStatus();
+
+  const hospitalMarkers = useMemo(() => {
+    if (!q.data?.items) return [];
+    return q.data.items
+      .filter((h) => typeof h.latitude === 'number' && typeof h.longitude === 'number' && Number.isFinite(h.latitude) && Number.isFinite(h.longitude))
+      .map((h) => ({
+        id: h.id,
+        latitude: h.latitude!,
+        longitude: h.longitude!,
+        title: h.name,
+        type: 'HOSPITAL' as const,
+        subtitle: `${h.hospitalType} · ${h.city ?? ''}`,
+        isEmergency: h.emergencyAvailability === 'AVAILABLE',
+      }));
+  }, [q.data?.items]);
+
+  const mapCenter = useMemo(() => {
+    if (hospitalMarkers.length > 0) {
+      return { latitude: hospitalMarkers[0].latitude, longitude: hospitalMarkers[0].longitude };
+    }
+    return { latitude: 28.6139, longitude: 77.2090 };
+  }, [hospitalMarkers]);
+
+  return (
+    <Section>
+      <AdminPage title="Hospital network" description="Real registrations with verified intake capabilities, status, and GIS network coverage.">
+        {hospitalMarkers.length > 0 && (
+          <div className="mb-6">
+            <Panel title="Hospital network radar" description="Live geographic coverage of registered hospital facilities.">
+              <div className="p-4">
+                <div className="h-72 w-full overflow-hidden rounded-xl border border-slate-200">
+                  <MapView center={mapCenter} zoom={11} markers={hospitalMarkers} interactive className="h-full w-full" />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
+                  <span>{hospitalMarkers.length} hospital facility location(s) mapped</span>
+                  <span>24/7 ER Ready</span>
+                </div>
+              </div>
+            </Panel>
+          </div>
+        )}
+        <Panel title="Hospitals">
+          <div className="p-4">
+            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Hospital, registration number, email or phone" />
+          </div>
+          {q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No hospitals found." /> : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs text-slate-500">
+                      <th className="px-4 py-3">Hospital</th>
+                      <th>Type</th>
+                      <th>Location</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {q.data.items.map((h: AdminHospital) => (
+                      <tr key={h.id} className="border-b border-slate-100 align-top">
+                        <td className="px-4 py-3">
+                          <b>{h.name}</b>
+                          <div className="text-xs text-slate-500">{h.registrationNumber} · {h.email}</div>
+                        </td>
+                        <td>{h.hospitalType}</td>
+                        <td>{h.city ?? '—'}, {h.state ?? '—'}</td>
+                        <td>
+                          <Status value={h.verificationStatus} />
+                          <div className="mt-1"><Status value={h.accountStatus} /></div>
+                        </td>
+                        <td>
+                          <ApprovalActions
+                            id={h.id}
+                            verification={h.verificationStatus}
+                            accountStatus={h.accountStatus}
+                            verify={(id, v) => verification.mutate({ id, verificationStatus: v })}
+                            changeStatus={(id, s) => status.mutate({ id, status: s })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pager {...q.data.pagination} onPage={setPage} />
+            </>
+          )}
+        </Panel>
+      </AdminPage>
+    </Section>
+  );
 };
 
 export const AdminAmbulancesPage = () => {
-  const [search, setSearch] = useState(''); const [page, setPage] = useState(1); const q = useAdminAmbulances({ page, limit: 20, search });
-  return <Section><AdminPage title="Ambulance network" description="Live fleet registrations, relationships and current location data."><Panel title="Ambulances"><div className="p-4"><Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Registration, vehicle number or type" /></div>{q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No ambulances found." /> : <><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Ambulance</th><th>Provider</th><th>Driver</th><th>Status</th><th>Location</th></tr></thead><tbody>{q.data.items.map((a: AdminAmbulance) => <tr key={a.id} className="border-b border-slate-100"><td className="px-4 py-3"><b>{a.registrationNumber}</b><div className="text-xs text-slate-500">{a.vehicleNumber} · {a.ambulanceType}</div></td><td>{a.provider?.name ?? 'Unassigned'}</td><td>{a.assignedDriver?.name ?? 'Unassigned'}</td><td><Status value={a.currentStatus} /><div className="mt-1"><Status value={a.verificationStatus} /></div></td><td>{a.currentLatitude !== undefined && a.currentLongitude !== undefined ? `${a.currentLatitude}, ${a.currentLongitude}` : 'No current location'}</td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage} /></>}</Panel></AdminPage></Section>;
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const q = useAdminAmbulances({ page, limit: 20, search });
+
+  const ambulanceMarkers = useMemo(() => {
+    if (!q.data?.items) return [];
+    return q.data.items
+      .filter((a) => typeof a.currentLatitude === 'number' && typeof a.currentLongitude === 'number' && Number.isFinite(a.currentLatitude) && Number.isFinite(a.currentLongitude))
+      .map((a) => ({
+        id: a.id,
+        latitude: a.currentLatitude!,
+        longitude: a.currentLongitude!,
+        title: a.registrationNumber || a.vehicleNumber || 'Ambulance',
+        type: 'AMBULANCE' as const,
+        subtitle: `${a.currentStatus} · ${a.ambulanceType}`,
+        metadata: {
+          vehiclePlate: a.vehicleNumber,
+          badgeText: a.currentStatus,
+          isAvailable: a.currentStatus === 'AVAILABLE',
+        },
+      }));
+  }, [q.data?.items]);
+
+  const mapCenter = useMemo(() => {
+    if (ambulanceMarkers.length > 0) {
+      return { latitude: ambulanceMarkers[0].latitude, longitude: ambulanceMarkers[0].longitude };
+    }
+    return { latitude: 28.6139, longitude: 77.2090 };
+  }, [ambulanceMarkers]);
+
+  return (
+    <Section>
+      <AdminPage title="Ambulance network" description="Live fleet registrations, GIS fleet radar and real-time positioning data.">
+        {ambulanceMarkers.length > 0 && (
+          <div className="mb-6">
+            <Panel title="Fleet command radar" description="Live geographical positioning of ambulances reporting coordinates.">
+              <div className="p-4">
+                <div className="h-72 w-full overflow-hidden rounded-xl border border-slate-200">
+                  <MapView center={mapCenter} zoom={12} markers={ambulanceMarkers} interactive className="h-full w-full" />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
+                  <span>{ambulanceMarkers.length} ambulance(s) transmitting live GPS coordinates</span>
+                  <span>Active Fleet Radar</span>
+                </div>
+              </div>
+            </Panel>
+          </div>
+        )}
+        <Panel title="Ambulances">
+          <div className="p-4">
+            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Registration, vehicle number or type" />
+          </div>
+          {q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No ambulances found." /> : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs text-slate-500">
+                      <th className="px-4 py-3">Ambulance</th>
+                      <th>Provider</th>
+                      <th>Driver</th>
+                      <th>Status</th>
+                      <th>Location</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {q.data.items.map((a: AdminAmbulance) => (
+                      <tr key={a.id} className="border-b border-slate-100">
+                        <td className="px-4 py-3">
+                          <b>{a.registrationNumber}</b>
+                          <div className="text-xs text-slate-500">{a.vehicleNumber} · {a.ambulanceType}</div>
+                        </td>
+                        <td>{a.provider?.name ?? 'Unassigned'}</td>
+                        <td>{a.assignedDriver?.name ?? 'Unassigned'}</td>
+                        <td>
+                          <Status value={a.currentStatus} />
+                          <div className="mt-1"><Status value={a.verificationStatus} /></div>
+                        </td>
+                        <td>{a.currentLatitude !== undefined && a.currentLongitude !== undefined ? `${a.currentLatitude}, ${a.currentLongitude}` : 'No current location'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pager {...q.data.pagination} onPage={setPage} />
+            </>
+          )}
+        </Panel>
+      </AdminPage>
+    </Section>
+  );
 };
 
 export const AdminProvidersPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminProviders({page,limit:20,search}); const v=useUpdateProviderVerification(); const s=useUpdateProviderStatus(); return <Section><AdminPage title="Ambulance providers" description="Manage provider verification, account status and fleet relationships."><Panel title="Providers"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Provider, registration, email or phone"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No providers found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Provider</th><th>Location</th><th>Fleet</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((p:AdminAmbulanceProvider)=><tr key={p.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{p.name}</b><div className="text-xs text-slate-500">{p.registrationNumber} · {p.email}</div></td><td>{p.city??'—'}, {p.state??'—'}</td><td>{p.ambulanceCount}</td><td><Status value={p.verificationStatus}/><div className="mt-1"><Status value={p.accountStatus}/></div></td><td><ApprovalActions id={p.id} verification={p.verificationStatus} accountStatus={p.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
