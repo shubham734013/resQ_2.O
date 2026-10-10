@@ -12,6 +12,8 @@ import { AmbulanceDriverModel } from './models/AmbulanceDriver.js';
 import { EmergencyRequestModel } from './models/EmergencyRequest.js';
 import { TripModel } from './models/Trip.js';
 import { HospitalPatientModel } from './models/HospitalPatient.js';
+import { DispatchJobModel } from './models/DispatchJob.js';
+import { HospitalCoordinationNotificationModel } from './models/HospitalCoordinationNotification.js';
 
 process.env.NODE_ENV ??= 'test';
 process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
@@ -49,11 +51,16 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
   const userId = new Types.ObjectId();
   const outsiderId = new Types.ObjectId();
   const hospitalId = new Types.ObjectId();
+  const otherHospitalId = new Types.ObjectId();
   const providerId = new Types.ObjectId();
   const ambulanceId = new Types.ObjectId();
   const driverId = new Types.ObjectId();
+  const secondAmbulanceId = new Types.ObjectId();
+  const secondDriverId = new Types.ObjectId();
   const emergencyId = new Types.ObjectId();
   const tripId = new Types.ObjectId();
+  const secondTripId = new Types.ObjectId();
+  const dispatchJobId = new Types.ObjectId();
   let server: ReturnType<typeof createServer> | null = null;
   let stopSockets: (() => Promise<void>) | null = null;
   const sockets: Socket[] = [];
@@ -65,6 +72,12 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await HospitalModel.create({
       _id: hospitalId, name: 'Tracking Test Hospital', registrationNumber: 'TRH-' + suffix,
       email: 'tracking-hospital-' + suffix + '@example.test', phone: '0000000000', passwordHash: 'test-only',
+      hospitalType: 'General', latitude: 26.9128, longitude: 75.7875,
+      verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
+    });
+    await HospitalModel.create({
+      _id: otherHospitalId, name: 'Other Tracking Hospital', registrationNumber: 'OTH-' + suffix,
+      email: 'other-tracking-hospital-' + suffix + '@example.test', phone: '0000000000', passwordHash: 'test-only',
       hospitalType: 'General', latitude: 26.9128, longitude: 75.7875,
       verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
     });
@@ -100,12 +113,24 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
       caseId: 'TRKC-' + suffix.slice(-8).toUpperCase(), hospitalId, emergencyId, ambulanceId,
       coordinationStatus: 'INCOMING', emergencyType: 'accident', receivedAt: new Date(),
     });
+    const now = new Date();
+    const attemptId = 'acceptance-' + suffix;
+    await DispatchJobModel.create({
+      _id: dispatchJobId, emergencyRequestId: emergencyId, hospitalId, userId, category: 'accident_injury',
+      pickupLatitude: 26.9124, pickupLongitude: 75.7873, status: 'ACCEPTED', generation: 1,
+      attempts: [{ attemptId, generation: 1, attemptNumber: 1, providerId, ambulanceId, driverId, status: 'ACCEPTED',
+        offeredAt: new Date(now.getTime() - 30000), deadlineAt: new Date(now.getTime() - 5000), respondedAt: now,
+        routeSource: 'DRIVING', routeDistanceMeters: 0 }],
+      events: [], currentAttemptId: attemptId, currentProviderId: providerId, currentAmbulanceId: ambulanceId,
+      currentDriverId: driverId, acceptedTripId: tripId,
+    });
 
     const { app } = await import('./app.js');
     const { initializeTrackingSockets } = await import('./services/trackingSocketService.js');
     const { broadcastEvent } = await import('./services/realtimeService.js');
     const { updateDriverLocation } = await import('./services/driverDutyService.js');
-    const { arrivedPickup, patientPickedUp, arrivedHospital, completeTrip } = await import('./services/ambulanceOperationsService.js');
+    const { arrivedPickup, patientPickedUp, arrivedHospital, completeTrip, cancelTrip } = await import('./services/ambulanceOperationsService.js');
+    const { recordHospitalCoordinationEvent } = await import('./services/hospitalCoordinationService.js');
     server = createServer(app);
     stopSockets = initializeTrackingSockets(server);
     await new Promise<void>((resolve) => server!.listen(0, resolve));
@@ -114,14 +139,17 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     const url = 'http://127.0.0.1:' + address.port;
     const userToken = accessToken(userId, 'tracking-user-' + suffix + '@example.test', 'USER');
     const hospitalToken = accessToken(hospitalId, 'tracking-hospital-' + suffix + '@example.test', 'HOSPITAL');
+    const otherHospitalToken = accessToken(otherHospitalId, 'other-tracking-hospital-' + suffix + '@example.test', 'HOSPITAL');
     const outsiderToken = accessToken(outsiderId, 'tracking-outsider-' + suffix + '@example.test', 'USER');
     const userSocket = await connect(url, userToken); sockets.push(userSocket);
     const hospitalSocket = await connect(url, hospitalToken); sockets.push(hospitalSocket);
+    const hospitalSecondSocket = await connect(url, hospitalToken); sockets.push(hospitalSecondSocket);
     const outsiderSocket = await connect(url, outsiderToken); sockets.push(outsiderSocket);
 
     assert.equal((await subscribe(userSocket, { type: 'emergency', id: String(emergencyId) })).ok, true);
     assert.equal((await subscribe(hospitalSocket, { type: 'emergency', id: String(emergencyId) })).ok, true);
     assert.equal((await subscribe(hospitalSocket, { type: 'hospital-operations', id: String(hospitalId) })).ok, true);
+    assert.equal((await subscribe(hospitalSecondSocket, { type: 'hospital-operations', id: String(hospitalId) })).ok, true, 'multiple authenticated hospital sessions can subscribe to the same hospital room');
     const denied = await subscribe(outsiderSocket, { type: 'emergency', id: String(emergencyId) });
     assert.equal(denied.ok, false, 'unrelated user must not join the emergency room');
     assert.equal((await subscribe(userSocket, { type: '*', id: '*' })).ok, false, 'wildcard room subscription must be rejected');
