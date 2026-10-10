@@ -107,7 +107,7 @@ const hospitalCoordinate = (hospital: Pick<EmergencyHospitalCandidate, 'location
       typeof longitude !== 'number' || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
   return { latitude, longitude };
 };
-const hospitalMatchesSituation = (hospital: Pick<EmergencyHospitalCandidate, 'hospitalType' | 'services' | 'capabilities'>, situationType: string) => {
+export const hospitalMatchesSituation = (hospital: Pick<EmergencyHospitalCandidate, 'hospitalType' | 'services' | 'capabilities'>, situationType: string) => {
   const terms = situationTerms[situationIdForLabel[situationType] ?? situationType] ?? situationTerms.other;
   return [hospital.hospitalType, ...(hospital.services ?? []), ...(hospital.capabilities ?? [])].some((value) => terms.test(value));
 };
