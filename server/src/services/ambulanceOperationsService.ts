@@ -4,10 +4,12 @@ import { AmbulanceProviderModel, type AmbulanceProviderDocument } from '../model
 import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel, type EmergencyRequestDocument } from '../models/EmergencyRequest.js';
+import { DispatchJobModel } from '../models/DispatchJob.js';
 import { TripModel, type TripDocument } from '../models/Trip.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { broadcastEvent } from './realtimeService.js';
+import { hospitalNotificationTypeForTripStatus, recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type * as S from '../schemas/ambulance.js';
@@ -67,8 +69,8 @@ export const listDrivers=async(pid:string,q:DriverQuery)=>{await operationalProv
 export const getDriver=async(pid:string,id:string)=>{await operationalProvider(pid);const x=await AmbulanceDriverModel.findOne({_id:oid(id,'driver'),providerId:oid(pid,'provider')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
 export const createDriver=async(pid:string,input:z.infer<typeof S.driverCreateSchema>)=>{await operationalProvider(pid);if(await AmbulanceDriverModel.exists({$or:[{email:input.email.toLowerCase()},{licenseNumber:input.licenseNumber}]}))throw new AppError('DRIVER_ALREADY_EXISTS','Driver email or license number already exists',409);const passwordHash=await bcrypt.hash(input.password,12);const x=await AmbulanceDriverModel.create({...input,email:input.email.toLowerCase(),passwordHash,providerId:oid(pid,'provider'),licenseVerificationStatus:'PENDING',accountStatus:'PENDING',availabilityStatus:'OFFLINE'});return driverOut(x.toObject());};
 export const updateDriver=async(pid:string,id:string,input:z.infer<typeof S.driverUpdateSchema>)=>{await operationalProvider(pid);const {password,...profileUpdate}=input;const update:Partial<AmbulanceDriverDocument>={...profileUpdate};if(password)update.passwordHash=await bcrypt.hash(password,12);const x=await AmbulanceDriverModel.findOneAndUpdate({_id:oid(id,'driver'),providerId:oid(pid,'provider')},{$set:update},{new:true,runValidators:true}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);return driverOut(x);};
-export const assignDriver=async(pid:string,aid:string,did:string)=>{await operationalProvider(pid);const p=oid(pid,'provider'),aId=oid(aid,'ambulance'),dId=oid(did,'driver');const [a,d]=await Promise.all([AmbulanceModel.findOne({_id:aId,providerId:p}).exec(),AmbulanceDriverModel.findOne({_id:dId,providerId:p}).exec()]);if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);if(!d)throw new AppError('NOT_FOUND','Driver not found',404);active(d.accountStatus);verified(d.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');if(d.assignedAmbulanceId&&String(d.assignedAmbulanceId)!==String(aId))throw new AppError('DRIVER_ALREADY_ASSIGNED','Driver is assigned to another ambulance',409);const current=await AmbulanceDriverModel.findOne({assignedAmbulanceId:aId,_id:{$ne:dId}}).exec();if(current)throw new AppError('AMBULANCE_ALREADY_ASSIGNED','Ambulance already has a driver',409);d.assignedAmbulanceId=aId;await d.save();return driverOut(d.toObject());};
-export const unassignDriver=async(pid:string,aid:string)=>{await operationalProvider(pid);const p=oid(pid,'provider');const a=await AmbulanceModel.findOne({_id:oid(aid,'ambulance'),providerId:p}).exec();if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);const d=await AmbulanceDriverModel.findOne({assignedAmbulanceId:a._id,providerId:p}).exec();if(!d)return {unassigned:true};d.assignedAmbulanceId=undefined;d.availabilityStatus='OFFLINE';await d.save();return {unassigned:true};};
+export const assignDriver=async(pid:string,aid:string,did:string)=>{await operationalProvider(pid);const p=oid(pid,'provider'),aId=oid(aid,'ambulance'),dId=oid(did,'driver');const [a,d]=await Promise.all([AmbulanceModel.findOne({_id:aId,providerId:p}).exec(),AmbulanceDriverModel.findOne({_id:dId,providerId:p}).exec()]);if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);if(!d)throw new AppError('NOT_FOUND','Driver not found',404);const now=new Date();if((a.dispatchReservationId&&a.dispatchReservationExpiresAt&&a.dispatchReservationExpiresAt>now)||(d.dispatchReservationId&&d.dispatchReservationExpiresAt&&d.dispatchReservationExpiresAt>now))throw new AppError('DISPATCH_RESERVATION_ACTIVE','Driver or ambulance is reserved for an active dispatch offer',409);active(d.accountStatus);verified(d.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');if(d.assignedAmbulanceId&&String(d.assignedAmbulanceId)!==String(aId))throw new AppError('DRIVER_ALREADY_ASSIGNED','Driver is assigned to another ambulance',409);const current=await AmbulanceDriverModel.findOne({assignedAmbulanceId:aId,_id:{$ne:dId}}).exec();if(current)throw new AppError('AMBULANCE_ALREADY_ASSIGNED','Ambulance already has a driver',409);d.assignedAmbulanceId=aId;await d.save();return driverOut(d.toObject());};
+export const unassignDriver=async(pid:string,aid:string)=>{await operationalProvider(pid);const p=oid(pid,'provider');const a=await AmbulanceModel.findOne({_id:oid(aid,'ambulance'),providerId:p}).exec();if(!a)throw new AppError('NOT_FOUND','Ambulance not found',404);const d=await AmbulanceDriverModel.findOne({assignedAmbulanceId:a._id,providerId:p}).exec();if(!d)return {unassigned:true};const now=new Date();if((a.dispatchReservationId&&a.dispatchReservationExpiresAt&&a.dispatchReservationExpiresAt>now)||(d.dispatchReservationId&&d.dispatchReservationExpiresAt&&d.dispatchReservationExpiresAt>now))throw new AppError('DISPATCH_RESERVATION_ACTIVE','Driver or ambulance is reserved for an active dispatch offer',409);d.assignedAmbulanceId=undefined;d.availabilityStatus='OFFLINE';await d.save();return {unassigned:true};};
 const requestFilter=(pid:string,q:RequestQuery)=>{const p=oid(pid,'provider');const f:QueryFilter<EmergencyRequestDocument>={status:'AMBULANCE_COORDINATION',$or:[{ambulanceProviderId:p},{ambulanceProviderId:{$exists:false}}]};if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.driver)f.driverId=oid(q.driver,'driver');if(q.status&&q.status!=='AMBULANCE_COORDINATION')f.status=q.status;if(q.search)f.$and=[{$or:[{requestCode:new RegExp(escape(q.search),'i')},{situationType:new RegExp(escape(q.search),'i')}]}];if(q.from||q.to)f.reportedAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};return f;};
 export const listProviderRequests = async (pid: string, q: RequestQuery) => {
   await operationalProvider(pid);
@@ -92,8 +94,9 @@ export const getProviderRequest = async (pid: string, id: string) => {
 };
 export const assignRequest = async (pid: string, rid: string, aid: string) => {
   await operationalProvider(pid);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(rid, 'request') })) throw new AppError('DISPATCH_ENGINE_MANAGED', 'This request is controlled by the automatic dispatch engine. Use dispatch job operations instead of legacy direct assignment.', 409);
   const p = oid(pid, 'provider'), aId = oid(aid, 'ambulance');
-  const a = await AmbulanceModel.findOne({ _id: aId, providerId: p, currentStatus: 'AVAILABLE', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE' }).exec();
+  const a = await AmbulanceModel.findOne({ _id: aId, providerId: p, currentStatus: 'AVAILABLE', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationId: null }, { dispatchReservationExpiresAt: { $lte: new Date() } }] }).exec();
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Ambulance is unavailable or not verified', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(rid, 'request'), status: 'AMBULANCE_COORDINATION', ambulanceId: { $exists: false }, $or: [{ ambulanceProviderId: { $exists: false } }, { ambulanceProviderId: p }] }, { $set: { ambulanceProviderId: p, ambulanceId: aId } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is already assigned', 409);
@@ -125,16 +128,25 @@ export const getDriverRequest = async (did: string, id: string) => {
 };
 export const acceptRequest = async (did: string, id: string) => {
   const d = await operationalDriver(did);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(id, 'request') })) throw new AppError('DISPATCH_OFFER_REQUIRED', 'This request must be accepted through its authenticated, unexpired dispatch offer.', 409);
+  if (d.dispatchReservationId && d.dispatchReservationExpiresAt && d.dispatchReservationExpiresAt > new Date()) throw new AppError('DISPATCH_RESERVATION_ACTIVE', 'Driver is reserved for an active dispatch offer.', 409);
   if (d.availabilityStatus === 'OFFLINE' || !d.assignedAmbulanceId) throw new AppError('DRIVER_UNAVAILABLE', 'Driver is offline or has no assigned ambulance', 409);
   const a = await AmbulanceModel.findOne({ _id: d.assignedAmbulanceId, providerId: d.providerId, currentStatus: 'BUSY', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE' }).exec();
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Assigned ambulance is not operational', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(id, 'request'), status: 'AMBULANCE_COORDINATION', ambulanceId: a._id, driverId: { $exists: false } }, { $set: { driverId: d._id } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is already accepted', 409);
-  const existing = await TripModel.findOne({ emergencyRequestId: x._id }).exec();
-  if (existing) return tripOut(existing.toObject());
-  const trip = await TripModel.create({ emergencyRequestId: x._id, providerId: d.providerId, ambulanceId: a._id, driverId: d._id, destinationHospitalId: x.hospitalId, status: 'ACCEPTED', acceptedAt: new Date() });
+  const existing = await TripModel.findOne({ emergencyRequestId: x._id, status: { $in: activeTripStatuses } }).sort({ createdAt: -1 }).exec();
+  if (existing) {
+    try { await recordHospitalCoordinationEvent({ emergencyId: String(x._id), tripId: String(existing._id), type: 'AMBULANCE_ASSIGNED' }); }
+    catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
+    return tripOut(existing.toObject());
+  }
+  const acceptedAt = new Date();
+  const trip = await TripModel.create({ emergencyRequestId: x._id, providerId: d.providerId, ambulanceId: a._id, driverId: d._id, destinationHospitalId: x.hospitalId, status: 'ACCEPTED', acceptedAt, statusHistory: [{ status: 'ACCEPTED', changedAt: acceptedAt, actorId: d._id, actorRole: 'AMBULANCE_DRIVER' }] });
   await AmbulanceDriverModel.updateOne({ _id: d._id }, { $set: { availabilityStatus: 'BUSY' } }).exec();
   const out = tripOut(trip.toObject());
+  try { await recordHospitalCoordinationEvent({ emergencyId: String(x._id), tripId: String(trip._id), type: 'AMBULANCE_ASSIGNED' }); }
+  catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
   broadcastEvent(`emergency:${x._id}`, 'dispatch:accepted', out);
   broadcastEvent(`hospital:${x.hospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent('operations', 'dispatch:accepted', out);
@@ -142,6 +154,7 @@ export const acceptRequest = async (did: string, id: string) => {
 };
 export const rejectRequest = async (did: string, id: string) => {
   const d = await operationalDriver(did);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(id, 'request') })) throw new AppError('DISPATCH_OFFER_REQUIRED', 'This request must be rejected through its authenticated dispatch offer.', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(id, 'request'), status: 'AMBULANCE_COORDINATION', driverId: { $exists: false }, ambulanceId: d.assignedAmbulanceId }, { $unset: { ambulanceId: 1, ambulanceProviderId: 1 } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is no longer available', 409);
   const a = d.assignedAmbulanceId ? await AmbulanceModel.findOne({ _id: d.assignedAmbulanceId, providerId: d.providerId }).exec() : null;
@@ -157,8 +170,8 @@ export const allowedTripTransitions: { [K in TripStatus]?: TripStatus[] } = {
   ACCEPTED: ['TO_PICKUP', 'AT_PICKUP', 'CANCELLED'],
   TO_PICKUP: ['AT_PICKUP', 'CANCELLED'],
   AT_PICKUP: ['PATIENT_ONBOARD', 'CANCELLED'],
-  PATIENT_ONBOARD: ['TO_HOSPITAL', 'AT_HOSPITAL', 'CANCELLED'],
-  TO_HOSPITAL: ['AT_HOSPITAL', 'CANCELLED'],
+  PATIENT_ONBOARD: ['TO_HOSPITAL', 'AT_HOSPITAL'],
+  TO_HOSPITAL: ['AT_HOSPITAL'],
   AT_HOSPITAL: ['COMPLETED'],
   COMPLETED: [],
   CANCELLED: []
@@ -174,41 +187,71 @@ async function moveTrip(did:string,id:string,next:TripStatus){
   if(next==='PATIENT_ONBOARD')set.patientPickedUpAt=now;
   if(next==='AT_HOSPITAL')set.arrivedAtHospitalAt=now;
   if(next==='COMPLETED')set.completedAt=now;
-  const x=await TripModel.findOneAndUpdate({_id:current._id,driverId:oid(did,'driver'),status:current.status},{$set:set},{new:true}).lean().exec();
+  const x=await TripModel.findOneAndUpdate(
+    {_id:current._id,driverId:oid(did,'driver'),status:current.status},
+    {$set:set,$push:{statusHistory:{status:next,changedAt:now,actorId:oid(did,'driver'),actorRole:'AMBULANCE_DRIVER',previousStatus:current.status}}},
+    {new:true}
+  ).lean().exec();
   if(!x)throw new AppError('INVALID_TRIP_TRANSITION','Trip changed before this action could be applied',409);
+
   if(next==='AT_HOSPITAL'){
     await HospitalPatientModel.updateOne(
-      { emergencyId: x.emergencyRequestId, coordinationStatus: { $in: ['INCOMING', 'HOSPITAL_NOTIFIED'] } },
-      { $set: { coordinationStatus: 'AT_HOSPITAL' } }
+      {emergencyId:x.emergencyRequestId,hospitalId:x.destinationHospitalId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+      {$set:{coordinationStatus:'AT_HOSPITAL'}}
     ).exec();
   }
   if(next==='COMPLETED'){
     await Promise.all([
-      AmbulanceModel.updateOne({_id:x.ambulanceId},{$set:{currentStatus:'AVAILABLE'}}).exec(),
-      AmbulanceDriverModel.updateOne({_id:x.driverId},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+      AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
+      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
       EmergencyRequestModel.updateOne(
-        { _id: x.emergencyRequestId, status: 'AMBULANCE_COORDINATION' },
-        {
-          $set: { status: 'RESOLVED' },
-          $push: {
-            statusHistory: {
-              status: 'RESOLVED',
-              changedAt: now,
-              previousStatus: 'AMBULANCE_COORDINATION',
-              actorId: x.driverId,
-              actorRole: 'AMBULANCE_DRIVER',
-            },
-          },
-        }
+        {_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION'},
+        {$set:{status:'RESOLVED'},$push:{statusHistory:{status:'RESOLVED',changedAt:now,previousStatus:'AMBULANCE_COORDINATION',actorId:x.driverId,actorRole:'AMBULANCE_DRIVER'}}}
       ).exec(),
       HospitalPatientModel.updateOne(
-        { emergencyId: x.emergencyRequestId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
-        { $set: { coordinationStatus: 'RESOLVED' } }
+        {emergencyId:x.emergencyRequestId,hospitalId:x.destinationHospitalId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+        {$set:{coordinationStatus:'RESOLVED'}}
       ).exec(),
     ]);
   }
+  if(next==='CANCELLED'){
+    await Promise.all([
+      AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
+      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+      EmergencyRequestModel.updateOne(
+        {_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION',ambulanceId:x.ambulanceId},
+        {$unset:{ambulanceId:1,ambulanceProviderId:1,driverId:1,etaMinutes:1}}
+      ).exec(),
+      HospitalPatientModel.updateOne(
+        {emergencyId:x.emergencyRequestId,hospitalId:x.destinationHospitalId,coordinationStatus:{$nin:['RESOLVED','CANCELLED']}},
+        {$set:{coordinationStatus:'REASSIGNMENT_REQUIRED'},$unset:{ambulanceId:1,etaMinutes:1}}
+      ).exec(),
+    ]);
+    const job=await DispatchJobModel.findOne({emergencyRequestId:x.emergencyRequestId,status:'ACCEPTED',acceptedTripId:x._id}).lean().exec();
+    if(job){
+      const set:Record<string,unknown>={status:'PENDING',generation:job.generation+1,nextAttemptAt:now};
+      const options:Record<string,unknown>={};
+      if(job.currentAttemptId){
+        set['attempts.$[attempt].status']='CANCELLED';
+        set['attempts.$[attempt].respondedAt']=now;
+        set['attempts.$[attempt].reason']='Trip cancelled before transport; returning emergency to dispatch.';
+        options.arrayFilters=[{'attempt.attemptId':job.currentAttemptId}];
+      }
+      await DispatchJobModel.updateOne({_id:job._id,status:'ACCEPTED',acceptedTripId:x._id},{
+        $set:set,
+        $unset:{acceptedTripId:1,currentAttemptId:1,currentProviderId:1,currentAmbulanceId:1,currentDriverId:1,deadlineAt:1,leaseUntil:1,leaseToken:1,exhaustedAt:1,escalatedAt:1,escalationReason:1},
+        $push:{events:{event:'TRIP_CANCELLED_REDISPATCH_QUEUED',at:now,actorId:oid(did,'driver'),actorRole:'AMBULANCE_DRIVER',reason:'Trip cancelled before patient transport.'}},
+      },options).exec();
+    }
+  }
+  const eventType=hospitalNotificationTypeForTripStatus(next);
+  if(eventType){
+    try{await recordHospitalCoordinationEvent({emergencyId:String(x.emergencyRequestId),tripId:String(x._id),type:eventType});}
+    catch(error){console.error('Hospital trip notification will reconcile from persisted trip history:',error instanceof Error?error.message:'notification persistence failed');}
+  }
   const out = tripOut(x);
   broadcastEvent(`emergency:${x.emergencyRequestId}`, 'tracking:status', out);
+  broadcastEvent(`trip:${x._id}`, 'tracking:status', out);
   broadcastEvent(`hospital:${x.destinationHospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent('operations', 'tracking:status', out);
   return out;
@@ -216,9 +259,16 @@ async function moveTrip(did:string,id:string,next:TripStatus){
 export const listDriverTrips=async(did:string,q:TripQuery)=>{await operationalDriver(did);const f:QueryFilter<TripDocument>={driverId:oid(did,'driver')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
 export const getDriverTrip=async(did:string,id:string)=>tripOut(await driverTrip(id,did));
 export const arrivedPickup=async(did:string,id:string)=>moveTrip(did,id,'AT_PICKUP');
-export const patientPickedUp=async(did:string,id:string)=>moveTrip(did,id,'PATIENT_ONBOARD');
+export const patientPickedUp=async(did:string,id:string)=>{
+  const current=await driverTrip(id,did);
+  if(current.status==='TO_HOSPITAL')return tripOut(current);
+  if(current.status==='PATIENT_ONBOARD')return moveTrip(did,id,'TO_HOSPITAL');
+  await moveTrip(did,id,'PATIENT_ONBOARD');
+  return moveTrip(did,id,'TO_HOSPITAL');
+};
 export const arrivedHospital=async(did:string,id:string)=>moveTrip(did,id,'AT_HOSPITAL');
 export const completeTrip=async(did:string,id:string)=>moveTrip(did,id,'COMPLETED');
+export const cancelTrip=async(did:string,id:string)=>moveTrip(did,id,'CANCELLED');
 export const listProviderTrips=async(pid:string,q:TripQuery)=>{await operationalProvider(pid);const f:QueryFilter<TripDocument>={providerId:oid(pid,'provider')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.driver)f.driverId=oid(q.driver,'driver');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
 export const getProviderTrip=async(pid:string,id:string)=>{await operationalProvider(pid);const x=await TripModel.findOne({_id:oid(id,'trip'),providerId:oid(pid,'provider')}).lean().exec();if(!x)throw new AppError('NOT_FOUND','Trip not found',404);return tripOut(x);};
 export const getDriverProfile=async(id:string)=>driverOut(await operationalDriver(id));
@@ -229,7 +279,7 @@ export const updateDriverLocation=async(did:string,input:z.infer<typeof S.ambula
   if(d.availabilityStatus==='OFFLINE') throw new AppError('DRIVER_OFFLINE','Location updates are allowed only while the driver is on duty',409);
   const a=await AmbulanceModel.findOneAndUpdate(
     {_id:d.assignedAmbulanceId,providerId:d.providerId,verificationStatus:'VERIFIED',accountStatus:'ACTIVE'},
-    {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:input.timestamp}},
+    {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:new Date()}},
     {new:true}
   ).lean().exec();
   if(!a) throw new AppError('AMBULANCE_UNAVAILABLE','Assigned ambulance is not operational',409);

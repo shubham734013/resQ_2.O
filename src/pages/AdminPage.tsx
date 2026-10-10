@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react';
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
@@ -77,6 +78,14 @@ export const AdminProvidersPage = () => { const [search,setSearch]=useState('');
 export const AdminDriversPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminDrivers({page,limit:20,search}); const v=useUpdateDriverVerification(); const s=useUpdateDriverStatus(); return <Section><AdminPage title="Ambulance drivers" description="Review driver verification, registered location and fleet assignment."><Panel title="Drivers"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Name, email, phone or license"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No drivers found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Driver</th><th>Provider</th><th>Ambulance</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((d:AdminAmbulanceDriver)=><tr key={d.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{d.fullName}</b><div className="text-xs text-slate-500">{d.email} · {d.licenseNumber}</div></td><td>{d.provider?.name??'Unassigned'}</td><td>{d.assignedAmbulance?.registrationNumber??'Unassigned'}</td><td>{d.city??'—'}, {d.state??'—'}</td><td><Status value={d.licenseVerificationStatus}/><div className="mt-1"><Status value={d.accountStatus}/></div></td><td><ApprovalActions id={d.id} verification={d.licenseVerificationStatus} accountStatus={d.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
 
 export const AdminEmergenciesPage = () => {
+  const queryClient = useQueryClient();
+  const [manualDriverIds, setManualDriverIds] = useState<Record<string, string>>({});
+  const [escalationReason, setEscalationReason] = useState('No eligible driver available; operations intervention required.');
+  const dispatchJobs = useQuery({ queryKey: ['admin-dispatch-jobs'], queryFn: () => adminApi.dispatchJobs({ limit: 50 }), refetchInterval: 5000 });
+  const refreshDispatch = async () => { await queryClient.invalidateQueries({ queryKey: ['admin-dispatch-jobs'] }); await queryClient.invalidateQueries({ queryKey: ['admin-emergencies'] }); };
+  const retryDispatch = useMutation({ mutationFn: (id: string) => adminApi.retryDispatchJob(id), onSuccess: refreshDispatch });
+  const manualDispatch = useMutation({ mutationFn: ({ id, driverId }: { id: string; driverId: string }) => adminApi.manualAssignDispatchJob(id, driverId), onSuccess: refreshDispatch });
+  const escalateDispatch = useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => adminApi.escalateDispatchJob(id, reason), onSuccess: refreshDispatch });
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -117,6 +126,37 @@ export const AdminEmergenciesPage = () => {
               <Pager {...q.data.pagination} onPage={setPage} />
             </>
           )}
+        </Panel>
+        <Panel title="Automatic ambulance dispatch" description="Persistent offer attempts, server deadlines and recovery controls.">
+          {dispatchJobs.isLoading ? <Loading /> : dispatchJobs.isError ? <ErrorBox message={message(dispatchJobs.error)} retry={() => void dispatchJobs.refetch()} /> : !dispatchJobs.data?.length ? <Empty label="No dispatch jobs have been created." /> : (
+            <div className="space-y-3 p-4">
+              {dispatchJobs.data.map((job) => (
+                <article key={job.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><p className="font-semibold">{job.requestCode ?? job.emergencyRequestId}</p><p className="mt-1 text-xs text-slate-500">{job.situationType ?? job.category} · Generation {job.generation} · {job.attempts.length} attempts</p></div>
+                    <Status value={job.status} />
+                  </div>
+                  {job.deadlineAt && <p className="mt-2 text-xs text-slate-600">Current server deadline: {new Date(job.deadlineAt).toLocaleString()}</p>}
+                  {job.escalationReason && <p className="mt-2 text-xs text-amber-800">{job.escalationReason}</p>}
+                  {job.attempts.length > 0 && <div className="mt-3 space-y-2">{job.attempts.slice(-3).reverse().map((attempt) => <div key={attempt.attemptNumber + '-' + attempt.generation + '-' + attempt.driverId} className="rounded-lg bg-slate-50 p-3 text-xs"><div className="flex flex-wrap justify-between gap-2"><span className="font-semibold">Attempt {attempt.attemptNumber} · {attempt.status}</span><span>{attempt.routeSource === 'DRIVING' && attempt.etaSeconds ? Math.round(attempt.etaSeconds / 60) + ' min driving' : 'Straight-line fallback'}</span></div><p className="mt-1 text-slate-500">Driver {attempt.driverId} · {Math.round(attempt.routeDistanceMeters)} m · {attempt.reason ?? 'No additional reason'}</p></div>)}</div>}
+                  {['EXHAUSTED', 'ESCALATED'].includes(job.status) && <div className="mt-4 space-y-3 border-t border-slate-200 pt-3">
+                    <p className="text-xs font-semibold text-amber-900">No active offer. Choose a recovery action; hospital destination remains unchanged.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" disabled={retryDispatch.isPending} onClick={() => retryDispatch.mutate(job.id)}>Retry dispatch</Button>
+                      <Button size="sm" variant="secondary" disabled={escalateDispatch.isPending || job.status !== 'EXHAUSTED'} onClick={() => escalateDispatch.mutate({id:job.id,reason:escalationReason})}>Escalate</Button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <input aria-label="Driver ID for manual dispatch" value={manualDriverIds[job.id] ?? ''} onChange={(event) => setManualDriverIds((old) => ({...old,[job.id]:event.target.value.trim()}))} placeholder="Verified driver's MongoDB ID" className="h-10 rounded-lg border border-slate-300 px-3 text-xs" />
+                      <Button size="sm" variant="primary" disabled={manualDispatch.isPending || !/^[a-f\d]{24}$/i.test(manualDriverIds[job.id] ?? '')} onClick={() => manualDispatch.mutate({id:job.id,driverId:manualDriverIds[job.id]})}>Offer to driver</Button>
+                    </div>
+                    <input aria-label="Escalation reason" value={escalationReason} onChange={(event) => setEscalationReason(event.target.value)} className="h-10 w-full rounded-lg border border-slate-300 px-3 text-xs" />
+                  </div>}
+                </article>
+              ))}
+            </div>
+          )}
+          {(retryDispatch.isError || manualDispatch.isError || escalateDispatch.isError) && <p role="alert" className="px-4 pb-4 text-sm text-rose-700">{message(retryDispatch.error || manualDispatch.error || escalateDispatch.error)}</p>}
+          {(retryDispatch.isSuccess || manualDispatch.isSuccess || escalateDispatch.isSuccess) && <p role="status" className="px-4 pb-4 text-sm text-emerald-700">Dispatch action submitted successfully.</p>}
         </Panel>
       </AdminPage>
     </Section>

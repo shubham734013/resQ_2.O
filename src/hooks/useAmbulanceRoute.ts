@@ -23,16 +23,16 @@ const mapRoute = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][num
   instructions: route.instructions,
 });
 
-export function useAmbulanceRoute(origin: Coordinate | null, destination: Coordinate | null) {
+export function useAmbulanceRoute(origin: Coordinate | null, destination: Coordinate | null, enabled = true) {
   const query = useQuery({
-    queryKey: ['ambulance-google-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],
+    queryKey: ['ambulance-google-route', origin ? origin.latitude.toFixed(3) : null, origin ? origin.longitude.toFixed(3) : null, destination?.latitude, destination?.longitude],
     queryFn: () => mapsApi.route({
       origin: origin as Coordinate,
       destination: destination as Coordinate,
       travelMode: 'DRIVE',
       routingPreference: 'TRAFFIC_AWARE',
     }),
-    enabled: Boolean(origin && destination),
+    enabled: Boolean(enabled && origin && destination),
     staleTime: 30_000,
     retry: 1,
   });

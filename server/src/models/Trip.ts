@@ -33,7 +33,7 @@ const historySchema=new Schema<TripStatusHistoryEntry>({
   previousStatus:{type:String,enum:TRIP_STATUSES},
 },{_id:false});
 const schema=new Schema<TripDocument>({
-  emergencyRequestId:{type:Schema.Types.ObjectId,ref:'EmergencyRequest',required:true,unique:true,index:true},
+  emergencyRequestId:{type:Schema.Types.ObjectId,ref:'EmergencyRequest',required:true},
   providerId:{type:Schema.Types.ObjectId,ref:'AmbulanceProvider',required:true,index:true},
   ambulanceId:{type:Schema.Types.ObjectId,ref:'Ambulance',required:true,index:true},
   driverId:{type:Schema.Types.ObjectId,ref:'AmbulanceDriver',index:true},
@@ -42,6 +42,7 @@ const schema=new Schema<TripDocument>({
   statusHistory:{type:[historySchema],default:[]},
   acceptedAt:Date,arrivedAtPickupAt:Date,patientPickedUpAt:Date,arrivedAtHospitalAt:Date,completedAt:Date,
 },{timestamps:true});
+schema.index({emergencyRequestId:1,createdAt:-1});
 schema.index({providerId:1,status:1,createdAt:-1});
 schema.index({driverId:1,status:1,createdAt:-1});
 schema.index({ambulanceId:1,status:1,createdAt:-1});

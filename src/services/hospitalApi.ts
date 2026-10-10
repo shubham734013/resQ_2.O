@@ -5,6 +5,9 @@ import type {
   HospitalProfile,
   HospitalPagination,
   HospitalEmergencySummary,
+  HospitalCoordinationNotificationPage,
+  HospitalCoordinationNotification,
+  HospitalCoordinationDetail,
 } from '../types/hospitalManagement';
 
 const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
@@ -63,6 +66,7 @@ export interface HospitalListParams {
   situationType?: string;
   provider?: string;
   sortOrder?: 'asc' | 'desc';
+  state?: string;
 }
 
 export const hospitalApi = {
@@ -96,4 +100,11 @@ export const hospitalApi = {
   getAmbulances: (params: HospitalListParams = {}) =>
     request<{ items: HospitalAmbulance[]; pagination: HospitalPagination }>(`/hospital/ambulances${query(params)}`),
   getAmbulance: (id: string) => request<HospitalAmbulance>(`/hospital/ambulances/${encodeURIComponent(id)}`),
+
+  getCoordinationNotifications: (params: { state?: 'UNREAD' | 'ACKNOWLEDGED' | 'SUPERSEDED' | 'ALL'; page?: number; limit?: number } = {}) =>
+    request<HospitalCoordinationNotificationPage>(`/hospital/coordination/notifications${query(params)}`),
+  acknowledgeCoordinationNotification: (id: string) =>
+    request<HospitalCoordinationNotification>(`/hospital/coordination/notifications/${encodeURIComponent(id)}/acknowledge`, { method: 'POST', body: JSON.stringify({}) }),
+  getCoordinationDetail: (emergencyId: string) =>
+    request<HospitalCoordinationDetail>(`/hospital/coordination/emergencies/${encodeURIComponent(emergencyId)}`),
 };
