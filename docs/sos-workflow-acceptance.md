@@ -22,6 +22,18 @@ Run against a dedicated staging/test database and a staging API with the Google 
 10. **Recovery after refresh/navigation:** create an active request, refresh `/sos` or leave and return. Expect the existing request/code/status to be restored from the authenticated API, with no second request created. Status polling failure must retain the request ID and provide a retry action.
 11. **Cancellation transition:** cancel an owned request in a user-cancellable state. Expect `CANCELLED` plus a history entry with previous status and actor; attempts after transport starts or after terminal status must be rejected.
 
+## Production index rollout
+
+Production database connections disable Mongoose automatic index creation. Before enabling the SOS endpoint in production, run the index check in an authorized environment:
+
+```bash
+cd server
+npm run ensure:emergency-idempotency-index
+npm run ensure:emergency-idempotency-index -- --apply
+```
+
+The first command is a dry run. The second creates only the sparse unique idempotency-key index after checking for duplicate key values. It does not modify request documents or drop/replace existing indexes. Review the dry-run result before applying.
+
 ## Commands
 
 From the repository root:
