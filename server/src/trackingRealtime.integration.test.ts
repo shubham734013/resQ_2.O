@@ -89,7 +89,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     });
     await AmbulanceModel.create({
       _id: ambulanceId, registrationNumber: 'TRA-' + suffix, vehicleNumber: 'TRV-' + suffix,
-      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'AVAILABLE',
+      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'BUSY',
       verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', currentLatitude: 26.9124, currentLongitude: 75.7873,
       location: { type: 'Point', coordinates: [75.7873, 26.9124] }, locationUpdatedAt: new Date(Date.now() - 5000),
       locationSourceTimestamp: new Date(Date.now() - 5000), locationAccuracyMeters: 7,
@@ -250,7 +250,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await AmbulanceModel.updateOne({ _id: ambulanceId }, { $set: { currentStatus: 'MAINTENANCE' } });
     await AmbulanceModel.create({
       _id: secondAmbulanceId, registrationNumber: 'TRB-' + suffix, vehicleNumber: 'TRW-' + suffix,
-      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'BUSY',
+      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'AVAILABLE',
       verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', currentLatitude: 26.9124, currentLongitude: 75.7873,
       location: { type: 'Point', coordinates: [75.7873, 26.9124] }, locationUpdatedAt: new Date(Date.now() - 5000),
       locationSourceTimestamp: new Date(Date.now() - 5000), locationAccuracyMeters: 7,
