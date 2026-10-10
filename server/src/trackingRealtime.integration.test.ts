@@ -4,7 +4,6 @@ import { createServer } from 'node:http';
 import jwt from 'jsonwebtoken';
 import mongoose, { Types } from 'mongoose';
 import { io as connectSocket, type Socket } from 'socket.io-client';
-import type { TrackingEnvelope } from '../src/services/trackingSocket.js';
 import { UserModel } from './models/User.js';
 import { HospitalModel } from './models/Hospital.js';
 import { AmbulanceProviderModel } from './models/AmbulanceProvider.js';
@@ -173,9 +172,8 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     const hospitalSnapshot = (await hospitalSnapshotResponse.json() as { data: { trip: { status: string }; location: { updatedAt: string } } }).data;
     assert.equal(userSnapshot.trip.status, hospitalSnapshot.trip.status);
     assert.equal(userSnapshot.location.updatedAt, hospitalSnapshot.location.updatedAt, 'user and hospital snapshots must share the persisted GPS timestamp');
-    const firstHospitalNotification = new Promise<TrackingEnvelope<{ id: string; type: string }>>((resolve) => hospitalSocket.once('hospital:coordination-notification', resolve));
+    const firstHospitalNotification = new Promise<{ channel: string; event: string; data: { id: string; type: string }; timestamp: string }>((resolve) => hospitalSocket.once('hospital:coordination-notification', resolve));
     const secondHospitalNotification = new Promise<TrackingEnvelope<{ id: string; type: string }>>((resolve) => hospitalSecondSocket.once('hospital:coordination-notification', resolve));
-    const { recordHospitalCoordinationEvent } = await import('./services/hospitalCoordinationService.js');
     const firstPersistedAlert = await recordHospitalCoordinationEvent({ emergencyId: String(emergencyId), tripId: String(tripId), type: 'AMBULANCE_ASSIGNED' });
     const duplicatePersistedAlert = await recordHospitalCoordinationEvent({ emergencyId: String(emergencyId), tripId: String(tripId), type: 'AMBULANCE_ASSIGNED' });
     assert.equal(firstPersistedAlert?.id, duplicatePersistedAlert?.id, 'duplicate lifecycle events must reuse the same notification record');
