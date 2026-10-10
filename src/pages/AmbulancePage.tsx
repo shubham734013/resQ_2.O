@@ -9,6 +9,7 @@ import { NavigationPanel } from '../components/ambulance/NavigationPanel';
 import { MapView } from '../components/map/MapView';
 import { ambulanceDriverApi } from '../services/ambulanceDriverApi';
 import { useAmbulanceRoute } from '../hooks/useAmbulanceRoute';
+import { trackingApi, trackingRouteOption } from '../services/trackingApi';
 import type { UserLocation } from '../types/facility';
 import type { RouteOptionItem } from '../types/route';
 
@@ -122,8 +123,18 @@ export const AmbulancePage=()=>{
  const destination=selectedRequest && typeof selectedRequest.latitude==='number' && typeof selectedRequest.longitude==='number'
    ? {latitude:selectedRequest.latitude,longitude:selectedRequest.longitude}:null;
  const origin=location?{latitude:location.latitude,longitude:location.longitude}:null;
- const route=useAmbulanceRoute(origin,destination);
- const routeItem=route.routes[0]??null;
+  const route=useAmbulanceRoute(origin,destination,!activeTrip);
+ const liveRoute=useQuery({
+   queryKey:['ambulance-driver','live-route',activeTrip?.id,toHospital?'HOSPITAL':'PICKUP',origin?.latitude.toFixed(3),origin?.longitude.toFixed(3)],
+   queryFn:()=>trackingApi.getRoute(activeTrip!.id),
+   enabled:Boolean(activeTrip&&routeDestination&&status.data?.location?.coordinatesAreLive&&!['AT_HOSPITAL','COMPLETED','CANCELLED'].includes(activeTrip.status)),
+   staleTime:18000,
+   refetchInterval:activeTrip&&routeDestination&&status.data?.location?.coordinatesAreLive&&!['AT_HOSPITAL','COMPLETED','CANCELLED'].includes(activeTrip.status)?20000:false,
+   retry:1,
+ });
+ const routeItem=activeTrip
+   ? (activeTrip.status==='AT_HOSPITAL'?null:liveRoute.data?.routes[0]?trackingRouteOption(liveRoute.data.routes[0]):null)
+   : route.routes[0]??null;
  const invalidate=useCallback(()=>Promise.all([qc.invalidateQueries({queryKey:['ambulance-driver']})]),[qc]);
  const startDutyMutation=useMutation({
    mutationFn:(fix:{latitude:number;longitude:number;accuracy:number;timestamp:number})=>ambulanceDriverApi.startDuty(fix),
@@ -212,6 +223,9 @@ export const AmbulancePage=()=>{
    );
  }
 
+ if(routeMode==='navigation' && activeTrip && routeDestination && !routeItem){
+   return <AmbulanceLayout><div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-10"><h1 className="text-2xl font-bold">{toHospital?'Hospital navigation unavailable':'Pickup navigation unavailable'}</h1><p role="status" className="text-sm text-slate-600">{status.data?.location?.freshness!=='FRESH'?'Waiting for a fresh GPS fix. The last-known position is not used as live navigation.':liveRoute.isError?'Google Routes could not calculate a route right now. Retry when connectivity is restored.':'Calculating the current driving route…'}</p><div className="flex flex-wrap gap-2"><Button onClick={()=>void liveRoute.refetch()} disabled={liveRoute.isFetching||!status.data?.location?.coordinatesAreLive} icon={<RefreshCw className="h-4 w-4"/>}>Retry route</Button><Button variant="secondary" onClick={()=>navigate('/ambulance/trip')}>Trip actions</Button></div></div></AmbulanceLayout>;
+ }
  if(routeMode==='navigation' && activeTrip && routeItem && routeDestination){
    return <AmbulanceLayout><NavigationPanel title={toHospital?'Transporting to Hospital':'Navigate to Patient'} destinationName={toHospital?(activeRequest.data?.hospitalName??'Destination hospital'):(selectedRequest?.location??'Patient pickup')} destinationAddress={toHospital?(activeRequest.data?.hospitalName ? `${activeRequest.data.hospitalName} Emergency Department` : 'Hospital Intake'):(selectedRequest?.location??'Dispatch coordinates')} destinationCoordinates={routeDestination} navigation={navigationFor(routeItem)} userLocation={currentLocation} route={routeItem} onAction={()=>toHospital?hospital.mutate(activeTrip.id):pickup.mutate(activeTrip.id)} actionLabel={toHospital?'Arrived at Hospital':'Arrived at Patient'} onCall={profile.data?.phone?()=>window.location.assign('tel:'+profile.data.phone):undefined}/></AmbulanceLayout>;
  }
