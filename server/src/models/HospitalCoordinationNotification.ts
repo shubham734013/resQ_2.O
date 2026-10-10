@@ -14,6 +14,8 @@ export interface HospitalCoordinationNotificationDocument {
   emergencyId: Types.ObjectId;
   tripId?: Types.ObjectId;
   ambulanceId?: Types.ObjectId;
+  ambulanceRegistration?: string;
+  ambulanceVehicleNumber?: string;
   dedupeKey: string;
   type: HospitalCoordinationNotificationType;
   state: HospitalCoordinationNotificationState;
@@ -36,6 +38,8 @@ const schema = new Schema<HospitalCoordinationNotificationDocument>({
   emergencyId: { type: Schema.Types.ObjectId, ref: 'EmergencyRequest', required: true, index: true },
   tripId: { type: Schema.Types.ObjectId, ref: 'Trip', index: true },
   ambulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance' },
+  ambulanceRegistration: { type: String, maxlength: 80 },
+  ambulanceVehicleNumber: { type: String, maxlength: 80 },
   dedupeKey: { type: String, required: true, unique: true },
   type: { type: String, enum: HOSPITAL_COORDINATION_NOTIFICATION_TYPES, required: true, index: true },
   state: { type: String, enum: HOSPITAL_COORDINATION_NOTIFICATION_STATES, required: true, default: 'UNREAD', index: true },
