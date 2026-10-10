@@ -259,7 +259,7 @@ export const getDriverDutyStatus = async (driverId: string) => {
     : null;
   const provider = await AmbulanceProviderModel.findById(driver.providerId).select('accountStatus verificationStatus').lean().exec();
   const now = new Date();
-  const freshness = locationFreshnessFor(ambulance?.locationUpdatedAt, now);
+  const freshness = ['ONLINE', 'BUSY'].includes(driver.availabilityStatus) ? locationFreshnessFor(ambulance?.locationUpdatedAt, now) : 'STALE';
   const activeTrip = await TripModel.findOne({ driverId: did, status: { $in: ACTIVE_TRIP_STATUSES } }).select('_id status emergencyRequestId ambulanceId').sort({ createdAt: -1 }).lean().exec();
   const activeDispatchOffer = await DispatchJobModel.exists({ currentDriverId: did, status: 'OFFERED', deadlineAt: { $gt: now } });
   return {
@@ -287,7 +287,8 @@ export const getDriverDutyStatus = async (driverId: string) => {
     staleAfterMs: env.DRIVER_LOCATION_STALE_AFTER_MS,
     canStartDuty: driver.accountStatus === 'ACTIVE' && driver.licenseVerificationStatus === 'VERIFIED' &&
       provider?.accountStatus === 'ACTIVE' && provider.verificationStatus === 'VERIFIED' &&
-      driver.availabilityStatus === 'OFFLINE' && Boolean(ambulance && ambulance.accountStatus === 'ACTIVE' && ambulance.verificationStatus === 'VERIFIED' && ['OFFLINE', 'AVAILABLE'].includes(ambulance.currentStatus)),
+      driver.availabilityStatus === 'OFFLINE' && !activeTrip && !activeDispatchOffer &&
+      !hasReservation(driver, now) && Boolean(ambulance && ambulance.accountStatus === 'ACTIVE' && ambulance.verificationStatus === 'VERIFIED' && ['OFFLINE', 'AVAILABLE'].includes(ambulance.currentStatus) && !hasReservation(ambulance, now)),
     canEndDuty: driver.availabilityStatus === 'ONLINE' && !activeTrip && !activeDispatchOffer,
   };
 };
