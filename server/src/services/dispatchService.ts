@@ -642,7 +642,7 @@ export const cancelDispatchForEmergencyInSession = async (emergencyRequestId: Ty
   if (!job || job.status === 'CANCELLED') return;
   const set: Record<string, unknown> = { status: 'CANCELLED' };
   const options: { session: import('mongoose').ClientSession; arrayFilters?: Array<Record<string, unknown>> } = { session };
-  if (job.currentAttemptId) {
+  if (job.currentAttemptId && job.status === 'OFFERED') {
     set['attempts.$[attempt].status'] = 'CANCELLED';
     set['attempts.$[attempt].respondedAt'] = new Date();
     set['attempts.$[attempt].reason'] = 'Emergency request cancelled by user';
