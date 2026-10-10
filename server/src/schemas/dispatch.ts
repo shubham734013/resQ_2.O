@@ -7,7 +7,7 @@ export const dispatchAdminQuerySchema = z.object({
 }).strict();
 
 export const dispatchManualAssignSchema = z.object({
-  driverId: z.string().regex(/^[a-f\\d]{24}$/i, 'driverId must be a MongoDB ObjectId'),
+  driverId: z.string().regex(/^[a-f\d]{24}$/i, 'driverId must be a MongoDB ObjectId'),
 }).strict();
 
 export const dispatchEscalateSchema = z.object({
