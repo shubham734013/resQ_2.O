@@ -53,6 +53,7 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
     try {
       const token = tokenFromSocket(socket);
       if (!token) throw new AppError('UNAUTHORIZED', 'Socket authentication is required.', 401);
+      const { authenticateAccessToken } = await import('./authService.js');
       socket.data.identity = await authenticateAccessToken(token);
       next();
     } catch { next(new Error('UNAUTHORIZED')); }
