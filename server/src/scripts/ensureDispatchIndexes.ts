@@ -13,7 +13,7 @@ const requiredIndexes = [
   { collection: AmbulanceDriverModel.collection, name: 'dispatchReservationId_1', key: { dispatchReservationId: 1 } },
 ];
 
-const indexesFor = async (collection: typeof DispatchJobModel.collection) => {
+type IndexInfo = { name?: string; key: Record<string, unknown>; unique?: boolean };\nconst indexesFor = async <T extends { indexes: () => Promise<unknown[]> }>(collection: T): Promise<IndexInfo[]> => {
   try { return await collection.indexes(); }
   catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 26) return [];
@@ -35,7 +35,7 @@ try {
 
   const plan = [];
   for (const item of requiredIndexes) {
-    const existingIndexes = item.collection === DispatchJobModel.collection
+    const existingIndexes = item.collection.collectionName === DispatchJobModel.collection.collectionName
       ? dispatchIndexes
       : await indexesFor(item.collection);
     const sameKey = existingIndexes.find((index) => JSON.stringify(index.key) === JSON.stringify(item.key));
