@@ -1,5 +1,5 @@
 export type HospitalAvailability = 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE' | 'UNKNOWN';
-export type HospitalEmergencyStatus = 'RECEIVED' | 'REVIEWING' | 'PREPARING' | 'AMBULANCE_COORDINATION' | 'RESOLVED' | 'CANCELLED';
+export type HospitalEmergencyStatus = 'RECEIVED' | 'REVIEWING' | 'PREPARING' | 'AMBULANCE_COORDINATION' | 'RESOLVED' | 'CANCELLED' | 'REASSIGNMENT_REQUIRED';
 export type HospitalPatientStatus = 'INCOMING' | 'HOSPITAL_NOTIFIED' | 'AT_HOSPITAL' | 'RESOLVED' | 'CANCELLED';
 
 export interface HospitalProfile {
@@ -83,4 +83,53 @@ export interface HospitalEmergencySummary {
   AMBULANCE_COORDINATION: number;
   RESOLVED: number;
   CANCELLED: number;
+}
+
+export type HospitalCoordinationNotificationType =
+  | 'EMERGENCY_RECEIVED' | 'EMERGENCY_CANCELLED' | 'AMBULANCE_ASSIGNED' | 'AMBULANCE_REASSIGNED'
+  | 'AMBULANCE_AT_PICKUP' | 'PATIENT_PICKED_UP' | 'EN_ROUTE_TO_HOSPITAL' | 'AMBULANCE_ARRIVED'
+  | 'TRIP_COMPLETED' | 'TRIP_CANCELLED';
+export type HospitalCoordinationNotificationState = 'UNREAD' | 'ACKNOWLEDGED' | 'SUPERSEDED';
+export interface HospitalCoordinationNotification {
+  id: string;
+  hospitalId: string;
+  emergencyId: string;
+  tripId?: string;
+  ambulanceId?: string;
+  type: HospitalCoordinationNotificationType;
+  state: HospitalCoordinationNotificationState;
+  requestCode: string;
+  emergencyCategory: string;
+  tripStatus?: string;
+  title: string;
+  message: string;
+  etaMinutes?: number;
+  acknowledgedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  deliveryAttemptCount: number;
+  lastDeliveryAttemptAt?: string;
+}
+export interface HospitalCoordinationNotificationPage {
+  items: HospitalCoordinationNotification[];
+  unreadCount: number;
+  pagination: HospitalPagination;
+}
+export interface HospitalCoordinationDetail {
+  emergency: {
+    id: string; requestCode: string; category: string; situationType: string; reportedAt: string;
+    status: HospitalEmergencyStatus; pickup: { label?: string; latitude?: number; longitude?: number }; etaMinutes?: number;
+  };
+  patient: { caseId: string; coordinationStatus: HospitalPatientStatus; receivedAt: string; etaMinutes?: number } | null;
+  trip: null | {
+    id: string; status: string; acceptedAt?: string; arrivedAtPickupAt?: string; patientPickedUpAt?: string;
+    arrivedAtHospitalAt?: string; completedAt?: string; createdAt: string; updatedAt: string;
+    history: Array<{ status: string; changedAt: string; actorRole: string; previousStatus?: string }>;
+  };
+  ambulance: null | {
+    id: string; registrationNumber: string; vehicleNumber: string; ambulanceType: string; currentStatus: string;
+    location: null | { latitude: number; longitude: number; accuracyMeters?: number; updatedAt?: string; ageMs?: number; freshness: 'FRESH' | 'STALE'; coordinatesAreLive: boolean };
+  };
+  allowedActions: HospitalEmergencyStatus[];
+  freshnessThresholdMs: number;
 }
