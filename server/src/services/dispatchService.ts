@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { startSession, Types, type QueryFilter } from 'mongoose';
-import { DispatchJobModel, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
+import { DispatchJobModel, type DispatchJobDocument, type DispatchJobStatus, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
-import { AmbulanceModel } from '../models/Ambulance.js';
+import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
@@ -97,7 +97,7 @@ const hospitalCapabilityTerms: Record<string, RegExp> = {
   other: /emergency|critical|urgent|icu/i,
 };
 const hospitalMatchesDispatchCategory = (hospital: { hospitalType: string; services?: string[]; capabilities?: string[] }, category: string) => {
-  const terms = hospitalCapabilityTerms[category] ?? hospitalCapabilityTerms.other;
+  const terms = hospitalCapabilityTerms[category] ?? /emergency|critical|urgent|icu/i;
   return [hospital.hospitalType, ...(hospital.services ?? []), ...(hospital.capabilities ?? [])].some((value) => terms.test(value));
 };
 const hospitalEligibleForJob = async (job: DispatchJobLean) => {
@@ -144,7 +144,7 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
     { dispatchReservationId: null },
     { dispatchReservationExpiresAt: { $lte: now } },
   ] };
-  const ambulanceFilter = {
+  const ambulanceFilter: QueryFilter<AmbulanceDocument> = {
     providerId: { $in: providerIds },
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
@@ -155,7 +155,8 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
   const ambulances = await AmbulanceModel.find(ambulanceFilter).select('_id providerId currentLatitude currentLongitude location locationUpdatedAt currentStatus accountStatus verificationStatus dispatchReservationId dispatchReservationExpiresAt').limit(500).lean().exec();
   if (!ambulances.length) return [];
   const ambulanceIds = ambulances.map((ambulance) => ambulance._id);
-  const driverFilter: Record<string, unknown> = {
+  const driverFilter: QueryFilter<AmbulanceDriverDocument> = {
+    _id: exactDriverId ?? { $exists: true },
     assignedAmbulanceId: { $in: ambulanceIds },
     providerId: { $in: providerIds },
     accountStatus: 'ACTIVE',
@@ -163,7 +164,6 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
     availabilityStatus: 'ONLINE',
     ...reservationAvailable,
   };
-  if (exactDriverId) driverFilter._id = exactDriverId;
   const drivers = await AmbulanceDriverModel.find(driverFilter).select('_id providerId assignedAmbulanceId accountStatus licenseVerificationStatus availabilityStatus dispatchReservationId dispatchReservationExpiresAt').limit(500).lean().exec();
   if (!drivers.length) return [];
   const activeTrips = await TripModel.find({
@@ -438,6 +438,34 @@ const candidateStillEligible = async (job: DispatchJobLean, attempt: DispatchAtt
   return Boolean(provider && driver && ambulance && !activeTrip);
 };
 
+let lastOrphanRecoveryAt = 0;
+export const recoverOrphanedDispatchJobs = async () => {
+  const nowMs = Date.now();
+  if (nowMs - lastOrphanRecoveryAt < 30_000) return;
+  lastOrphanRecoveryAt = nowMs;
+  const orphaned = await EmergencyRequestModel.aggregate<{
+    _id: Types.ObjectId; hospitalId: Types.ObjectId; userId: Types.ObjectId; category?: string;
+    latitude: number; longitude: number; createdAt: Date;
+  }>([
+    { $match: { status: 'AMBULANCE_COORDINATION', ambulanceId: { $exists: false }, latitude: { $type: 'number', $gte: -90, $lte: 90 }, longitude: { $type: 'number', $gte: -180, $lte: 180 } } },
+    { $lookup: { from: DispatchJobModel.collection.name, localField: '_id', foreignField: 'emergencyRequestId', as: 'dispatchJobs' } },
+    { $match: { dispatchJobs: { $eq: [] } } },
+    { $sort: { createdAt: 1 } },
+    { $limit: 100 },
+    { $project: { hospitalId: 1, userId: 1, category: 1, latitude: 1, longitude: 1 } },
+  ]).exec();
+  for (const request of orphaned) {
+    await DispatchJobModel.findOneAndUpdate({ emergencyRequestId: request._id }, {
+      $setOnInsert: {
+        emergencyRequestId: request._id, hospitalId: request.hospitalId, userId: request.userId,
+        category: request.category ?? 'other', pickupLatitude: request.latitude, pickupLongitude: request.longitude,
+        status: 'PENDING', generation: 1, attempts: [],
+        events: [appendEvent('ORPHAN_DISPATCH_RECOVERED', 'Recovered a persisted emergency without a dispatch job')],
+      },
+    }, { upsert: true, setDefaultsOnInsert: true }).exec();
+  }
+};
+
 export const processDispatchTick = async () => {
   await recoverOrphanedDispatchJobs();
   const now = new Date();
@@ -596,8 +624,8 @@ export const listDriverDispatchOffers = async (driverId: string) => {
   }));
 };
 
-export const listDispatchJobs = async (query: { status?: string; limit?: number } = {}) => {
-  const filter = query.status ? { status: query.status } : {};
+export const listDispatchJobs = async (query: { status?: DispatchJobStatus; limit?: number } = {}) => {
+  const filter: QueryFilter<DispatchJobDocument> = query.status ? { status: query.status } : {};
   const jobs = await DispatchJobModel.find(filter).sort({ updatedAt: -1 }).limit(Math.min(Math.max(query.limit ?? 50, 1), 100)).lean().exec() as DispatchJobLean[];
   return Promise.all(jobs.map(async (job) => {
     const request = await EmergencyRequestModel.findById(job.emergencyRequestId).select('requestCode situationType status').lean().exec();
