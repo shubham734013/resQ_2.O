@@ -12,6 +12,8 @@ export const hospitalKeys = {
   emergencySummary: () => [...hospitalKeys.all, 'emergency-summary'] as const,
   emergencies: (params: HospitalListParams) => [...hospitalKeys.all, 'emergencies', params] as const,
   emergency: (id: string) => [...hospitalKeys.all, 'emergency', id] as const,
+  coordinationNotifications: (params: { state?: string; page?: number; limit?: number }) => [...hospitalKeys.all, 'coordination-notifications', params] as const,
+  coordinationDetail: (id: string) => [...hospitalKeys.all, 'coordination-detail', id] as const,
   patients: (params: HospitalListParams) => [...hospitalKeys.all, 'patients', params] as const,
   patient: (id: string) => [...hospitalKeys.all, 'patient', id] as const,
   ambulances: (params: HospitalListParams) => [...hospitalKeys.all, 'ambulances', params] as const,
@@ -45,6 +47,32 @@ export const useHospitalEmergencies = (params: HospitalListParams = {}) => useQu
   refetchOnWindowFocus: true,
 });
 export const useHospitalEmergency = (id: string) => useQuery({ queryKey: hospitalKeys.emergency(id), queryFn: () => hospitalApi.getEmergency(id), enabled: Boolean(id) });
+export const useHospitalCoordinationNotifications = (params: { state?: 'UNREAD' | 'ACKNOWLEDGED' | 'SUPERSEDED' | 'ALL'; page?: number; limit?: number } = { state: 'UNREAD', page: 1, limit: 25 }) => useQuery({
+  queryKey: hospitalKeys.coordinationNotifications(params),
+  queryFn: () => hospitalApi.getCoordinationNotifications(params),
+  refetchInterval: 15000,
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: true,
+});
+export const useHospitalCoordinationDetail = (id: string) => useQuery({
+  queryKey: hospitalKeys.coordinationDetail(id),
+  queryFn: () => hospitalApi.getCoordinationDetail(id),
+  enabled: Boolean(id),
+  refetchInterval: (query) => query.state.data?.trip && !['COMPLETED', 'CANCELLED'].includes(query.state.data.trip.status) ? 10000 : false,
+  refetchOnWindowFocus: true,
+});
+export const useAcknowledgeHospitalCoordinationNotification = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: hospitalApi.acknowledgeCoordinationNotification,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: [...hospitalKeys.all, 'coordination-notifications'] });
+      void client.invalidateQueries({ queryKey: [...hospitalKeys.all, 'coordination-detail'] });
+      void client.invalidateQueries({ queryKey: hospitalKeys.patients({}) });
+      void client.invalidateQueries({ queryKey: hospitalKeys.emergencySummary() });
+    },
+  });
+};
 export const useHospitalPatients = (params: HospitalListParams = {}) => useQuery({ queryKey: hospitalKeys.patients(params), queryFn: () => hospitalApi.getPatients(params) });
 export const useHospitalPatient = (id: string) => useQuery({ queryKey: hospitalKeys.patient(id), queryFn: () => hospitalApi.getPatient(id), enabled: Boolean(id) });
 export const useHospitalAmbulances = (params: HospitalListParams = {}) => useQuery({ queryKey: hospitalKeys.ambulances(params), queryFn: () => hospitalApi.getAmbulances(params) });

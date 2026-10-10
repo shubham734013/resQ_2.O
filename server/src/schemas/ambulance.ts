@@ -5,7 +5,7 @@ import { HOSPITAL_EMERGENCY_STATUSES } from '../models/EmergencyRequest.js';
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 const lat = z.number().min(-90).max(90);
 const lng = z.number().min(-180).max(180);
-export const ambulanceLocationUpdateSchema=z.object({latitude:lat,longitude:lng,accuracy:z.number().finite().min(0).max(100000),timestamp:z.coerce.date()}).strict();
+export const ambulanceLocationUpdateSchema=z.object({latitude:lat,longitude:lng,accuracy:z.number().finite().min(0).max(1000),timestamp:z.coerce.date()}).strict();
 const page = z.coerce.number().int().min(1).default(1);
 const limit = z.coerce.number().int().min(1).max(100).default(20);
 const date = z.string().datetime().transform((v) => new Date(v));
