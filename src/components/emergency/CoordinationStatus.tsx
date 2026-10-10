@@ -99,6 +99,7 @@ export const CoordinationStatus = ({
     try {
       await emergencyApi.cancel(emergencyRequestId);
       await queryClient.invalidateQueries({ queryKey: ['emergency-requests'] });
+      await queryClient.invalidateQueries({ queryKey: ['user', 'emergencies'] });
       await queryClient.invalidateQueries({ queryKey: ['emergency-request', emergencyRequestId] });
       setShowExitModal(false);
       onExit();
