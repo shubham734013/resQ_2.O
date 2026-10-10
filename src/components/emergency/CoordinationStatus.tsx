@@ -152,8 +152,8 @@ export const CoordinationStatus = ({
         )}
 
         {error && (
-          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 flex items-start gap-2 text-xs text-rose-800">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-2 text-xs text-amber-900">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
             <span>{error}</span>
           </div>
         )}
