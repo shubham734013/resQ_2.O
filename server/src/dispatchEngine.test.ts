@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Types } from 'mongoose';
-import {
+process.env.NODE_ENV ??= 'test';
+process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
+process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
+process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough';
+process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
+process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
+
+const {
   DISPATCH_ALLOWED_TRANSITIONS,
   DISPATCH_LOCATION_FRESHNESS_MS,
   DISPATCH_OFFER_TIMEOUT_MS,
@@ -9,8 +16,8 @@ import {
   isDispatchLocationFresh,
   isDispatchOfferAcceptable,
   rankDispatchCandidates,
-  type DispatchCandidate,
-} from './services/dispatchService.js';
+} = await import('./services/dispatchService.js');
+type DispatchCandidate = import('./services/dispatchService.js').DispatchCandidate;
 
 const candidate = (source: 'DRIVING' | 'STRAIGHT_LINE_FALLBACK', distance: number, eta?: number): DispatchCandidate => ({
   providerId: new Types.ObjectId(),
