@@ -293,6 +293,7 @@ export const EmergencyPage = () => {
       });
       idempotencyKeyRef.current = null;
       await queryClient.invalidateQueries({ queryKey: activeEmergencyQueryKey });
+      await queryClient.invalidateQueries({ queryKey: ['user', 'emergencies'] });
       setCurrentStep('coordination');
       if (typeof request.etaMinutes !== 'number') {
         setCoordinationError('Your request was saved, but live driving ETA is unavailable. Keep 112 available and contact the hospital if needed.');
