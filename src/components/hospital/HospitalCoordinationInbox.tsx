@@ -60,7 +60,6 @@ export const HospitalCoordinationInbox = () => {
         currentSocket.disconnect();
       };
     } catch {
-      setRealtime('RECONNECTING');
       return () => { disposed = true; socket?.disconnect(); };
     }
   }, [profile.data?.id, queryClient]);
