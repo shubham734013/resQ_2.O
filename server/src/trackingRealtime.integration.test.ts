@@ -59,7 +59,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
   const secondDriverId = new Types.ObjectId();
   const emergencyId = new Types.ObjectId();
   const tripId = new Types.ObjectId();
-  const secondTripId = new Types.ObjectId();
+  let secondTripId = new Types.ObjectId();
   const dispatchJobId = new Types.ObjectId();
   let server: ReturnType<typeof createServer> | null = null;
   let stopSockets: (() => Promise<void>) | null = null;
@@ -72,7 +72,8 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await HospitalModel.create({
       _id: hospitalId, name: 'Tracking Test Hospital', registrationNumber: 'TRH-' + suffix,
       email: 'tracking-hospital-' + suffix + '@example.test', phone: '0000000000', passwordHash: 'test-only',
-      hospitalType: 'General', latitude: 26.9128, longitude: 75.7875,
+      hospitalType: 'Emergency', services: ['Emergency', 'Trauma'], capabilities: ['Emergency', 'Trauma'],
+      emergencyAvailability: 'AVAILABLE', latitude: 26.9128, longitude: 75.7875,
       verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
     });
     await HospitalModel.create({
@@ -88,7 +89,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     });
     await AmbulanceModel.create({
       _id: ambulanceId, registrationNumber: 'TRA-' + suffix, vehicleNumber: 'TRV-' + suffix,
-      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'BUSY',
+      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'AVAILABLE',
       verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', currentLatitude: 26.9124, currentLongitude: 75.7873,
       location: { type: 'Point', coordinates: [75.7873, 26.9124] }, locationUpdatedAt: new Date(Date.now() - 5000),
       locationSourceTimestamp: new Date(Date.now() - 5000), locationAccuracyMeters: 7,
@@ -257,22 +258,22 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await AmbulanceDriverModel.create({
       _id: secondDriverId, fullName: 'Replacement Tracking Driver', email: 'replacement-driver-' + suffix + '@example.test',
       phone: '0000000000', passwordHash: 'test-only', authProvider: 'LOCAL', licenseNumber: 'TRW-L-' + suffix,
-      providerId, assignedAmbulanceId: secondAmbulanceId, availabilityStatus: 'BUSY', profileCompletionStatus: 'COMPLETE',
+      providerId, assignedAmbulanceId: secondAmbulanceId, availabilityStatus: 'ONLINE', profileCompletionStatus: 'COMPLETE',
       licenseVerificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
     });
-    const acceptedAt = new Date();
-    await TripModel.create({
-      _id: secondTripId, emergencyRequestId: emergencyId, providerId, ambulanceId: secondAmbulanceId, driverId: secondDriverId,
-      destinationHospitalId: hospitalId, status: 'ACCEPTED', acceptedAt,
-      statusHistory: [{ status: 'ACCEPTED', changedAt: acceptedAt, actorId: secondDriverId, actorRole: 'AMBULANCE_DRIVER' }],
-    });
-    await EmergencyRequestModel.updateOne({ _id: emergencyId }, { $set: { ambulanceId: secondAmbulanceId, ambulanceProviderId: providerId, driverId: secondDriverId } });
-    await DispatchJobModel.updateOne({ _id: dispatchJobId }, {
-      $set: { status: 'ACCEPTED', generation: 2, currentAttemptId: 'replacement-' + suffix, currentProviderId: providerId,
-        currentAmbulanceId: secondAmbulanceId, currentDriverId: secondDriverId, acceptedTripId: secondTripId, attempts: [] },
-    });
-    const reassignedAlert = await recordHospitalCoordinationEvent({ emergencyId: String(emergencyId), tripId: String(secondTripId), type: 'AMBULANCE_ASSIGNED' });
-    assert.equal(reassignedAlert?.type, 'AMBULANCE_REASSIGNED', 'a changed accepted ambulance is recorded as a reassignment');
+    const { processDispatchTick, acceptDispatchOffer } = await import('./services/dispatchService.js');
+    await processDispatchTick();
+    const offeredJob = await DispatchJobModel.findById(dispatchJobId).lean().exec();
+    assert.equal(offeredJob?.status, 'OFFERED', 'cancelled pre-transport trips return the emergency to automatic dispatch');
+    assert.equal(String(offeredJob?.currentDriverId), String(secondDriverId), 'dispatch must offer the replacement ambulance, not the unavailable old vehicle');
+    const acceptedReplacement = await acceptDispatchOffer(String(secondDriverId), String(dispatchJobId));
+    secondTripId = new Types.ObjectId(acceptedReplacement.tripId);
+    assert.equal(acceptedReplacement.status, 'ACCEPTED');
+    const reassignedTrip = await TripModel.findById(secondTripId).lean().exec();
+    assert.equal(String(reassignedTrip?.ambulanceId), String(secondAmbulanceId));
+    const reassignedAlert = await HospitalCoordinationNotificationModel.findOne({ emergencyId, type: 'AMBULANCE_REASSIGNED' }).lean().exec();
+    assert.ok(reassignedAlert, 'the replacement acceptance persists a reassignment notification');
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'AMBULANCE_REASSIGNED' }), 1);
     assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'HOSPITAL_NOTIFIED');
     assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'AMBULANCE_REASSIGNED' }), 1);
 
