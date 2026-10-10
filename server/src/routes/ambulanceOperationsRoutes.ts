@@ -40,7 +40,10 @@ driver.patch('/profile',validateBody(driverUpdateSchema.omit({password:true})),c
 driver.get('/status',c.driverStatus);
 driver.patch('/status',validateBody(driverStatusSchema),c.driverStatusUpdate);
 driver.patch('/location',validateBody(ambulanceLocationUpdateSchema),c.driverLocationUpdate);
-driver.get('/dispatch-offers',dispatch.driverOffers);\ndriver.post('/dispatch-offers/:id/accept',dispatch.driverAcceptOffer);\ndriver.post('/dispatch-offers/:id/reject',dispatch.driverRejectOffer);\ndriver.get('/requests',validateQuery(driverRequestQuerySchema),c.driverRequests);
+driver.get('/dispatch-offers',dispatch.driverOffers);
+driver.post('/dispatch-offers/:id/accept',dispatch.driverAcceptOffer);
+driver.post('/dispatch-offers/:id/reject',dispatch.driverRejectOffer);
+driver.get('/requests',validateQuery(driverRequestQuerySchema),c.driverRequests);
 driver.get('/requests/:id',c.driverRequest);
 driver.post('/requests/:id/accept',c.driverAccept);
 driver.post('/requests/:id/reject',c.driverReject);
