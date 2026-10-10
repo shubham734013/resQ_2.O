@@ -259,7 +259,13 @@ async function moveTrip(did:string,id:string,next:TripStatus){
 export const listDriverTrips=async(did:string,q:TripQuery)=>{await operationalDriver(did);const f:QueryFilter<TripDocument>={driverId:oid(did,'driver')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
 export const getDriverTrip=async(did:string,id:string)=>tripOut(await driverTrip(id,did));
 export const arrivedPickup=async(did:string,id:string)=>moveTrip(did,id,'AT_PICKUP');
-export const patientPickedUp=async(did:string,id:string)=>moveTrip(did,id,'PATIENT_ONBOARD');
+export const patientPickedUp=async(did:string,id:string)=>{
+  const current=await driverTrip(id,did);
+  if(current.status==='TO_HOSPITAL')return tripOut(current);
+  if(current.status==='PATIENT_ONBOARD')return moveTrip(did,id,'TO_HOSPITAL');
+  await moveTrip(did,id,'PATIENT_ONBOARD');
+  return moveTrip(did,id,'TO_HOSPITAL');
+};
 export const arrivedHospital=async(did:string,id:string)=>moveTrip(did,id,'AT_HOSPITAL');
 export const completeTrip=async(did:string,id:string)=>moveTrip(did,id,'COMPLETED');
 export const listProviderTrips=async(pid:string,q:TripQuery)=>{await operationalProvider(pid);const f:QueryFilter<TripDocument>={providerId:oid(pid,'provider')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.driver)f.driverId=oid(q.driver,'driver');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
