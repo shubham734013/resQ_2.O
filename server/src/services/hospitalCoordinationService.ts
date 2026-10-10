@@ -19,6 +19,8 @@ const isDuplicateKey = (error: unknown) => typeof error === 'object' && error !=
 const copy = (value: Record<string, unknown> & { _id: Types.ObjectId }) => ({
   id: String(value._id), hospitalId: String(value.hospitalId), emergencyId: String(value.emergencyId),
   tripId: value.tripId ? String(value.tripId) : undefined, ambulanceId: value.ambulanceId ? String(value.ambulanceId) : undefined,
+  ambulanceRegistration: typeof value.ambulanceRegistration === 'string' ? value.ambulanceRegistration : undefined,
+  ambulanceVehicleNumber: typeof value.ambulanceVehicleNumber === 'string' ? value.ambulanceVehicleNumber : undefined,
   type: value.type as HospitalCoordinationNotificationType, state: value.state as 'UNREAD' | 'ACKNOWLEDGED' | 'SUPERSEDED',
   requestCode: String(value.requestCode), emergencyCategory: String(value.emergencyCategory), tripStatus: value.tripStatus,
   title: String(value.title), message: String(value.message), etaMinutes: typeof value.etaMinutes === 'number' ? value.etaMinutes : undefined,
@@ -87,13 +89,17 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
   const descriptor = eventCopy[effectiveType];
   const dedupeKey = `${String(emergency.hospitalId)}:${String(emergencyObjectId)}:${trip ? String(trip._id) : 'no-trip'}:${effectiveType}:${ambulanceId ? String(ambulanceId) : 'none'}`;
   const existing = await HospitalCoordinationNotificationModel.findOne({ dedupeKey }).lean().exec();
-  if (existing) return copy(existing as unknown as Record<string, unknown> & { _id: Types.ObjectId });
+  if (existing) {
+    await updatePatientForEvent(emergency.hospitalId, emergencyObjectId, effectiveType, ambulanceId, emergency.etaMinutes);
+    return copy(existing as unknown as Record<string, unknown> & { _id: Types.ObjectId });
+  }
 
   const ambulance = ambulanceId ? await AmbulanceModel.findById(ambulanceId).select('registrationNumber vehicleNumber').lean().exec() : null;
   let created: HospitalCoordinationNotificationDocument;
   try {
     const docs = await HospitalCoordinationNotificationModel.create([{
       hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId, tripId: trip?._id, ambulanceId,
+      ambulanceRegistration: ambulance?.registrationNumber, ambulanceVehicleNumber: ambulance?.vehicleNumber,
       dedupeKey, type: effectiveType, state: 'UNREAD', requestCode: emergency.requestCode,
       emergencyCategory: emergency.category ?? emergency.situationType, tripStatus: trip?.status,
       title: descriptor.title, message: descriptor.message(emergency.requestCode, emergency.etaMinutes),
@@ -104,6 +110,7 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
     if (!isDuplicateKey(error)) throw error;
     const duplicate = await HospitalCoordinationNotificationModel.findOne({ dedupeKey }).lean().exec();
     if (!duplicate) throw error;
+    await updatePatientForEvent(emergency.hospitalId, emergencyObjectId, effectiveType, ambulanceId, emergency.etaMinutes);
     return copy(duplicate as unknown as Record<string, unknown> & { _id: Types.ObjectId });
   }
 
