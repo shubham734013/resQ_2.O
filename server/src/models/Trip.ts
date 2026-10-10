@@ -5,7 +5,7 @@ export interface TripStatusHistoryEntry {
   status: TripStatus;
   changedAt: Date;
   actorId?: Types.ObjectId;
-  actorRole: 'HOSPITAL'|'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER'|'ADMIN'|'SYSTEM';
+  actorRole: 'USER'|'HOSPITAL'|'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER'|'ADMIN'|'SYSTEM';
   previousStatus?: TripStatus;
 }
 
@@ -29,7 +29,7 @@ const historySchema=new Schema<TripStatusHistoryEntry>({
   status:{type:String,enum:TRIP_STATUSES,required:true},
   changedAt:{type:Date,required:true},
   actorId:{type:Schema.Types.ObjectId},
-  actorRole:{type:String,enum:['HOSPITAL','AMBULANCE_PROVIDER','AMBULANCE_DRIVER','ADMIN','SYSTEM'],required:true,default:'SYSTEM'},
+  actorRole:{type:String,enum:['USER','HOSPITAL','AMBULANCE_PROVIDER','AMBULANCE_DRIVER','ADMIN','SYSTEM'],required:true,default:'SYSTEM'},
   previousStatus:{type:String,enum:TRIP_STATUSES},
 },{_id:false});
 const schema=new Schema<TripDocument>({
