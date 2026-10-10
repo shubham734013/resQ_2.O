@@ -31,7 +31,7 @@ const formatAge = (ageMs: number | null | undefined) => {
 
 export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOperations = false }: LiveAmbulanceTrackingProps) => {
   const queryClient = useQueryClient();
-  const queryKey = ['tracking', 'emergency', emergencyRequestId] as const;
+  const queryKey = useMemo(() => ['tracking', 'emergency', emergencyRequestId] as const, [emergencyRequestId]);
   const [connected, setConnected] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
   const snapshotQuery = useQuery({
@@ -71,7 +71,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
         if (!current?.trip || current.trip.id !== event.tripId || !current.trackingActive || ['COMPLETED', 'CANCELLED'].includes(event.tripStatus)) return current;
         const incomingTime = Date.parse(event.locationUpdatedAt);
         const currentTime = current.location?.updatedAt ? Date.parse(current.location.updatedAt) : 0;
-        if (!Number.isFinite(incomingTime) || incomingTime < currentTime) return current;
+        if (!Number.isFinite(incomingTime) || incomingTime <= currentTime) return current;
         return {
           ...current,
           location: {
@@ -97,7 +97,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       socket.disconnect();
       socket.removeAllListeners();
     };
-  }, [emergencyRequestId, queryClient, subscribeHospitalOperations, snapshot?.hospital.id]);
+  }, [emergencyRequestId, queryClient, queryKey, subscribeHospitalOperations, snapshot?.hospital.id]);
   const routePhase = snapshot?.routeTarget ?? 'PICKUP';
   const location = snapshot?.location;
   const roundedLat = typeof location?.latitude === 'number' ? location.latitude.toFixed(3) : 'none';
@@ -150,7 +150,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
     </header>
 
     {!snapshot.trip && <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"><Radio className="mr-2 inline h-4 w-4" />Dispatch progress only. Driver identity, vehicle details and GPS remain hidden until a driver accepts.</div>}
-    {snapshot.trip && <div className="grid gap-3 sm:grid-cols-2">
+    {snapshot.trip && snapshot.trackingActive && <div className="grid gap-3 sm:grid-cols-2">
       <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Assigned ambulance</p><p className="mt-1 font-semibold">{snapshot.ambulance?.vehicleNumber ?? 'Assigned vehicle'}</p><p className="text-xs text-slate-500">{snapshot.ambulance?.ambulanceType ?? 'Type unavailable'} · {snapshot.ambulance?.driverName ?? 'Driver assigned'}</p></div>
       <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Location freshness</p><p className={`mt-1 font-semibold ${location?.coordinatesAreLive ? 'text-emerald-700' : 'text-amber-800'}`}>{location?.coordinatesAreLive ? 'Live GPS' : location ? 'Last-known location · STALE' : 'Waiting for first GPS fix'}</p><p className="mt-1 text-xs text-slate-500">{formatAge(location?.ageMs)}{location?.accuracyMeters ? ` · ±${Math.round(location.accuracyMeters)} m` : ''}</p></div>
     </div>}
