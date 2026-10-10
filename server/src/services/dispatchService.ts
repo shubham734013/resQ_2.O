@@ -86,6 +86,30 @@ export const rankDispatchCandidates = (candidates: DispatchCandidate[]) => [...c
   if (a.route.source === 'DRIVING' && b.route.source === 'DRIVING') return (a.route.etaSeconds ?? Number.MAX_SAFE_INTEGER) - (b.route.etaSeconds ?? Number.MAX_SAFE_INTEGER);
   return a.straightLineMeters - b.straightLineMeters;
 });
+const hospitalCapabilityTerms: Record<string, RegExp> = {
+  accident_injury: /trauma|accident|emergency|critical|orthop|surg|icu/i,
+  severe_bleeding: /trauma|bleed|emergency|critical|surg|icu/i,
+  breathing_difficulty: /respirat|pulmon|emergency|critical|icu/i,
+  chest_pain: /cardio|heart|stemi|cath|emergency|critical|icu/i,
+  stroke_symptoms: /stroke|neuro|brain|emergency|critical|icu/i,
+  unconscious_person: /emergency|critical|icu|neuro|trauma/i,
+  burn: /burn|trauma|emergency|critical|surg|icu/i,
+  other: /emergency|critical|urgent|icu/i,
+};
+const hospitalMatchesDispatchCategory = (hospital: { hospitalType: string; services?: string[]; capabilities?: string[] }, category: string) => {
+  const terms = hospitalCapabilityTerms[category] ?? hospitalCapabilityTerms.other;
+  return [hospital.hospitalType, ...(hospital.services ?? []), ...(hospital.capabilities ?? [])].some((value) => terms.test(value));
+};
+const hospitalEligibleForJob = async (job: DispatchJobLean) => {
+  const hospital = await HospitalModel.findOne({
+    _id: job.hospitalId,
+    accountStatus: 'ACTIVE',
+    verificationStatus: 'VERIFIED',
+    emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+  }).select('hospitalType services capabilities').lean().exec();
+  return Boolean(hospital && hospitalMatchesDispatchCategory(hospital, job.category));
+};
+
 const attemptFor = (job: DispatchJobLean, attemptId: string) => job.attempts.find((attempt) => attempt.attemptId === attemptId);
 export const isDispatchLocationFresh = (updatedAt: Date | undefined, now: Date) => Boolean(updatedAt && updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS && updatedAt.getTime() >= now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS);
 const isFresh = isDispatchLocationFresh;
@@ -215,6 +239,13 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
         hospitalId: currentJob.hospitalId,
       }).session(session).lean().exec();
       if (!request) throw new AppError('EMERGENCY_NOT_DISPATCHABLE', 'Emergency request is no longer eligible for dispatch', 409);
+      const hospital = await HospitalModel.findOne({
+        _id: currentJob.hospitalId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
+        emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+      }).select('hospitalType services capabilities').session(session).lean().exec();
+      if (!hospital || !hospitalMatchesDispatchCategory(hospital, currentJob.category)) {
+        throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Selected hospital is no longer eligible for this emergency. Dispatch stopped; operations must coordinate a new destination.', 409);
+      }
       const provider = await AmbulanceProviderModel.findOne({ _id: candidate.providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).session(session).lean().exec();
       const driver = await AmbulanceDriverModel.findOne({
         _id: candidate.driverId,
@@ -332,12 +363,20 @@ const claimJob = async () => {
 };
 
 const searchAndOffer = async (job: DispatchJobLean) => {
+  if (!(await hospitalEligibleForJob(job))) {
+    await markExhausted(job, 'Selected hospital is no longer eligible for this emergency. Do not dispatch to this destination; operations must coordinate a new destination.');
+    return;
+  }
   const candidates = await eligibleCandidatePool(job);
   for (const candidate of candidates) {
     try {
       const result = await reserveAndOffer(job, candidate);
       if (result) return;
     } catch (error) {
+      if (error instanceof AppError && error.code === 'HOSPITAL_NO_LONGER_ELIGIBLE') {
+        await markExhausted(job, error.message);
+        return;
+      }
       if (!(error instanceof AppError) || !['DISPATCH_CANDIDATE_UNAVAILABLE', 'DISPATCH_CANDIDATE_BUSY', 'DISPATCH_RESERVATION_CONFLICT'].includes(error.code)) throw error;
     }
   }
@@ -487,8 +526,8 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
       if (activeTrip) throw new AppError('ACTIVE_TRIP_EXISTS', 'Driver or ambulance already has an active trip', 409);
       const existingTrip = await TripModel.findOne({ emergencyRequestId: job.emergencyRequestId }).session(session).lean().exec();
       if (existingTrip) throw new AppError('TRIP_ALREADY_EXISTS', 'An active or historical trip already exists for this emergency', 409);
-      const hospital = await HospitalModel.findOne({ _id: job.hospitalId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED', emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] } }).session(session).lean().exec();
-      if (!hospital) throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Selected hospital is no longer eligible; do not transport the patient to this destination', 409);
+      const hospital = await HospitalModel.findOne({ _id: job.hospitalId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED', emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] } }).select('hospitalType services capabilities').session(session).lean().exec();
+      if (!hospital || !hospitalMatchesDispatchCategory(hospital, job.category)) throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Selected hospital is no longer eligible; do not transport the patient to this destination', 409);
 
       const trip = new TripModel({
         emergencyRequestId: job.emergencyRequestId,
