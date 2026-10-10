@@ -17,6 +17,8 @@ export interface FacilitySearchFilters {
   latitude?: number;
   longitude?: number;
   radiusMeters?: number;
+  page?: number;
+  limit?: number;
 }
 
 export const facilityApi = {
@@ -28,6 +30,8 @@ export const facilityApi = {
     if (filters.latitude !== undefined) params.set('latitude', String(filters.latitude));
     if (filters.longitude !== undefined) params.set('longitude', String(filters.longitude));
     if (filters.radiusMeters !== undefined) params.set('radiusMeters', String(filters.radiusMeters));
+    if (filters.page !== undefined) params.set('page', String(filters.page));
+    if (filters.limit !== undefined) params.set('limit', String(filters.limit));
     return request<{ items: Facility[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>('/facilities/search?' + params.toString());
   },
   getById: (id: string) => request<Facility>('/facilities/' + encodeURIComponent(id)),

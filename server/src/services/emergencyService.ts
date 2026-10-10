@@ -8,11 +8,13 @@ import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { broadcastEvent } from './realtimeService.js';
 import { AppError } from '../utils/AppError.js';
+import { calculateGoogleRoutes } from './mapsService.js';
 import type { z } from 'zod';
-import type { createEmergencyRequestSchema } from '../schemas/emergency.js';
+import type { createEmergencyRequestSchema, emergencyDiscoveryQuerySchema } from '../schemas/emergency.js';
 import type { EmergencyRequestDocument, HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 
 type CreateEmergencyInput = z.infer<typeof createEmergencyRequestSchema>;
+type EmergencyDiscoveryQuery = z.infer<typeof emergencyDiscoveryQuerySchema>;
 export type EmergencyRecord = EmergencyRequestDocument & { _id: Types.ObjectId | string };
 
 export const USER_CANCELLABLE_STATUSES: HospitalEmergencyStatus[] = ['RECEIVED', 'REVIEWING', 'PREPARING', 'AMBULANCE_COORDINATION'];
@@ -29,6 +31,7 @@ const output = (request: EmergencyRecord) => ({
   requestCode: request.requestCode,
   hospitalId: String(request.hospitalId),
   situationType: request.situationType,
+  category: request.category ?? categoryIdForSituation(request.situationType),
   reportedAt: request.reportedAt,
   location: request.location,
   latitude: request.latitude,
@@ -46,72 +49,263 @@ const output = (request: EmergencyRecord) => ({
   driverId: request.driverId ? String(request.driverId) : undefined,
   patientId: request.patientId ? String(request.patientId) : undefined,
   etaMinutes: request.etaMinutes,
+  routeDistanceMeters: request.routeDistanceMeters,
   createdAt: request.createdAt,
   updatedAt: request.updatedAt,
 });
 
-export const createEmergencyRequest = async (userId: string, input: CreateEmergencyInput) => {
+type EmergencyHospitalCandidate = {
+  _id: Types.ObjectId;
+  name: string;
+  hospitalType: string;
+  services?: string[];
+  capabilities?: string[];
+  emergencyAvailability: string;
+  verificationStatus: string;
+  accountStatus: string;
+  updatedAt: Date;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  phone?: string;
+  location?: { type?: string; coordinates?: number[] };
+  latitude?: number;
+  longitude?: number;
+  distanceMeters?: number;
+};
+
+const situationTerms: Record<string, RegExp> = {
+  accident_injury: /trauma|accident|emergency|critical|orthop|surg|icu/i,
+  severe_bleeding: /trauma|bleed|emergency|critical|surg|icu/i,
+  breathing_difficulty: /respirat|pulmon|emergency|critical|icu/i,
+  chest_pain: /cardio|heart|stemi|cath|emergency|critical|icu/i,
+  stroke_symptoms: /stroke|neuro|brain|emergency|critical|icu/i,
+  unconscious_person: /emergency|critical|icu|neuro|trauma/i,
+  burn: /burn|trauma|emergency|critical|surg|icu/i,
+  other: /emergency|critical|urgent|icu/i,
+};
+const situationIdForLabel: Record<string, string> = {
+  'Accident / Injury': 'accident_injury',
+  'Severe Bleeding': 'severe_bleeding',
+  'Breathing Difficulty': 'breathing_difficulty',
+  'Chest Pain': 'chest_pain',
+  'Stroke-like Symptoms': 'stroke_symptoms',
+  'Unconscious Person': 'unconscious_person',
+  Burn: 'burn',
+  'Other Acute Situation': 'other',
+};
+const hospitalCoordinate = (hospital: Pick<EmergencyHospitalCandidate, 'location' | 'latitude' | 'longitude'>) => {
+  const coordinates = hospital.location?.coordinates;
+  const geoLatitude = Array.isArray(coordinates) ? coordinates[1] : undefined;
+  const geoLongitude = Array.isArray(coordinates) ? coordinates[0] : undefined;
+  const latitude = typeof geoLatitude === 'number' && Number.isFinite(geoLatitude) && geoLatitude >= -90 && geoLatitude <= 90
+    ? geoLatitude
+    : hospital.latitude;
+  const longitude = typeof geoLongitude === 'number' && Number.isFinite(geoLongitude) && geoLongitude >= -180 && geoLongitude <= 180
+    ? geoLongitude
+    : hospital.longitude;
+  if (typeof latitude !== 'number' || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+      typeof longitude !== 'number' || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+  return { latitude, longitude };
+};
+export const categoryIdForSituation = (situationType: string) => {
+  const known = situationIdForLabel[situationType] ?? situationType;
+  if (situationTerms[known]) return known;
+  const text = situationType.toLowerCase();
+  if (/chest|cardiac|heart|cardio/.test(text)) return 'chest_pain';
+  if (/stroke|neurolog|neuro|brain|speech difficulty/.test(text)) return 'stroke_symptoms';
+  if (/breath|respirat|asthma|chok/.test(text)) return 'breathing_difficulty';
+  if (/bleed|hemorrhag/.test(text)) return 'severe_bleeding';
+  if (/burn/.test(text)) return 'burn';
+  if (/accident|injur|trauma|fracture/.test(text)) return 'accident_injury';
+  if (/unconscious|unresponsive|faint/.test(text)) return 'unconscious_person';
+  return 'other';
+};
+export const hospitalMatchesSituation = (hospital: Pick<EmergencyHospitalCandidate, 'hospitalType' | 'services' | 'capabilities'>, situationType: string) => {
+  const terms = situationTerms[categoryIdForSituation(situationType)] ?? /emergency|critical|urgent|icu/i;
+  return [hospital.hospitalType, ...(hospital.services ?? []), ...(hospital.capabilities ?? [])].some((value) => terms.test(value));
+};
+const haversineMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
+  const radians = (value: number) => value * Math.PI / 180;
+  const dLat = radians(b.latitude - a.latitude);
+  const dLng = radians(b.longitude - a.longitude);
+  const part = Math.sin(dLat / 2) ** 2 + Math.cos(radians(a.latitude)) * Math.cos(radians(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(part), Math.sqrt(Math.max(0, 1 - part)));
+};
+const safeRoute = async (origin: { latitude: number; longitude: number }, destination: { latitude: number; longitude: number }) => {
+  try {
+    const result = await calculateGoogleRoutes({ origin, destination, travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE' });
+    const route = result.routes[0];
+    if (!route || !Number.isFinite(route.distanceMeters) || !Number.isFinite(route.durationSeconds) || route.durationSeconds <= 0) return null;
+    return { distanceMeters: route.distanceMeters, etaMinutes: Math.max(1, Math.round(route.durationSeconds / 60)) };
+  } catch {
+    // Routing is best-effort: the request can still be persisted, but no fabricated ETA is returned.
+    return null;
+  }
+};
+
+export const discoverEmergencyHospitals = async (userId: string, query: EmergencyDiscoveryQuery) => {
+  assertId(userId, 'user');
+  const terms = situationTerms[query.category] ?? situationTerms.other;
+  const filter = {
+    accountStatus: 'ACTIVE' as const,
+    verificationStatus: 'VERIFIED' as const,
+    emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] as const },
+    $or: [{ hospitalType: terms }, { services: terms }, { capabilities: terms }],
+  };
+  const origin = { latitude: query.latitude, longitude: query.longitude };
+  const geoItems = await HospitalModel.aggregate<EmergencyHospitalCandidate>([
+    { $geoNear: { near: { type: 'Point', coordinates: [query.longitude, query.latitude] }, key: 'location', distanceField: 'distanceMeters', spherical: true, maxDistance: query.radiusMeters, query: filter } },
+    { $limit: 100 },
+    { $project: { name: 1, hospitalType: 1, services: 1, capabilities: 1, address: 1, city: 1, state: 1, country: 1, phone: 1, location: 1, latitude: 1, longitude: 1, verificationStatus: 1, accountStatus: 1, emergencyAvailability: 1, updatedAt: 1, distanceMeters: 1 } },
+  ]).exec();
+
+  // Older records may have valid legacy lat/lng without GeoJSON. Include them without writing/migrating data.
+  const legacyItems = await HospitalModel.find({
+    ...filter,
+    location: { $exists: false },
+    latitude: { $gte: -90, $lte: 90 },
+    longitude: { $gte: -180, $lte: 180 },
+  }).select('name hospitalType services capabilities address city state country phone latitude longitude verificationStatus accountStatus emergencyAvailability updatedAt').limit(500).lean().exec() as unknown as EmergencyHospitalCandidate[];
+  const byId = new Map<string, { hospital: EmergencyHospitalCandidate; straightLineDistanceMeters: number }>();
+  for (const hospital of geoItems) {
+    const coordinates = hospitalCoordinate(hospital);
+    if (!coordinates) continue;
+    const distance = typeof hospital.distanceMeters === 'number' ? hospital.distanceMeters : haversineMeters(origin, coordinates);
+    if (distance <= query.radiusMeters) byId.set(String(hospital._id), { hospital, straightLineDistanceMeters: distance });
+  }
+  for (const hospital of legacyItems) {
+    const coordinates = hospitalCoordinate(hospital);
+    if (!coordinates) continue;
+    const distance = haversineMeters(origin, coordinates);
+    if (distance <= query.radiusMeters && !byId.has(String(hospital._id))) byId.set(String(hospital._id), { hospital, straightLineDistanceMeters: distance });
+  }
+  const ranked = [...byId.values()].sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters).slice(0, query.limit);
+  const items = await Promise.all(ranked.map(async ({ hospital, straightLineDistanceMeters }) => {
+    const destination = hospitalCoordinate(hospital);
+    const route = destination && query.includeRoutes ? await safeRoute(origin, destination) : null;
+    return {
+      id: String(hospital._id),
+      name: hospital.name,
+      type: hospital.hospitalType,
+      services: hospital.services ?? [],
+      capabilities: hospital.capabilities ?? [],
+      address: hospital.address ?? '',
+      city: hospital.city ?? '',
+      state: hospital.state ?? '',
+      country: hospital.country ?? '',
+      phone: hospital.phone ?? '',
+      latitude: destination?.latitude,
+      longitude: destination?.longitude,
+      distanceMeters: route?.distanceMeters ?? Math.round(straightLineDistanceMeters),
+      straightLineDistanceMeters: Math.round(straightLineDistanceMeters),
+      distanceType: route ? 'DRIVING' as const : 'STRAIGHT_LINE' as const,
+      etaMinutes: route?.etaMinutes ?? null,
+      estimatedTime: route ? route.etaMinutes + ' min' : null,
+      emergencyAvailability: hospital.emergencyAvailability,
+      verified: hospital.verificationStatus === 'VERIFIED',
+      lastUpdated: hospital.updatedAt.toISOString(),
+    };
+  }));
+  return { items, pagination: { page: 1, limit: query.limit, total: items.length, totalPages: items.length ? 1 : 0 }, searchedAt: new Date().toISOString() };
+};
+
+export const createEmergencyRequest = async (userId: string, input: CreateEmergencyInput, idempotencyKey: string) => {
   const userObjectId = assertId(userId, 'user');
   const hospitalId = assertId(input.hospitalId, 'hospital');
+  const requestedCategory = input.category ?? categoryIdForSituation(input.situationType);
+  const existing = await EmergencyRequestModel.findOne({ userId: userObjectId, idempotencyKey }).lean().exec();
+  if (existing) {
+    if (String(existing.hospitalId) !== String(hospitalId) || existing.situationType !== input.situationType ||
+        (existing.category ?? categoryIdForSituation(existing.situationType)) !== requestedCategory ||
+        existing.latitude !== input.latitude || existing.longitude !== input.longitude) {
+      throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
+    }
+    return output(existing as EmergencyRecord);
+  }
 
   const hospital = await HospitalModel.findOne({
     _id: hospitalId,
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
-    emergencyAvailability: { $ne: 'UNAVAILABLE' },
-  }).select('_id').lean().exec();
-
+    emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+  }).select('_id name hospitalType services capabilities emergencyAvailability location latitude longitude').lean().exec() as unknown as EmergencyHospitalCandidate | null;
   if (!hospital) {
-    throw new AppError('HOSPITAL_NOT_OPERATIONAL', 'The selected hospital is not currently accepting emergency requests through ResQ', 409);
+    throw new AppError('HOSPITAL_NOT_OPERATIONAL', 'The selected hospital is not currently eligible for emergency coordination. Refresh the hospital list or choose another destination.', 409);
+  }
+  if (!hospitalMatchesSituation(hospital, requestedCategory)) {
+    throw new AppError('HOSPITAL_CAPABILITY_MISMATCH', 'The selected hospital does not declare a capability matching this emergency type. Choose a different verified hospital.', 409);
+  }
+  const destination = hospitalCoordinate(hospital);
+  if (!destination) {
+    throw new AppError('HOSPITAL_LOCATION_UNAVAILABLE', 'The selected hospital has no valid coordinates. Choose another destination or call 112.', 409);
   }
 
-  // Idempotency: Reuse recent unhandled request created within the last 30 seconds
-  const recentExisting = await EmergencyRequestModel.findOne({
-    userId: userObjectId,
-    hospitalId,
-    status: { $in: ['RECEIVED', 'REVIEWING'] },
-    createdAt: { $gte: new Date(Date.now() - 30000) },
-  }).lean().exec();
-  if (recentExisting) {
-    return output(recentExisting);
-  }
-
+  const route = await safeRoute({ latitude: input.latitude, longitude: input.longitude }, destination);
   const now = new Date();
-  const request = await EmergencyRequestModel.create({
-    requestCode: 'RSQ-' + cryptoSafeCode(),
-    userId: userObjectId,
-    hospitalId,
-    situationType: input.situationType,
-    reportedAt: now,
-    location: input.location,
-    latitude: input.latitude,
-    longitude: input.longitude,
-    status: 'RECEIVED',
-    statusHistory: [{ status: 'RECEIVED', changedAt: now, actorId: userObjectId, actorRole: 'USER' }],
-  });
-
-  const patient = await HospitalPatientModel.findOneAndUpdate(
-    { emergencyId: request._id },
-    {
-      $setOnInsert: {
-        caseId: 'CASE-' + cryptoSafeCode(),
+  const session = await startSession();
+  let linked: EmergencyRecord | null = null;
+  try {
+    await session.withTransaction(async () => {
+      const currentHospital = await HospitalModel.findOne({
+        _id: hospitalId,
+        accountStatus: 'ACTIVE',
+        verificationStatus: 'VERIFIED',
+        emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+      }).select('_id hospitalType services capabilities location latitude longitude').session(session).lean().exec() as unknown as EmergencyHospitalCandidate | null;
+      if (!currentHospital || !hospitalMatchesSituation(currentHospital, requestedCategory) || !hospitalCoordinate(currentHospital)) {
+        throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Hospital eligibility changed before the request was saved. Refresh hospitals and choose an eligible destination.', 409);
+      }
+      const request = new EmergencyRequestModel({
+        requestCode: 'RSQ-' + cryptoSafeCode(),
+        idempotencyKey,
+        userId: userObjectId,
         hospitalId,
-        emergencyId: request._id,
-        emergencyType: input.situationType,
-        coordinationStatus: 'INCOMING',
-        receivedAt: now,
-      },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  ).exec();
+        situationType: input.situationType,
+        category: requestedCategory,
+        reportedAt: now,
+        location: input.location,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        etaMinutes: route?.etaMinutes,
+        routeDistanceMeters: route?.distanceMeters,
+        status: 'RECEIVED',
+        statusHistory: [{ status: 'RECEIVED', changedAt: now, actorId: userObjectId, actorRole: 'USER' }],
+      });
+      await request.save({ session });
+      const patient = await HospitalPatientModel.findOneAndUpdate(
+        { emergencyId: request._id },
+        { $setOnInsert: { caseId: 'CASE-' + cryptoSafeCode(), hospitalId, emergencyId: request._id, emergencyType: input.situationType, coordinationStatus: 'INCOMING', receivedAt: now } },
+        { upsert: true, new: true, setDefaultsOnInsert: true, session },
+      ).exec();
+      if (!patient) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
+      const updated = await EmergencyRequestModel.findOneAndUpdate(
+        { _id: request._id, status: 'RECEIVED', patientId: { $exists: false } },
+        { $set: { patientId: patient._id } },
+        { new: true, runValidators: true, session },
+      ).lean().exec();
+      if (!updated) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
+      linked = updated as unknown as EmergencyRecord;
+    });
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 11000) {
+      const duplicate = await EmergencyRequestModel.findOne({ userId: userObjectId, idempotencyKey }).lean().exec();
+      if (duplicate) {
+        if (String(duplicate.hospitalId) !== String(hospitalId) || duplicate.situationType !== input.situationType ||
+            (duplicate.category ?? categoryIdForSituation(duplicate.situationType)) !== requestedCategory ||
+            duplicate.latitude !== input.latitude || duplicate.longitude !== input.longitude) {
+          throw new AppError('IDEMPOTENCY_KEY_REUSED', 'This submission key was already used for a different SOS payload. Refresh the request and try again.', 409);
+        }
+        return output(duplicate as EmergencyRecord);
+      }
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
 
-  const linked = await EmergencyRequestModel.findOneAndUpdate(
-    { _id: request._id, status: 'RECEIVED', patientId: { $exists: false } },
-    { $set: { patientId: patient._id } },
-    { new: true },
-  ).lean().exec();
-
-  if (!linked) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
+  if (!linked) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
   const out = output(linked);
   broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', out);
   broadcastEvent('operations', 'emergency:created', out);

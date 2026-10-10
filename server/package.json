@@ -13,7 +13,9 @@
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "audit:db": "tsx src/scripts/auditDatabase.ts",
     "repair:test-data": "tsx src/scripts/repairTestData.ts",
-    "enrich:hospital-coords": "tsx src/scripts/enrichHospitalCoordinates.ts"
+    "enrich:hospital-coords": "tsx src/scripts/enrichHospitalCoordinates.ts",
+    "diagnose:hospitals": "tsx src/scripts/diagnoseHospitalDirectory.ts",
+    "ensure:emergency-idempotency-index": "tsx src/scripts/ensureEmergencyIdempotencyIndex.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -25,6 +25,7 @@ export interface Facility {
   category: FacilityCategory;
   distance: string;
   distanceMeters?: number;
+  distanceType?: 'DRIVING' | 'STRAIGHT_LINE';
   estimatedTime: string;
   emergencyAvailable: boolean;
   verified: boolean;

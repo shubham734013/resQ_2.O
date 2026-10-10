@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Clock,
@@ -36,6 +36,7 @@ export const CoordinationStatus = ({
   className = '',
 }: CoordinationStatusProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showExitModal, setShowExitModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -48,7 +49,8 @@ export const CoordinationStatus = ({
   });
 
   const data = request.data;
-  const ready = Boolean(data);
+  const requestSubmitted = Boolean(emergencyRequestId);
+  const ready = Boolean(data) || requestSubmitted;
   const isCancellable =
     ready &&
     data?.status &&
@@ -65,11 +67,15 @@ export const CoordinationStatus = ({
             ? 'Resolved'
             : data?.status === 'CANCELLED'
               ? 'Cancelled'
-              : ready
-                ? 'Received by hospital queue'
-                : isCreatingRequest
-                  ? 'Creating emergency request'
-                  : 'Emergency request not created';
+              : requestSubmitted && request.isError
+                ? 'Request saved · status unavailable'
+                : requestSubmitted && request.isLoading
+                  ? 'Request saved · loading status'
+                  : ready
+                    ? 'Received by hospital queue'
+                    : isCreatingRequest
+                      ? 'Creating emergency request'
+                      : 'Emergency request not created';
 
   const callHospital = () => {
     if (facility.phone) window.location.href = `tel:${facility.phone.replace(/[^0-9+]/g, '')}`;
@@ -92,6 +98,9 @@ export const CoordinationStatus = ({
     setCancelError(null);
     try {
       await emergencyApi.cancel(emergencyRequestId);
+      await queryClient.invalidateQueries({ queryKey: ['emergency-requests'] });
+      await queryClient.invalidateQueries({ queryKey: ['user', 'emergencies'] });
+      await queryClient.invalidateQueries({ queryKey: ['emergency-request', emergencyRequestId] });
       setShowExitModal(false);
       onExit();
     } catch (err) {
@@ -106,7 +115,7 @@ export const CoordinationStatus = ({
       <div className="space-y-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${ready ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
+            <span className={`w-2.5 h-2.5 rounded-full ${ready && !request.isError ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
               {statusLabel}
             </span>
@@ -135,17 +144,24 @@ export const CoordinationStatus = ({
         {ready && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800">ResQ request</p>
-            <p className="mt-1 font-bold text-emerald-950">{data?.requestCode}</p>
+            <p className="mt-1 font-bold text-emerald-950">{data?.requestCode ?? emergencyRequestId}</p>
             <p className="mt-1 text-xs text-emerald-800">
               Persisted in the selected hospital&apos;s emergency queue. Hospital response controls the next coordination step.
             </p>
+            <p className="mt-1 text-[11px] text-emerald-800">Request ID: {data?.id ?? emergencyRequestId}</p>
           </div>
         )}
 
         {error && (
-          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 flex items-start gap-2 text-xs text-rose-800">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-2 text-xs text-amber-900">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
             <span>{error}</span>
+          </div>
+        )}
+        {request.isError && requestSubmitted && (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+            The request ID is retained, but its latest status could not be loaded. Your request has not been cancelled.
+            <button type="button" onClick={() => void request.refetch()} className="ml-2 font-semibold underline">Retry status</button>
           </div>
         )}
 
@@ -163,7 +179,7 @@ export const CoordinationStatus = ({
                 done: ready,
                 current: isCreatingRequest,
               },
-              { label: 'Ready for navigation', detail: 'Live route is available from the navigation screen.', done: ready },
+              { label: 'Ready for navigation', detail: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? 'Hospital coordinates are available for navigation.' : 'Hospital coordinates are not currently available.', done: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' },
             ].map((step, index) => (
               <li key={step.label} className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
@@ -202,7 +218,7 @@ export const CoordinationStatus = ({
             icon={<Navigation className="w-4 h-4" />}
             onClick={() => navigate(`/route/${facility.id}?emergency=true`)}
             className="flex-1 font-bold"
-            disabled={!ready}
+            disabled={!ready || typeof facility.latitude !== 'number' || typeof facility.longitude !== 'number'}
           >
             Start Navigation
           </Button>
