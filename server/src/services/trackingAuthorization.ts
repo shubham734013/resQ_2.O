@@ -10,6 +10,6 @@ export const canAccessTrackingSnapshot = (
   if (identity.role === 'USER') return String(emergency.userId) === identity.id;
   if (identity.role === 'HOSPITAL') return String(emergency.hospitalId) === identity.id && (!trip?.destinationHospitalId || String(trip.destinationHospitalId) === identity.id);
   if (identity.role === 'AMBULANCE_DRIVER') return Boolean(trip?.driverId && String(trip.driverId) === identity.id);
-  if (identity.role === 'AMBULANCE_PROVIDER') return Boolean((trip && String(trip.providerId) === identity.id) || (emergency.ambulanceProviderId && String(emergency.ambulanceProviderId) === identity.id));
+  if (identity.role === 'AMBULANCE_PROVIDER') return trip ? String(trip.providerId) === identity.id : Boolean(emergency.ambulanceProviderId && String(emergency.ambulanceProviderId) === identity.id);
   return false;
 };
