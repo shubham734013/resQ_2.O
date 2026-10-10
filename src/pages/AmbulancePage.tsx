@@ -38,12 +38,12 @@ const DispatchCountdownCard = ({
   isAccepting: boolean;
   isRejecting: boolean;
 }) => {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, []);
-  const secondsLeft = Math.max(0, Math.ceil((new Date(offer.deadlineAt).getTime() - now) / 1000));
+  const secondsLeft = now === 0 ? 25 : Math.max(0, Math.ceil((new Date(offer.deadlineAt).getTime() - now) / 1000));
   const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 25) * 100));
   const request = offer.request;
   const hospital = offer.hospital;
