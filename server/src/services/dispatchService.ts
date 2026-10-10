@@ -426,6 +426,19 @@ const searchAndOffer = async (job: DispatchJobLean) => {
       if (!(error instanceof AppError) || !['DISPATCH_CANDIDATE_UNAVAILABLE', 'DISPATCH_CANDIDATE_BUSY', 'DISPATCH_RESERVATION_CONFLICT'].includes(error.code)) throw error;
     }
   }
+  if (!candidates.length) {
+    const jobAgeMs = Date.now() - new Date(job.createdAt).getTime();
+    const INITIAL_SEARCH_GRACE_WINDOW_MS = 25_000;
+    if (jobAgeMs < INITIAL_SEARCH_GRACE_WINDOW_MS && job.attempts.length === 0) {
+      await DispatchJobModel.updateOne({ _id: job._id, status: 'SEARCHING', leaseToken: job.leaseToken }, {
+        $set: { status: 'PENDING', nextAttemptAt: new Date(Date.now() + 2_500) },
+        $unset: { leaseUntil: 1, leaseToken: 1 },
+        $push: { events: appendEvent('SEARCH_RETRY_SCHEDULED', 'No candidate on immediate tick; searching area for newly online drivers.') },
+      }).exec();
+      return;
+    }
+  }
+
   await markExhausted(job, candidates.length ? 'All ranked candidates became unavailable before reservation.' : 'No eligible on-duty driver with a fresh location and an available verified ambulance was found.');
 };
 
