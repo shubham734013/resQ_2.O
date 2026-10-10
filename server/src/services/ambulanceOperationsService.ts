@@ -4,6 +4,7 @@ import { AmbulanceProviderModel, type AmbulanceProviderDocument } from '../model
 import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel, type EmergencyRequestDocument } from '../models/EmergencyRequest.js';
+import { DispatchJobModel } from '../models/DispatchJob.js';
 import { TripModel, type TripDocument } from '../models/Trip.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { HospitalModel } from '../models/Hospital.js';
