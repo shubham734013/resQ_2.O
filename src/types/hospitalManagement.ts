@@ -96,6 +96,8 @@ export interface HospitalCoordinationNotification {
   emergencyId: string;
   tripId?: string;
   ambulanceId?: string;
+  ambulanceRegistration?: string;
+  ambulanceVehicleNumber?: string;
   type: HospitalCoordinationNotificationType;
   state: HospitalCoordinationNotificationState;
   requestCode: string;
