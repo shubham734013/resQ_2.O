@@ -8,6 +8,7 @@ import { HospitalModel } from './models/Hospital.js';
 import { EmergencyRequestModel } from './models/EmergencyRequest.js';
 import { DispatchJobModel } from './models/DispatchJob.js';
 import { TripModel } from './models/Trip.js';
+import { HospitalPatientModel } from './models/HospitalPatient.js';
 process.env.NODE_ENV ??= 'test';
 process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
 process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
@@ -66,6 +67,10 @@ test('concurrent reservations and duplicate acceptances create one active trip',
       situationType: 'Other Acute Situation', category: 'other', reportedAt: new Date(),
       latitude: 26.9124, longitude: 75.7873, status: 'AMBULANCE_COORDINATION',
       statusHistory: [{ status: 'AMBULANCE_COORDINATION', changedAt: new Date(), actorRole: 'SYSTEM', previousStatus: 'RECEIVED' }],
+    })));
+    await HospitalPatientModel.insertMany(requestIds.map((requestId, index) => ({
+      caseId: 'CASE-' + suffix.slice(0, 8) + index, hospitalId, emergencyId: requestId,
+      coordinationStatus: 'INCOMING', emergencyType: 'Other Acute Situation', receivedAt: new Date(),
     })));
     await DispatchJobModel.insertMany(jobIds.map((jobId, index) => ({
       _id: jobId, emergencyRequestId: requestIds[index]!, hospitalId, userId, category: 'other',
@@ -159,6 +164,7 @@ test('concurrent reservations and duplicate acceptances create one active trip',
   } finally {
     await TripModel.deleteMany({ emergencyRequestId: { $in: requestIds } });
     await DispatchJobModel.deleteMany({ _id: { $in: jobIds } });
+    await HospitalPatientModel.deleteMany({ emergencyId: { $in: requestIds } });
     await EmergencyRequestModel.deleteMany({ _id: { $in: requestIds } });
     await AmbulanceDriverModel.deleteMany({ _id: driverId });
     await AmbulanceModel.deleteMany({ _id: ambulanceId });
