@@ -9,6 +9,7 @@ import { cancelDispatchForEmergencyInSession } from './dispatchService.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { broadcastEvent } from './realtimeService.js';
+import { recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
 import { AppError } from '../utils/AppError.js';
 import { calculateGoogleRoutes } from './mapsService.js';
 import type { z } from 'zod';
@@ -353,6 +354,8 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   const persisted = linked as EmergencyRecord | null;
   if (!persisted) throw new AppError('EMERGENCY_CREATE_FAILED', 'Emergency request was not persisted. Retry safely or call 112.', 500);
   const out = output(persisted);
+  try { await recordHospitalCoordinationEvent({ emergencyId: String(persisted._id), type: 'EMERGENCY_RECEIVED' }); }
+  catch (error) { console.error('Hospital coordination inbox will reconcile this emergency:', error instanceof Error ? error.message : 'notification persistence failed'); }
   const queueRefresh = { event: 'QUEUE_REFRESH', requestStatus: out.status, timestamp: new Date().toISOString() };
   broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', queueRefresh);
   broadcastEvent('operations', 'emergency:created', { event: 'QUEUE_REFRESH', timestamp: queueRefresh.timestamp });
@@ -507,6 +510,8 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
   const persistedCancellation = updatedRequest as EmergencyRecord | null;
   if (!persistedCancellation) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
   const out = { ...output(persistedCancellation), dispatch: await dispatchSummary(persistedCancellation._id) };
+  try { await recordHospitalCoordinationEvent({ emergencyId: String(persistedCancellation._id), type: 'EMERGENCY_CANCELLED' }); }
+  catch (error) { console.error('Hospital cancellation notification will reconcile from persisted emergency state:', error instanceof Error ? error.message : 'notification persistence failed'); }
   const statusRefresh = { event: 'STATUS_REFRESH', status: out.status, timestamp: new Date().toISOString() };
   broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', statusRefresh);
   broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', statusRefresh);
