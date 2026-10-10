@@ -231,6 +231,15 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   let linked: EmergencyRecord | null = null;
   try {
     await session.withTransaction(async () => {
+      const currentHospital = await HospitalModel.findOne({
+        _id: hospitalId,
+        accountStatus: 'ACTIVE',
+        verificationStatus: 'VERIFIED',
+        emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+      }).select('_id hospitalType services capabilities location latitude longitude').session(session).lean().exec() as unknown as EmergencyHospitalCandidate | null;
+      if (!currentHospital || !hospitalMatchesSituation(currentHospital, input.situationType) || !hospitalCoordinate(currentHospital)) {
+        throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Hospital eligibility changed before the request was saved. Refresh hospitals and choose an eligible destination.', 409);
+      }
       const request = new EmergencyRequestModel({
         requestCode: 'RSQ-' + cryptoSafeCode(),
         idempotencyKey,
