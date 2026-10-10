@@ -20,6 +20,7 @@ export const emergencyDiscoveryQuerySchema = z.object({
   category: z.enum(EMERGENCY_CATEGORY_IDS),
   radiusMeters: z.coerce.number().int().min(100).max(100000).default(30000),
   limit: z.coerce.number().int().min(1).max(10).default(10),
+  includeRoutes: z.coerce.boolean().default(true),
 }).strict();
 
 export const userEmergencyListQuerySchema = z.object({
