@@ -68,7 +68,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       const event = envelope?.data;
       if (!event || event.emergencyRequestId !== emergencyRequestId) return;
       queryClient.setQueryData<TrackingSnapshot>(queryKey, (current) => {
-        if (!current?.trip || current.trip.id !== event.tripId || !current.trackingActive) return current;
+        if (!current?.trip || current.trip.id !== event.tripId || !current.trackingActive || ['COMPLETED', 'CANCELLED'].includes(event.tripStatus)) return current;
         const incomingTime = Date.parse(event.locationUpdatedAt);
         const currentTime = current.location?.updatedAt ? Date.parse(current.location.updatedAt) : 0;
         if (!Number.isFinite(incomingTime) || incomingTime < currentTime) return current;
