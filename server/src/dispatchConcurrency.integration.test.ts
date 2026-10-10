@@ -8,7 +8,15 @@ import { HospitalModel } from './models/Hospital.js';
 import { EmergencyRequestModel } from './models/EmergencyRequest.js';
 import { DispatchJobModel } from './models/DispatchJob.js';
 import { TripModel } from './models/Trip.js';
-import { acceptDispatchOffer, rejectDispatchOffer, processDispatchTick, retryDispatchJob, reserveAndOffer, type DispatchCandidate } from './services/dispatchService.js';
+process.env.NODE_ENV ??= 'test';
+process.env.MONGODB_URI ??= 'mongodb://127.0.0.1:27017/resq_test';
+process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
+process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough';
+process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
+process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
+
+const { acceptDispatchOffer, rejectDispatchOffer, processDispatchTick, retryDispatchJob, reserveAndOffer } = await import('./services/dispatchService.js');
+type DispatchCandidate = import('./services/dispatchService.js').DispatchCandidate;
 
 const uri = process.env.DISPATCH_TEST_MONGODB_URI;
 const enabled = Boolean(uri && /test|dispatch/i.test(new URL(uri).pathname));
