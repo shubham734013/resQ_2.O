@@ -150,17 +150,23 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
   const busyAmbulanceIds = new Set(activeTrips.map((trip) => String(trip.ambulanceId)));
   const busyDriverIds = new Set(activeTrips.filter((trip) => trip.driverId).map((trip) => String(trip.driverId)));
   const driversByAmbulance = new Map<string, typeof drivers[number]>();
+  const ambiguousAmbulances = new Set<string>();
   for (const driver of drivers) {
-    if (driver.assignedAmbulanceId && String(driver.providerId) === String(ambulances.find((ambulance) => String(ambulance._id) === String(driver.assignedAmbulanceId))?.providerId)) {
-      driversByAmbulance.set(String(driver.assignedAmbulanceId), driver);
+    const ambulanceId = driver.assignedAmbulanceId ? String(driver.assignedAmbulanceId) : '';
+    if (!ambulanceId || String(driver.providerId) !== String(ambulances.find((ambulance) => String(ambulance._id) === ambulanceId)?.providerId)) continue;
+    if (driversByAmbulance.has(ambulanceId)) {
+      ambiguousAmbulances.add(ambulanceId);
+      driversByAmbulance.delete(ambulanceId);
+      continue;
     }
+    if (!ambiguousAmbulances.has(ambulanceId)) driversByAmbulance.set(ambulanceId, driver);
   }
   const attemptedDrivers = new Set(job.attempts.filter((attempt) => attempt.generation === job.generation).map((attempt) => String(attempt.driverId)));
   const pickup = { latitude: job.pickupLatitude, longitude: job.pickupLongitude };
   const pool: DispatchCandidate[] = [];
   for (const ambulance of ambulances) {
     const driver = driversByAmbulance.get(String(ambulance._id));
-    if (!driver || busyAmbulanceIds.has(String(ambulance._id)) || busyDriverIds.has(String(driver._id))) continue;
+    if (ambiguousAmbulances.has(String(ambulance._id)) || !driver || busyAmbulanceIds.has(String(ambulance._id)) || busyDriverIds.has(String(driver._id))) continue;
     if (attemptedDrivers.has(String(driver._id))) continue;
     if (exactDriverId && String(driver._id) !== String(exactDriverId)) continue;
     if (!isFresh(ambulance.locationUpdatedAt, now)) continue;
@@ -178,10 +184,15 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
     });
   }
   pool.sort((a, b) => a.straightLineMeters - b.straightLineMeters);
-  const routedPool = await Promise.all(pool.slice(0, DISPATCH_ROUTE_CANDIDATE_LIMIT).map(async (candidate) => ({
-    ...candidate,
-    route: await routeRank(candidate.coordinates, pickup, candidate.straightLineMeters),
-  })));
+  const routeCandidates = pool.slice(0, DISPATCH_ROUTE_CANDIDATE_LIMIT);
+  const routedPool: DispatchCandidate[] = [];
+  for (let index = 0; index < routeCandidates.length; index += 5) {
+    const batch = await Promise.all(routeCandidates.slice(index, index + 5).map(async (candidate) => ({
+      ...candidate,
+      route: await routeRank(candidate.coordinates, pickup, candidate.straightLineMeters),
+    })));
+    routedPool.push(...batch);
+  }
   return rankDispatchCandidates(routedPool);
 };
 
