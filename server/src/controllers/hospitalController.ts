@@ -38,3 +38,13 @@ export const getPatientController = async (req: Request, res: Response): Promise
 
 export const listAmbulancesController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.listAmbulances(hospitalId(req), query(res)));
 export const getAmbulanceController = async (req: Request, res: Response): Promise<void> => sendSuccess(res, await service.getAmbulance(hospitalId(req), id(req)));
+
+export const listCoordinationNotificationsController = async (req: Request, res: Response): Promise<void> =>
+  sendSuccess(res, await service.listHospitalCoordinationNotifications(hospitalId(req), query(res)));
+export const acknowledgeCoordinationNotificationController = async (req: Request, res: Response): Promise<void> => {
+  const auth = (req as AuthenticatedRequest).auth;
+  if (!auth || auth.role !== 'HOSPITAL') throw new Error('Hospital authentication required');
+  sendSuccess(res, await service.acknowledgeHospitalCoordinationNotification(hospitalId(req), id(req), auth.id));
+};
+export const getCoordinationDetailController = async (req: Request, res: Response): Promise<void> =>
+  sendSuccess(res, await service.getHospitalCoordinationDetail(hospitalId(req), id(req)));
