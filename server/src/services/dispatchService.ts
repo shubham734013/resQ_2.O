@@ -325,7 +325,7 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
         accountStatus: 'ACTIVE',
         verificationStatus: 'VERIFIED',
         $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationId: null }, { dispatchReservationExpiresAt: { $lte: now } }],
-      }, { $set: { dispatchReservationId: currentJob._id, dispatchReservationExpiresAt: deadlineAt } }, { new: true, session }).lean().exec();
+      }, { $set: { dispatchReservationId: currentJob._id, dispatchReservationExpiresAt: deadlineAt } }, { returnDocument: 'after', session }).lean().exec();
       if (!reservedAmbulance) throw new AppError('DISPATCH_RESERVATION_CONFLICT', 'Ambulance was reserved by another dispatch', 409);
       const reservedDriver = await AmbulanceDriverModel.findOneAndUpdate({
         _id: candidate.driverId,
@@ -335,7 +335,7 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
         licenseVerificationStatus: 'VERIFIED',
         availabilityStatus: 'ONLINE',
         $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationId: null }, { dispatchReservationExpiresAt: { $lte: now } }],
-      }, { $set: { dispatchReservationId: currentJob._id, dispatchReservationExpiresAt: deadlineAt } }, { new: true, session }).lean().exec();
+      }, { $set: { dispatchReservationId: currentJob._id, dispatchReservationExpiresAt: deadlineAt } }, { returnDocument: 'after', session }).lean().exec();
       if (!reservedDriver) throw new AppError('DISPATCH_RESERVATION_CONFLICT', 'Driver was reserved by another dispatch', 409);
 
       const attempt: DispatchAttemptDocument = {
@@ -368,7 +368,7 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
         },
         $unset: { leaseUntil: 1, leaseToken: 1, nextAttemptAt: 1 },
         $push: { attempts: attempt, events: appendEvent(actor ? 'MANUAL_OFFER_CREATED' : 'OFFER_CREATED', actor ? 'Manual dispatch by administrator' : undefined, actor?.id, actor?.role ?? 'SYSTEM', attemptId) },
-      }, { new: true, session }).lean().exec() as DispatchJobLean | null;
+      }, { returnDocument: 'after', session }).lean().exec() as DispatchJobLean | null;
       if (!update) throw new AppError('DISPATCH_STATE_CONFLICT', 'Dispatch state changed before the offer could be saved', 409);
       result = { job: update, attempt };
     });
@@ -403,7 +403,7 @@ const claimJob = async () => {
   }, {
     $set: { status: 'SEARCHING', leaseUntil: new Date(now.getTime() + LEASE_MS), leaseToken },
     $push: { events: appendEvent('SEARCH_STARTED') },
-  }, { new: true, sort: { createdAt: 1 } }).lean().exec() as DispatchJobLean | null;
+  }, { returnDocument: 'after', sort: { createdAt: 1 } }).lean().exec() as DispatchJobLean | null;
   if (!job) return null;
   return job;
 };
@@ -454,7 +454,7 @@ const expireOrReleaseOffer = async (job: DispatchJobLean, reason: string, outcom
         },
         $unset: { currentAttemptId: 1, currentProviderId: 1, currentAmbulanceId: 1, currentDriverId: 1, deadlineAt: 1 },
         $push: { events: appendEvent(outcome === 'REJECTED' ? 'OFFER_REJECTED' : outcome === 'EXPIRED' ? 'OFFER_EXPIRED' : 'OFFER_RELEASED', reason, undefined, 'SYSTEM', attemptId) },
-      }, { new: true, session, arrayFilters: [{ 'attempt.attemptId': attemptId }] }).lean().exec() as DispatchJobLean | null;
+      }, { returnDocument: 'after', session, arrayFilters: [{ 'attempt.attemptId': attemptId }] }).lean().exec() as DispatchJobLean | null;
       if (!updated) return;
       await releaseReservationInSession(job._id, attempt.ambulanceId, attempt.driverId, session);
     });
@@ -618,7 +618,7 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
       await trip.save({ session });
       const updatedRequest = await EmergencyRequestModel.findOneAndUpdate({
         _id: job.emergencyRequestId, status: 'AMBULANCE_COORDINATION', ambulanceId: { $exists: false },
-      }, { $set: { ambulanceProviderId: attempt.providerId, ambulanceId: attempt.ambulanceId, driverId: did } }, { new: true, session }).lean().exec();
+      }, { $set: { ambulanceProviderId: attempt.providerId, ambulanceId: attempt.ambulanceId, driverId: did } }, { returnDocument: 'after', session }).lean().exec();
       if (!updatedRequest) throw new AppError('EMERGENCY_ASSIGNMENT_CONFLICT', 'Another dispatch action assigned this emergency first', 409);
       const acceptanceGuardTime = new Date();
       const updatedJob = await DispatchJobModel.findOneAndUpdate({
@@ -627,10 +627,10 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
         $set: { status: 'ACCEPTED', acceptedTripId: trip._id, 'attempts.$[attempt].status': 'ACCEPTED', 'attempts.$[attempt].respondedAt': acceptanceGuardTime },
         $unset: { deadlineAt: 1, leaseUntil: 1, leaseToken: 1 },
         $push: { events: appendEvent('OFFER_ACCEPTED', undefined, did, 'AMBULANCE_DRIVER', attempt.attemptId) },
-      }, { new: true, session, arrayFilters: [{ 'attempt.attemptId': attempt.attemptId }] }).lean().exec();
+      }, { returnDocument: 'after', session, arrayFilters: [{ 'attempt.attemptId': attempt.attemptId }] }).lean().exec();
       if (!updatedJob) throw new AppError('DISPATCH_STATE_CONFLICT', 'Offer was consumed before acceptance could commit', 409);
-      const changedAmbulance = await AmbulanceModel.findOneAndUpdate({ _id: attempt.ambulanceId, dispatchReservationId: jid, currentStatus: 'AVAILABLE' }, { $set: { currentStatus: 'BUSY' }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { new: true, session }).lean().exec();
-      const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, dispatchReservationId: jid, availabilityStatus: 'ONLINE' }, { $set: { availabilityStatus: 'BUSY' }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { new: true, session }).lean().exec();
+      const changedAmbulance = await AmbulanceModel.findOneAndUpdate({ _id: attempt.ambulanceId, dispatchReservationId: jid, currentStatus: 'AVAILABLE' }, { $set: { currentStatus: 'BUSY' }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { returnDocument: 'after', session }).lean().exec();
+      const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, dispatchReservationId: jid, availabilityStatus: 'ONLINE' }, { $set: { availabilityStatus: 'BUSY' }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { returnDocument: 'after', session }).lean().exec();
       if (!changedAmbulance || !changedDriver) throw new AppError('DISPATCH_RESERVATION_CONFLICT', 'Reservation could not be converted into an active trip', 409);
       await HospitalPatientModel.updateOne({ emergencyId: job.emergencyRequestId, hospitalId: job.hospitalId }, { $set: { ambulanceId: attempt.ambulanceId, etaMinutes: request.etaMinutes } }, { session }).exec();
       result = { tripId: String(trip._id), emergencyRequestId: String(job.emergencyRequestId), hospitalId: String(job.hospitalId), requestCode: request.requestCode, etaMinutes: request.etaMinutes, routeSource: attempt.routeSource };
@@ -708,7 +708,7 @@ export const retryDispatchJob = async (adminId: string, dispatchJobId: string) =
     $set: { status: 'PENDING', generation: current.generation + 1, nextAttemptAt: now },
     $unset: { exhaustedAt: 1, escalatedAt: 1, escalationReason: 1 },
     $push: { events: appendEvent('MANUAL_RETRY', 'Administrator requested a new dispatch generation', aid, 'ADMIN') },
-  }, { new: true }).lean().exec() as DispatchJobLean | null : null;
+  }, { returnDocument: 'after' }).lean().exec() as DispatchJobLean | null : null;
   if (!job) throw new AppError('DISPATCH_NOT_RETRYABLE', 'Only exhausted or escalated dispatch jobs can be retried', 409);
   return { id: String(job._id), status: job.status, generation: job.generation, queued: true };
 };
@@ -725,7 +725,7 @@ export const manualAssignDispatchJob = async (adminId: string, dispatchJobId: st
       $set: { status: 'PENDING', generation: job.generation + 1 },
       $unset: { exhaustedAt: 1, escalatedAt: 1, escalationReason: 1, nextAttemptAt: 1 },
       $push: { events: appendEvent('MANUAL_ASSIGNMENT_STARTED', 'Administrator selected a specific driver', aid, 'ADMIN') },
-    }, { new: true }).lean().exec() as DispatchJobLean | null;
+    }, { returnDocument: 'after' }).lean().exec() as DispatchJobLean | null;
   }
   if (!job) throw new AppError('DISPATCH_STATE_CONFLICT', 'Dispatch job changed before manual assignment', 409);
   const candidates = await eligibleCandidatePool(job, did);
@@ -734,7 +734,7 @@ export const manualAssignDispatchJob = async (adminId: string, dispatchJobId: st
   const leaseToken = randomUUID();
   const claimed = await DispatchJobModel.findOneAndUpdate({ _id: jid, status: 'PENDING' }, {
     $set: { status: 'SEARCHING', leaseToken, leaseUntil: new Date(Date.now() + LEASE_MS) },
-  }, { new: true }).lean().exec() as DispatchJobLean | null;
+  }, { returnDocument: 'after' }).lean().exec() as DispatchJobLean | null;
   if (!claimed) throw new AppError('DISPATCH_STATE_CONFLICT', 'Dispatch worker claimed this job before manual assignment', 409);
   try {
     const offered = await reserveAndOffer(claimed, candidate, { id: aid, role: 'ADMIN' });
@@ -753,7 +753,7 @@ export const escalateDispatchJob = async (adminId: string, dispatchJobId: string
   const job = await DispatchJobModel.findOneAndUpdate({ _id: jid, status: 'EXHAUSTED' }, {
     $set: { status: 'ESCALATED', escalatedAt: now, escalationReason: reason },
     $push: { events: appendEvent('EMERGENCY_ESCALATED', reason, aid, 'ADMIN') },
-  }, { new: true }).lean().exec() as DispatchJobLean | null;
+  }, { returnDocument: 'after' }).lean().exec() as DispatchJobLean | null;
   if (!job) throw new AppError('DISPATCH_NOT_ESCALATED', 'Only an exhausted dispatch job can be escalated', 409);
   const payload = { dispatchJobId: String(jid), emergencyRequestId: String(job.emergencyRequestId), status: 'ESCALATED', reason, emergencyCallNumber: '112' };
   return payload;

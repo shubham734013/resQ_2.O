@@ -192,7 +192,7 @@ export const acknowledgeHospitalCoordinationNotification = async (hospitalId: st
   const hospitalObjectId = idOf(hospitalId, 'hospital');
   const notificationObjectId = idOf(notificationId, 'notification');
   const actorObjectId = idOf(actorId, 'hospital actor');
-  const updated = await HospitalCoordinationNotificationModel.findOneAndUpdate({ _id: notificationObjectId, hospitalId: hospitalObjectId, state: 'UNREAD' }, { $set: { state: 'ACKNOWLEDGED', acknowledgedAt: new Date(), acknowledgedBy: actorObjectId } }, { new: true }).lean().exec();
+  const updated = await HospitalCoordinationNotificationModel.findOneAndUpdate({ _id: notificationObjectId, hospitalId: hospitalObjectId, state: 'UNREAD' }, { $set: { state: 'ACKNOWLEDGED', acknowledgedAt: new Date(), acknowledgedBy: actorObjectId } }, { returnDocument: 'after' }).lean().exec();
   if (updated) {
     try {
       broadcastEvent(`hospital:${hospitalObjectId}`, 'hospital:coordination-notification-acknowledged', {

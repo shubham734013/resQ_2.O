@@ -26,7 +26,7 @@ export const updateDriverAmbulanceLocation = async (driverId: string, input: Loc
         locationUpdatedAt: new Date(input.timestamp),
       },
     },
-    { new: true },
+    { returnDocument: 'after' },
   ).lean().exec();
 
   if (!ambulance) throw new AppError('AMBULANCE_NOT_OPERATIONAL', 'Assigned ambulance is not active and verified', 409);

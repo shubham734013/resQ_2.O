@@ -44,7 +44,7 @@ export const updateUserStatus=async(id:string,status:Extract<AccountStatus,'ACTI
   safeId(id);
   const prev=await UserModel.findById(id).select('accountStatus').lean().exec();
   if(!prev)throw new AppError('NOT_FOUND','User not found',404);
-  const x=await UserModel.findByIdAndUpdate(id,{accountStatus:status},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
+  const x=await UserModel.findByIdAndUpdate(id,{accountStatus:status},{returnDocument: 'after',runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','User not found',404);
   await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_USER_STATUS',entityType:'USER',entityId:id,previousState:{accountStatus:prev.accountStatus},newState:{accountStatus:status}});
   return {...x,id:String(x._id)} as unknown as AdminUser;
@@ -62,7 +62,7 @@ export const updateHospitalVerification=async(id:string,verificationStatus:Verif
   if (verificationStatus === 'VERIFIED' && prev.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';
   }
-  const x=await HospitalModel.findByIdAndUpdate(id,{$set:updateDoc},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
+  const x=await HospitalModel.findByIdAndUpdate(id,{$set:updateDoc},{returnDocument: 'after',runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Hospital not found',404);
   await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_HOSPITAL_VERIFICATION',entityType:'HOSPITAL',entityId:id,previousState:{verificationStatus:prev.verificationStatus,accountStatus:prev.accountStatus},newState:{verificationStatus,accountStatus:x.accountStatus as AccountStatus}});
   return hospitalOut(x as unknown as Record<string,unknown>);
@@ -71,7 +71,7 @@ export const updateHospitalStatus=async(id:string,status:Extract<AccountStatus,'
   safeId(id);
   const prev=await HospitalModel.findById(id).select('accountStatus').lean().exec();
   if(!prev)throw new AppError('NOT_FOUND','Hospital not found',404);
-  const x=await HospitalModel.findByIdAndUpdate(id,{accountStatus:status},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
+  const x=await HospitalModel.findByIdAndUpdate(id,{accountStatus:status},{returnDocument: 'after',runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Hospital not found',404);
   await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_HOSPITAL_STATUS',entityType:'HOSPITAL',entityId:id,previousState:{accountStatus:prev.accountStatus},newState:{accountStatus:status}});
   return hospitalOut(x as unknown as Record<string,unknown>);
@@ -93,7 +93,7 @@ export const updateProviderVerification=async(id:string,verificationStatus:Verif
   if (verificationStatus === 'VERIFIED' && prev.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';
   }
-  const x=await AmbulanceProviderModel.findByIdAndUpdate(id,{$set:updateDoc},{new:true,runValidators:true}).select('-passwordHash').lean().exec();
+  const x=await AmbulanceProviderModel.findByIdAndUpdate(id,{$set:updateDoc},{returnDocument: 'after',runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Ambulance provider not found',404);
   await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_PROVIDER_VERIFICATION',entityType:'AMBULANCE_PROVIDER',entityId:id,previousState:{verificationStatus:prev.verificationStatus,accountStatus:prev.accountStatus},newState:{verificationStatus,accountStatus:x.accountStatus as AccountStatus}});
   return {...x,id:String(x._id),ambulanceCount:await AmbulanceModel.countDocuments({providerId:x._id})} as unknown as AdminAmbulanceProvider;
