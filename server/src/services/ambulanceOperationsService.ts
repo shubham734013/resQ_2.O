@@ -233,7 +233,7 @@ export const updateDriverLocation=async(did:string,input:z.infer<typeof S.ambula
   if(d.availabilityStatus==='OFFLINE') throw new AppError('DRIVER_OFFLINE','Location updates are allowed only while the driver is on duty',409);
   const a=await AmbulanceModel.findOneAndUpdate(
     {_id:d.assignedAmbulanceId,providerId:d.providerId,verificationStatus:'VERIFIED',accountStatus:'ACTIVE'},
-    {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:input.timestamp}},
+    {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:new Date()}},
     {new:true}
   ).lean().exec();
   if(!a) throw new AppError('AMBULANCE_UNAVAILABLE','Assigned ambulance is not operational',409);
