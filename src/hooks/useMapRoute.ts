@@ -3,6 +3,15 @@ import { mapsApi } from '../services/mapsApi';
 import type { Facility, UserLocation } from '../types/facility';
 import type { RouteOptionItem } from '../types/route';
 
+const retryTransientFailure = (failureCount: number, error: unknown): boolean => {
+  // A 4xx response is deterministic; retrying the same request only repeats the failure.
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === 'number' && status >= 400 && status < 500) return false;
+  }
+  return failureCount < 1;
+};
+
 const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][number]): RouteOptionItem => ({
   id: route.id,
   name: route.recommended ? 'Fastest route' : 'Alternative route',
@@ -25,11 +34,20 @@ const toRouteItem = (route: Awaited<ReturnType<typeof mapsApi.route>>['routes'][
 });
 
 export function useMapRoute(facility: Facility | null, location: UserLocation | null) {
-  const origin = location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
+  const origin = location
+    && Number.isFinite(location.latitude) && location.latitude >= -90 && location.latitude <= 90
+    && Number.isFinite(location.longitude) && location.longitude >= -180 && location.longitude <= 180
     ? { latitude: location.latitude, longitude: location.longitude }
     : null;
-  const destination = facility && Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude)
-    ? { latitude: facility.latitude, longitude: facility.longitude }
+  // Facility coordinates are optional in the API model; narrow to numbers before range checks.
+  const latitude = facility?.latitude;
+  const longitude = facility?.longitude;
+  const hasValidDestination = typeof latitude === 'number'
+    && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
+    && typeof longitude === 'number'
+    && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
+  const destination = facility && hasValidDestination
+    ? { latitude, longitude }
     : null;
 
   const query = useQuery({
@@ -42,7 +60,7 @@ export function useMapRoute(facility: Facility | null, location: UserLocation | 
     }),
     enabled: Boolean(origin && destination),
     staleTime: 30_000,
-    retry: 1,
+    retry: retryTransientFailure,
   });
 
   const routes = query.data?.routes.map(toRouteItem) ?? [];

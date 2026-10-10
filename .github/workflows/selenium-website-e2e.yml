@@ -1,0 +1,98 @@
+name: Selenium Website E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/operational-frontend-integration
+      - test/selenium-website-e2e
+  push:
+    branches:
+      - test/selenium-website-e2e
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Optional deployed staging URL to test (leave blank to test a local production build)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selenium-website-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selenium:
+    name: Selenium browser regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RESQ_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url != '' && inputs.base_url || 'http://127.0.0.1:4173' }}
+      SELENIUM_ARTIFACTS_DIR: artifacts/selenium
+      VITE_API_BASE_URL: http://127.0.0.1:5001/api/v1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Start local production preview when no staging URL was supplied
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.base_url == '' }}
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/resq-vite-preview.log 2>&1 &
+          echo $! > /tmp/resq-vite-preview.pid
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              echo "Vite production preview is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/resq-vite-preview.log
+          exit 1
+
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Remove runner ChromeDriver if its version differs from the provisioned browser
+        run: sudo rm -f /usr/local/bin/chromedriver /usr/bin/chromedriver
+
+      - name: Export Chrome binary path
+        run: echo "CHROME_BIN=${{ steps.setup-chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+
+      - name: Install Selenium
+        run: python -m pip install --upgrade pip selenium
+
+      - name: Run Selenium website suite
+        run: python -m unittest discover -s tests/selenium -p 'test_*.py' -v
+
+      - name: Upload Selenium screenshots and page source on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resq-selenium-failure-artifacts
+          path: artifacts/selenium/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Print local preview log on failure
+        if: failure() && (github.event_name != 'workflow_dispatch' || inputs.base_url == '')
+        run: cat /tmp/resq-vite-preview.log || true
