@@ -158,7 +158,7 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
     location?: { coordinates?: number[] }; locationUpdatedAt?: Date; currentStatus?: string;
     accountStatus?: string; verificationStatus?: string; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
   };
-  const pickupPoint = { type: 'Point' as const, coordinates: [job.pickupLongitude, job.pickupLatitude] };
+  const pickupPoint: { type: 'Point'; coordinates: [number, number] } = { type: 'Point', coordinates: [job.pickupLongitude, job.pickupLatitude] };
   let geoAmbulances: AmbulanceCandidateRecord[] = [];
   try {
     geoAmbulances = await AmbulanceModel.aggregate<AmbulanceCandidateRecord>([
@@ -175,6 +175,7 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
     ]).exec();
   } catch {
     // Keep dispatch available for older deployments while the explicit index rollout is pending.
+    geoAmbulances = await AmbulanceModel.find(ambulanceFilter).select('_id providerId currentLatitude currentLongitude location locationUpdatedAt currentStatus accountStatus verificationStatus dispatchReservationId dispatchReservationExpiresAt').sort({ locationUpdatedAt: -1 }).limit(500).lean().exec() as unknown as AmbulanceCandidateRecord[];
   }
   const legacyAmbulances = await AmbulanceModel.find({
     ...ambulanceBaseFilter,
@@ -184,6 +185,10 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
         { 'location.coordinates': { $exists: false } },
         { 'location.coordinates.0': { $exists: false } },
         { 'location.type': { $ne: 'Point' } },
+        { 'location.coordinates.0': { $lt: -180 } },
+        { 'location.coordinates.0': { $gt: 180 } },
+        { 'location.coordinates.1': { $lt: -90 } },
+        { 'location.coordinates.1': { $gt: 90 } },
       ] },
     ],
   }).select('_id providerId currentLatitude currentLongitude location locationUpdatedAt currentStatus accountStatus verificationStatus dispatchReservationId dispatchReservationExpiresAt').sort({ locationUpdatedAt: -1 }).limit(500).lean().exec() as unknown as AmbulanceCandidateRecord[];
