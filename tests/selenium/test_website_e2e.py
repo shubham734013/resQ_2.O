@@ -28,6 +28,7 @@ class ResQWebsiteE2ETests(unittest.TestCase):
     def setUpClass(cls) -> None:
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         options = webdriver.ChromeOptions()
+        options.page_load_strategy = "eager"
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -35,7 +36,7 @@ class ResQWebsiteE2ETests(unittest.TestCase):
         options.add_argument("--window-size=1440,1000")
         options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
         cls.driver = webdriver.Chrome(options=options)
-        cls.driver.set_page_load_timeout(35)
+        cls.driver.set_page_load_timeout(20)
         cls.wait = WebDriverWait(cls.driver, 12)
 
     @classmethod
