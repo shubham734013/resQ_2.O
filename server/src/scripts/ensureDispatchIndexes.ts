@@ -9,6 +9,7 @@ const requiredIndexes = [
   { collection: DispatchJobModel.collection, name: 'dispatch_worker_queue', key: { status: 1, nextAttemptAt: 1, leaseUntil: 1, updatedAt: 1 } },
   { collection: DispatchJobModel.collection, name: 'dispatch_current_driver_state', key: { currentDriverId: 1, status: 1, deadlineAt: 1 } },
   { collection: DispatchJobModel.collection, name: 'dispatch_current_ambulance_state', key: { currentAmbulanceId: 1, status: 1 } },
+  { collection: AmbulanceModel.collection, name: 'location_2dsphere', key: { location: '2dsphere' } },
   { collection: AmbulanceModel.collection, name: 'dispatchReservationId_1', key: { dispatchReservationId: 1 } },
   { collection: AmbulanceDriverModel.collection, name: 'dispatchReservationId_1', key: { dispatchReservationId: 1 } },
 ];
