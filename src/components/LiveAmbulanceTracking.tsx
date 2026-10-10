@@ -17,7 +17,7 @@ interface LocationEvent {
   sourceTimestamp?: string; freshness: 'FRESH' | 'STALE'; coordinatesAreLive: boolean;
 }
 const statusLabels: Record<string, string> = {
-  ASSIGNED: 'Assigned', ACCEPTED: 'Driver accepted · pickup navigation active', TO_PICKUP: 'En route to pickup',
+  ASSIGNED: 'Assigned', ACCEPTED: 'Driver accepted · route to pickup', TO_PICKUP: 'En route to pickup',
   AT_PICKUP: 'Driver arrived at pickup', PATIENT_ONBOARD: 'Patient picked up',
   TO_HOSPITAL: 'En route to hospital', AT_HOSPITAL: 'Arrived at hospital',
   COMPLETED: 'Trip completed', CANCELLED: 'Trip cancelled',
