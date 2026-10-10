@@ -162,9 +162,10 @@ export const startDriverDuty = async (driverId: string, input: LocationInput) =>
   } finally {
     await session.endSession();
   }
-  if (!result) throw new AppError('DUTY_START_FAILED', 'Duty could not be started. Retry after refreshing status.', 409);
-  publishDuty(did, new Types.ObjectId(result.ambulanceId), { status: result.status, dutyState: result.dutyState, locationUpdatedAt: result.locationUpdatedAt, freshness: 'FRESH' });
-  return { ...result, trackingIntervalMs: env.DRIVER_LOCATION_UPDATE_INTERVAL_MS, staleAfterMs: env.DRIVER_LOCATION_STALE_AFTER_MS };
+  const completedResult = result as { driverId: string; ambulanceId: string; status: string; dutyState: string; locationUpdatedAt: Date } | null;
+  if (!completedResult) throw new AppError('DUTY_START_FAILED', 'Duty could not be started. Retry after refreshing status.', 409);
+  publishDuty(did, new Types.ObjectId(completedResult.ambulanceId), { status: completedResult.status, dutyState: completedResult.dutyState, locationUpdatedAt: completedResult.locationUpdatedAt, freshness: 'FRESH' });
+  return { ...completedResult, trackingIntervalMs: env.DRIVER_LOCATION_UPDATE_INTERVAL_MS, staleAfterMs: env.DRIVER_LOCATION_STALE_AFTER_MS };
 };
 
 export const endDriverDuty = async (driverId: string) => {
@@ -245,9 +246,10 @@ export const endDriverDuty = async (driverId: string) => {
   } finally {
     await session.endSession();
   }
-  if (!result) throw new AppError('DUTY_END_FAILED', 'Duty could not be ended. Retry after refreshing status.', 409);
-  if (result.ambulanceId) publishDuty(did, result.ambulanceId, { status: result.status, dutyState: result.dutyState, freshness: 'STALE' });
-  return { status: result.status, dutyState: result.dutyState, alreadyOffDuty: Boolean(result.alreadyOffDuty), updatedAt: new Date() };
+  const completedResult = result as { ambulanceId?: Types.ObjectId; status: 'OFFLINE'; dutyState: 'OFF_DUTY'; alreadyOffDuty?: boolean } | null;
+  if (!completedResult) throw new AppError('DUTY_END_FAILED', 'Duty could not be ended. Retry after refreshing status.', 409);
+  if (completedResult.ambulanceId) publishDuty(did, completedResult.ambulanceId, { status: completedResult.status, dutyState: completedResult.dutyState, freshness: 'STALE' });
+  return { status: completedResult.status, dutyState: completedResult.dutyState, alreadyOffDuty: Boolean(completedResult.alreadyOffDuty), updatedAt: new Date() };
 };
 
 export const updateDriverLocation = async (driverId: string, input: LocationInput) => {
@@ -288,10 +290,12 @@ export const updateDriverLocation = async (driverId: string, input: LocationInpu
   } finally {
     await session.endSession();
   }
-  if (!telemetry || !ambulanceId) throw new AppError('LOCATION_UPDATE_FAILED', 'Location update was not saved. Retry.', 409);
-  broadcastEvent(`driver:${did}`, 'tracking:location:update', telemetry);
-  broadcastEvent(`ambulance:${ambulanceId}`, 'tracking:location:update', telemetry);
-  return telemetry;
+  const completedTelemetry = telemetry as Record<string, unknown> | null;
+  const completedAmbulanceId = ambulanceId as Types.ObjectId | null;
+  if (!completedTelemetry || !completedAmbulanceId) throw new AppError('LOCATION_UPDATE_FAILED', 'Location update was not saved. Retry.', 409);
+  broadcastEvent(`driver:${did}`, 'tracking:location:update', completedTelemetry);
+  broadcastEvent(`ambulance:${completedAmbulanceId}`, 'tracking:location:update', completedTelemetry);
+  return completedTelemetry;
 };
 
 export const getDriverDutyStatus = async (driverId: string) => {
