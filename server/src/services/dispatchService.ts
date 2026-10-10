@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import { randomUUID } from 'node:crypto';
 import { startSession, Types, type QueryFilter } from 'mongoose';
 import { DispatchJobModel, type DispatchJobDocument, type DispatchJobStatus, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
@@ -25,7 +26,7 @@ export const isAllowedDispatchTransition = (from: keyof typeof DISPATCH_ALLOWED_
   (DISPATCH_ALLOWED_TRANSITIONS[from] as readonly string[]).includes(to);
 
 export const DISPATCH_OFFER_TIMEOUT_MS = 25_000;
-export const DISPATCH_LOCATION_FRESHNESS_MS = Number(process.env.DRIVER_LOCATION_STALE_AFTER_MS ?? 15_000);
+export const DISPATCH_LOCATION_FRESHNESS_MS = env.DRIVER_LOCATION_STALE_AFTER_MS;
 export const DISPATCH_SEARCH_RADIUS_METERS = 100_000;
 export const DISPATCH_ROUTE_CANDIDATE_LIMIT = 30;
 export const DISPATCH_ACTIVE_TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] as const;
