@@ -110,6 +110,7 @@ export const AmbulancePage=()=>{
  const [locationError,setLocationError]=useState('');
  const [lastLocationSentAt,setLastLocationSentAt]=useState<number|null>(null);
  const [gpsPermissionDenied,setGpsPermissionDenied]=useState(false);
+ const [trackingRestartToken,setTrackingRestartToken]=useState(0);
  const lastGpsSentAtRef=useRef(0);
  const locationRequestInFlightRef=useRef(false);
 
@@ -175,7 +176,7 @@ export const AmbulancePage=()=>{
    requestFix();
    timer=window.setInterval(requestFix,intervalMs);
    return()=>{disposed=true;if(timer!==undefined)window.clearInterval(timer);locationRequestInFlightRef.current=false;};
- },[status.data?.status,status.data?.trackingIntervalMs,invalidate]);
+ },[status.data?.status,status.data?.trackingIntervalMs,invalidate,trackingRestartToken]);
  const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance/navigation');}});
  const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance');}});
  const pickup=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedPickup(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
@@ -238,6 +239,7 @@ export const AmbulancePage=()=>{
   {lastLocationSentAt&&<p className="mt-1 text-xs text-slate-500">Last update sent from this device: {new Date(lastLocationSentAt).toLocaleTimeString()} · every {Math.round((status.data?.trackingIntervalMs??4000)/1000)} seconds while active</p>}
   {locationError&&<p role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{locationError}</p>}
   {gpsPermissionDenied&&<p className="mt-2 text-sm text-rose-700">GPS permission is denied. Change browser site settings and retry. Live dispatch eligibility requires a fresh location.</p>}
+  {(locationHealth==='ERROR'||locationHealth==='RETRYING')&&(status.data?.status==='ONLINE'||status.data?.status==='BUSY')&&<Button variant="secondary" onClick={()=>{setLocationError('');setTrackingRestartToken(value=>value+1);}}>Retry GPS tracking</Button>}
   <div className="mt-4 flex flex-wrap gap-2">
    {status.data?.status==='ONLINE'?<Button variant="secondary" onClick={()=>endDutyMutation.mutate()} disabled={!status.data.canEndDuty||endDutyMutation.isPending}>{endDutyMutation.isPending?'Ending duty…':'End duty'}</Button>:status.data?.status==='BUSY'?<Button variant="secondary" disabled>On active trip — duty cannot end</Button>:<Button onClick={()=>void startDuty()} disabled={!status.data?.canStartDuty||startDutyMutation.isPending}>{startDutyMutation.isPending?'Confirming GPS and starting…':'Start duty'}</Button>}
    <Button variant="secondary" onClick={()=>void invalidate()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh status</Button>
