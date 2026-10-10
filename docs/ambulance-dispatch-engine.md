@@ -38,7 +38,7 @@ A candidate is eligible only when all of these checks pass at search time and ag
 - Neither resource has another unexpired dispatch reservation.
 - Candidate is within the 100 km dispatch search radius.
 
-The worker prefilters geographically, asks Google Routes for driving distance/ETA for up to 30 nearest eligible candidates, and ranks successful driving routes by ETA. Candidates whose route lookup fails are explicitly marked `STRAIGHT_LINE_FALLBACK` and rank after candidates with driving ETAs. A fallback never pretends to be a driving ETA.
+The worker uses the ambulance 2dsphere index to find candidates within the dispatch radius, merges legacy-coordinate records, asks Google Routes for driving distance/ETA for up to 30 nearest eligible candidates, and ranks successful driving routes by ETA. Candidates whose route lookup fails are explicitly marked `STRAIGHT_LINE_FALLBACK` and rank after candidates with driving ETAs. A fallback never pretends to be a driving ETA.
 
 ## Reservation, offer and acceptance
 
