@@ -28,6 +28,8 @@ test('concurrent duty starts serialize; GPS timestamps are monotonic; active tri
   const providerId = new Types.ObjectId();
   const ambulanceId = new Types.ObjectId();
   const driverId = new Types.ObjectId();
+  const mismatchedDriverId = new Types.ObjectId();
+  const mismatchedProviderId = new Types.ObjectId();
   const emergencyId = new Types.ObjectId();
   const hospitalId = new Types.ObjectId();
   const suffix = new Types.ObjectId().toHexString();
@@ -48,8 +50,15 @@ test('concurrent duty starts serialize; GPS timestamps are monotonic; active tri
       providerId, assignedAmbulanceId: ambulanceId, availabilityStatus: 'OFFLINE',
       licenseVerificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
     });
+    await AmbulanceDriverModel.create({
+      _id: mismatchedDriverId, fullName: 'Wrong Owner Driver', email: 'duty-mismatch-' + suffix + '@example.test',
+      phone: '0000000000', passwordHash: 'test-only', licenseNumber: 'LIC-MISMATCH-' + suffix,
+      providerId: mismatchedProviderId, assignedAmbulanceId: ambulanceId, availabilityStatus: 'OFFLINE',
+      licenseVerificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
+    });
     const now = Date.now();
     const fix = (timestamp: number) => ({ latitude: 26.9124, longitude: 75.7873, accuracy: 8, timestamp: new Date(timestamp) });
+    await assert.rejects(() => startDriverDuty(String(mismatchedDriverId), fix(now)), /Assigned ambulance must be active and verified/i);
     const starts = await Promise.allSettled([
       startDriverDuty(String(driverId), fix(now)),
       startDriverDuty(String(driverId), fix(now + 1)),
@@ -81,7 +90,7 @@ test('concurrent duty starts serialize; GPS timestamps are monotonic; active tri
     assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.currentStatus, 'BUSY');
   } finally {
     await TripModel.deleteMany({ driverId });
-    await AmbulanceDriverModel.deleteMany({ _id: driverId });
+    await AmbulanceDriverModel.deleteMany({ _id: { $in: [driverId, mismatchedDriverId] } });
     await AmbulanceModel.deleteMany({ _id: ambulanceId });
     await AmbulanceProviderModel.deleteMany({ _id: providerId });
     await mongoose.disconnect();
