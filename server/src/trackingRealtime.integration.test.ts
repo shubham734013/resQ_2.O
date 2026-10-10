@@ -170,6 +170,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await completeTrip(String(driverId), String(tripId));
     assert.equal((await terminalStatus).data.status, 'COMPLETED');
     assert.equal((await TripModel.findById(tripId).lean().exec())?.status, 'COMPLETED');
+    assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, false, 'terminal trips cannot be resubscribed for live events');
     assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.currentStatus, 'AVAILABLE');
     assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.availabilityStatus, 'ONLINE');
     assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'RESOLVED');
