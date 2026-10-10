@@ -208,7 +208,7 @@ export const discoverEmergencyHospitals = async (userId: string, query: Emergenc
       lastUpdated: hospital.updatedAt.toISOString(),
     };
   }));
-  return { items, pagination: { page: 1, limit: query.limit, total: byId.size, totalPages: byId.size ? 1 : 0 }, searchedAt: new Date().toISOString() };
+  return { items, pagination: { page: 1, limit: query.limit, total: items.length, totalPages: items.length ? 1 : 0 }, searchedAt: new Date().toISOString() };
 };
 
 export const createEmergencyRequest = async (userId: string, input: CreateEmergencyInput, idempotencyKey: string) => {
