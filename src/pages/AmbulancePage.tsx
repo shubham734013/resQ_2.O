@@ -26,98 +26,57 @@ const navigationFor=(route:RouteOptionItem)=>({
 });
 
 const DispatchCountdownCard = ({
-  request,
+  offer,
   onAccept,
   onReject,
   isAccepting,
   isRejecting,
 }: {
-  request: { id: string; requestCode: string; situationType: string; location?: string; hospitalId: string; hospitalName?: string };
+  offer: import('../services/ambulanceDriverApi').DispatchOffer;
   onAccept: () => void;
   onReject: () => void;
   isAccepting: boolean;
   isRejecting: boolean;
 }) => {
-  const [secondsLeft, setSecondsLeft] = useState(45);
-
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (secondsLeft <= 0) {
-      onReject();
-      return;
-    }
-    const timer = setInterval(() => {
-      setSecondsLeft((s) => s - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [secondsLeft, onReject]);
-
-  const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 45) * 100));
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const secondsLeft = Math.max(0, Math.ceil((new Date(offer.deadlineAt).getTime() - now) / 1000));
+  const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 25) * 100));
+  const request = offer.request;
+  const hospital = offer.hospital;
+  const expired = secondsLeft <= 0;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">Incoming dispatch offer</p>
-          <h1 className="mt-1 text-3xl font-bold">Emergency Request</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">Authenticated dispatch offer</p>
+          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Emergency request</h1>
         </div>
-        <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 px-3.5 py-1.5 rounded-full text-xs font-bold font-mono">
-          <Clock className="w-4 h-4 animate-spin text-rose-600" />
-          <span>{secondsLeft}s left</span>
+        <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold font-mono ${expired ? 'border-slate-300 bg-slate-100 text-slate-600' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+          <Clock className="h-4 w-4" />
+          <span>{expired ? 'Deadline reached' : `${secondsLeft}s left`}</span>
         </div>
       </div>
-
-      <div className="mt-4 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-        <div
-          className={`h-full transition-all duration-1000 ${
-            secondsLeft <= 10 ? 'bg-rose-600' : secondsLeft <= 20 ? 'bg-amber-500' : 'bg-emerald-500'
-          }`}
-          style={{ width: `${progressPercent}%` }}
-        />
+      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+        <div className={`h-full transition-all ${secondsLeft <= 5 ? 'bg-rose-600' : secondsLeft <= 12 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${progressPercent}%` }} />
       </div>
-
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-        <div>
-          <p className="text-xs text-slate-500">Request code</p>
-          <p className="font-mono font-bold text-slate-900 text-lg">{request.requestCode}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">Situation</p>
-          <p className="font-semibold text-slate-900">{request.situationType}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">Patient pickup location</p>
-          <p className="font-semibold text-slate-900">{request.location ?? 'Coordinates provided by dispatch'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">Destination hospital</p>
-          <p className="font-semibold text-slate-900">
-            {request.hospitalName ? `${request.hospitalName}` : `Hospital ID: ${request.hospitalId}`}
-          </p>
-        </div>
+      <div className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div><p className="text-xs text-slate-500">Request code</p><p className="font-mono text-lg font-bold text-slate-900">{request?.requestCode ?? 'Emergency request'}</p></div>
+        <div><p className="text-xs text-slate-500">Emergency type</p><p className="font-semibold text-slate-900">{request?.situationType ?? request?.category ?? 'Acute emergency'}</p></div>
+        <div><p className="text-xs text-slate-500">Patient pickup</p><p className="font-semibold text-slate-900">{request?.pickup.label || 'Confirmed pickup coordinates'}</p><p className="mt-1 font-mono text-xs text-slate-500">{request?.pickup.latitude.toFixed(5)}, {request?.pickup.longitude.toFixed(5)}</p></div>
+        <div><p className="text-xs text-slate-500">Selected destination hospital</p><p className="font-semibold text-slate-900">{hospital?.name ?? 'Hospital details unavailable'}</p><p className="text-sm text-slate-500">{[hospital?.address, hospital?.city].filter(Boolean).join(', ')}</p>{hospital?.phone && <a className="text-sm font-semibold text-blue-700 underline" href={`tel:${hospital.phone.replace(/[^0-9+]/g, '')}`}>Hospital contact: {hospital.phone}</a>}</div>
+        <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-semibold text-slate-700">Route to pickup</p><p className="mt-1 text-sm text-slate-800">{offer.route?.source === 'DRIVING' && typeof offer.route.etaSeconds === 'number' ? `${Math.max(1, Math.round(offer.route.etaSeconds / 60))} min · ${(offer.route.distanceMeters / 1000).toFixed(1)} km driving` : 'Driving route unavailable; ranking used straight-line fallback.'}</p></div>
       </div>
-
+      {expired && <p role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">The server deadline has passed or is expiring. This page will refresh offers; the local countdown does not expire or reject the offer.</p>}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <Button
-          size="lg"
-          variant="emergency"
-          fullWidth
-          onClick={onAccept}
-          disabled={isAccepting || secondsLeft <= 0}
-          className="font-bold min-h-12"
-        >
-          {isAccepting ? 'Accepting...' : 'Accept Request'}
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          fullWidth
-          onClick={onReject}
-          disabled={isRejecting}
-          className="min-h-12"
-        >
-          Decline
-        </Button>
+        <Button size="lg" variant="emergency" fullWidth onClick={onAccept} disabled={isAccepting || isRejecting || expired} className="min-h-12 font-bold">{isAccepting ? 'Validating and accepting…' : 'Accept dispatch'}</Button>
+        <Button size="lg" variant="secondary" fullWidth onClick={onReject} disabled={isRejecting || isAccepting || expired} className="min-h-12">{isRejecting ? 'Declining…' : 'Decline offer'}</Button>
       </div>
+      <p className="mt-3 text-center text-xs text-slate-500">The server deadline is authoritative. A trip is created only after backend eligibility and reservation checks succeed.</p>
     </div>
   );
 };
@@ -131,6 +90,7 @@ export const AmbulancePage=()=>{
  const profile=useQuery({queryKey:['ambulance-driver','profile'],queryFn:ambulanceDriverApi.getProfile});
  const status=useQuery({queryKey:['ambulance-driver','status'],queryFn:ambulanceDriverApi.getStatus});
  const requests=useQuery({queryKey:['ambulance-driver','requests'],queryFn:()=>ambulanceDriverApi.getRequests({limit:20})});
+ const offers=useQuery({queryKey:['ambulance-driver','dispatch-offers'],queryFn:ambulanceDriverApi.getDispatchOffers,refetchInterval:2000,refetchOnWindowFocus:true});
  const trips=useQuery({queryKey:['ambulance-driver','trips'],queryFn:()=>ambulanceDriverApi.getTrips({limit:20})});
  const activeTrip=useMemo(()=>trips.data?.items.find(t=>!['COMPLETED','CANCELLED'].includes(t.status))??null,[trips.data?.items]);
 
@@ -150,6 +110,7 @@ export const AmbulancePage=()=>{
  }, [location, status.data?.status]);
  const activeRequest=useQuery({queryKey:['ambulance-driver','request',activeTrip?.emergencyRequestId],queryFn:()=>ambulanceDriverApi.getRequest(activeTrip!.emergencyRequestId),enabled:Boolean(activeTrip?.emergencyRequestId)});
  const incoming=requests.data?.items.find(r=>!r.driverId && ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION'].includes(r.status))??requests.data?.items[0]??null;
+ const incomingOffer=offers.data?.[0]??null;
  const selectedRequest=routeMode==='request'?incoming:activeRequest.data??incoming;
  const destination=selectedRequest && typeof selectedRequest.latitude==='number' && typeof selectedRequest.longitude==='number'
    ? {latitude:selectedRequest.latitude,longitude:selectedRequest.longitude}:null;
@@ -158,8 +119,8 @@ export const AmbulancePage=()=>{
  const routeItem=route.routes[0]??null;
  const invalidate=()=>Promise.all([qc.invalidateQueries({queryKey:['ambulance-driver']})]);
  const statusMutation=useMutation({mutationFn:(s:string)=>ambulanceDriverApi.updateStatus(s),onSuccess:invalidate});
- const accept=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptRequest(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/navigation');}});
- const reject=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectRequest(id),onSuccess:async()=>{await invalidate();navigate('/ambulance');}});
+ const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance/navigation');}});
+ const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance');}});
  const pickup=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedPickup(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
  const onboard=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.patientPickedUp(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/navigation');}});
  const hospital=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedHospital(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
@@ -171,16 +132,25 @@ export const AmbulancePage=()=>{
       ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:destination)
    : destination;
 
- if(routeMode==='request' && selectedRequest) {
+ if(routeMode==='request') {
    return (
      <AmbulanceLayout>
-       <DispatchCountdownCard
-         request={selectedRequest}
-         onAccept={()=>accept.mutate(selectedRequest.id)}
-         onReject={()=>reject.mutate(selectedRequest.id)}
-         isAccepting={accept.isPending}
-         isRejecting={reject.isPending}
-       />
+       {incomingOffer ? (
+         <DispatchCountdownCard
+           offer={incomingOffer}
+           onAccept={()=>acceptOffer.mutate(incomingOffer.dispatchJobId)}
+           onReject={()=>rejectOffer.mutate(incomingOffer.dispatchJobId)}
+           isAccepting={acceptOffer.isPending}
+           isRejecting={rejectOffer.isPending}
+         />
+       ) : (
+         <div className="mx-auto w-full max-w-2xl px-4 py-10">
+           <h1 className="text-2xl font-bold">No active dispatch offer</h1>
+           <p className="mt-2 text-sm text-slate-600">Offers are assigned by the dispatch service and expire on the server. Refresh to check for a new offer.</p>
+           <Button className="mt-5" onClick={()=>void offers.refetch()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh offers</Button>
+           {offers.isError && <p role="alert" className="mt-3 text-sm text-rose-700">Could not load offers. Check your connection and retry.</p>}
+         </div>
+       )}
      </AmbulanceLayout>
    );
  }
@@ -197,5 +167,5 @@ export const AmbulancePage=()=>{
 
  if(routeMode==='trips') return <AmbulanceLayout><div className="mx-auto w-full max-w-3xl px-4 py-8"><h1 className="text-2xl font-bold">Trip history</h1><div className="mt-5 space-y-3">{(trips.data?.items??[]).map(t=><div className="rounded-lg border border-slate-200 bg-white p-4" key={t.id}><div className="flex justify-between"><span className="font-semibold">{t.status}</span><span className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleString()}</span></div><p className="mt-2 text-sm text-slate-500">Request {t.emergencyRequestId}</p></div>)}</div></div></AmbulanceLayout>;
 
- return <AmbulanceLayout><div className="flex flex-1 flex-col"><div className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ambulance driver</p><h1 className="mt-1 text-3xl font-bold">{profile.data?.fullName??'Driver'}</h1></div><AmbulanceStatus status={status.data?.status==='ONLINE'?'available':status.data?.status==='BUSY'?'busy':'offline'}/></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Status</p><p className="mt-1 font-semibold">{status.data?.status??'OFFLINE'}</p></div><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Pending requests</p><p className="mt-1 text-2xl font-bold">{requests.data?.pagination.total??0}</p></div><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Active trip</p><p className="mt-1 font-semibold">{activeTrip?.status??'None'}</p></div></div><div className="mt-5 h-[42vh] min-h-[280px] overflow-hidden rounded-lg border border-slate-200"><MapView userLocation={currentLocation} center={origin??undefined} interactive className="h-full w-full"/></div>{permissionState!=='granted'&&<div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Location access is required for real navigation. <button className="font-semibold underline" onClick={refreshLocation}>Enable location</button></div>}<div className="mt-4 flex gap-2">{status.data?.status==='ONLINE'?<Button variant="secondary" onClick={()=>statusMutation.mutate('OFFLINE')} disabled={statusMutation.isPending}>Go Offline</Button>:<Button onClick={()=>statusMutation.mutate('ONLINE')} disabled={statusMutation.isPending}>Go Online</Button>}<Button variant="secondary" onClick={()=>void invalidate()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh</Button></div>{incoming&&<div className="mt-5 rounded-lg border border-rose-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-rose-600">Emergency request</p><h2 className="mt-1 text-xl font-bold">{incoming.requestCode}</h2><p className="mt-1 text-sm text-slate-500">{incoming.situationType}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate('/ambulance/request')}>Review Request</Button></div>}{activeTrip&&<div className="mt-4 rounded-lg border border-slate-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-slate-500">Current trip</p><p className="mt-1 text-xl font-bold">{activeTrip.status}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate(activeTrip.status==='AT_PICKUP'||activeTrip.status==='AT_HOSPITAL'?'/ambulance/trip':'/ambulance/navigation')}>Continue Trip</Button></div>}</div></div></AmbulanceLayout>;
+ return <AmbulanceLayout><div className="flex flex-1 flex-col"><div className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ambulance driver</p><h1 className="mt-1 text-3xl font-bold">{profile.data?.fullName??'Driver'}</h1></div><AmbulanceStatus status={status.data?.status==='ONLINE'?'available':status.data?.status==='BUSY'?'busy':'offline'}/></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Status</p><p className="mt-1 font-semibold">{status.data?.status??'OFFLINE'}</p></div><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Pending requests</p><p className="mt-1 text-2xl font-bold">{offers.data?.length??0}</p></div><div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Active trip</p><p className="mt-1 font-semibold">{activeTrip?.status??'None'}</p></div></div><div className="mt-5 h-[42vh] min-h-[280px] overflow-hidden rounded-lg border border-slate-200"><MapView userLocation={currentLocation} center={origin??undefined} interactive className="h-full w-full"/></div>{permissionState!=='granted'&&<div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">Location access is required for real navigation. <button className="font-semibold underline" onClick={refreshLocation}>Enable location</button></div>}<div className="mt-4 flex gap-2">{status.data?.status==='ONLINE'?<Button variant="secondary" onClick={()=>statusMutation.mutate('OFFLINE')} disabled={statusMutation.isPending}>Go Offline</Button>:<Button onClick={()=>statusMutation.mutate('ONLINE')} disabled={statusMutation.isPending}>Go Online</Button>}<Button variant="secondary" onClick={()=>void invalidate()} icon={<RefreshCw className="h-4 w-4"/>}>Refresh</Button></div>{incomingOffer&&<div className="mt-5 rounded-lg border border-rose-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-rose-600">Dispatch offer</p><h2 className="mt-1 text-xl font-bold">{incomingOffer.request?.requestCode??'Emergency request'}</h2><p className="mt-1 text-sm text-slate-500">{incomingOffer.request?.situationType??incomingOffer.request?.category}</p><p className="mt-1 text-xs text-slate-500">Server deadline: {new Date(incomingOffer.deadlineAt).toLocaleTimeString()}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate('/ambulance/request')}>Review and respond</Button></div>}{activeTrip&&<div className="mt-4 rounded-lg border border-slate-200 bg-white p-5"><p className="text-xs uppercase tracking-wider text-slate-500">Current trip</p><p className="mt-1 text-xl font-bold">{activeTrip.status}</p><Button className="mt-4 min-h-12" fullWidth onClick={()=>navigate(activeTrip.status==='AT_PICKUP'||activeTrip.status==='AT_HOSPITAL'?'/ambulance/trip':'/ambulance/navigation')}>Continue Trip</Button></div>}</div></div></AmbulanceLayout>;
 };
