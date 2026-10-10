@@ -58,7 +58,7 @@ test('concurrent duty starts serialize; GPS timestamps are monotonic; active tri
     });
     const now = Date.now();
     const fix = (timestamp: number) => ({ latitude: 26.9124, longitude: 75.7873, accuracy: 8, timestamp: new Date(timestamp) });
-    await assert.rejects(() => startDriverDuty(String(mismatchedDriverId), fix(now)), /Assigned ambulance must be active and verified/i);
+    await assert.rejects(() => startDriverDuty(String(mismatchedDriverId), fix(now)), /Assigned ambulance must be active, verified/i);
     const starts = await Promise.allSettled([
       startDriverDuty(String(driverId), fix(now)),
       startDriverDuty(String(driverId), fix(now + 1)),
