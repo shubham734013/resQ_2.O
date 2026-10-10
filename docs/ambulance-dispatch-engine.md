@@ -45,7 +45,7 @@ The worker prefilters geographically, asks Google Routes for driving distance/ET
 1. Worker atomically claims a job using a persisted 30-second lease. An expired `SEARCHING` lease can be recovered after restart.
 2. A MongoDB transaction rechecks the emergency request, provider, driver, ambulance, location freshness and active trips.
 3. Conditional updates reserve both ambulance and driver with the dispatch job ID and the same expiration timestamp. The job is changed to `OFFERED` in that transaction. Any failed conditional update aborts all reservation writes.
-4. The authenticated driver can poll `GET /api/v1/ambulance-driver/dispatch-offers`; an SSE event is a notification only, never authority.
+4. The authenticated driver polls `GET /api/v1/ambulance-driver/dispatch-offers`. Dispatch offers are deliberately not sent over the existing unauthenticated SSE stream; polling is the authenticated delivery channel.
 5. The acceptance deadline is stored in MongoDB (25 seconds). The frontend countdown is display-only. The worker expires offers and releases only reservations whose `dispatchReservationId` matches that job.
 6. Acceptance checks the current offer UUID, assigned driver, server deadline, fresh location, provider, ambulance, hospital and emergency state again. It then creates the existing `Trip`, marks driver and ambulance busy, updates the emergency assignment, and marks the dispatch attempt accepted in one transaction. The existing unique `Trip.emergencyRequestId` constraint prevents a second trip for the same emergency.
 7. Late acceptances and offers superseded by rejection, timeout, cancellation or reassignment fail with a conflict.
