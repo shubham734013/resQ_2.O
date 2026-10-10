@@ -9,6 +9,7 @@ import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/Am
 import { HospitalModel } from '../models/Hospital.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { calculateGoogleRoutes } from './mapsService.js';
+import { broadcastEvent } from './realtimeService.js';
 import { AppError } from '../utils/AppError.js';
 
 export const DISPATCH_ALLOWED_TRANSITIONS = {
@@ -592,6 +593,9 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
   }
   const acceptedResult = result as { tripId: string; emergencyRequestId: string; hospitalId: string; requestCode: string; etaMinutes?: number; routeSource: string } | null;
   if (!acceptedResult) throw new AppError('DISPATCH_ACCEPT_FAILED', 'Offer acceptance could not be committed', 500);
+  const acceptedEvent = { event: 'QUEUE_REFRESH', status: 'AMBULANCE_ASSIGNED', timestamp: new Date().toISOString() };
+  broadcastEvent(`hospital:${acceptedResult.hospitalId}`, 'hospital:incoming-patient', acceptedEvent);
+  broadcastEvent('operations', 'dispatch:accepted', { event: 'QUEUE_REFRESH', status: 'ACCEPTED', timestamp: acceptedEvent.timestamp });
   return { dispatchJobId: String(jid), ...acceptedResult, status: 'ACCEPTED' };
 };
 
