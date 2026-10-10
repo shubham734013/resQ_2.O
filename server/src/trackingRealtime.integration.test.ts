@@ -233,22 +233,93 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await delay(100);
     assert.equal(outsiderReceived, false, 'GPS must not leak to an unrelated user');
     assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, true, 'authorized user may explicitly subscribe to their trip');
-    await arrivedPickup(String(driverId), String(tripId));
-    await patientPickedUp(String(driverId), String(tripId));
-    await arrivedHospital(String(driverId), String(tripId));
+
+    // Simulate a driver cancelling before transport. The old trip is terminal, its resources are released,
+    // the hospital case returns to a reassignment-required state, and dispatch is durably requeued.
+    hospitalSocket.disconnect();
+    hospitalSecondSocket.disconnect();
+    await cancelTrip(String(driverId), String(tripId));
+    assert.equal((await TripModel.findById(tripId).lean().exec())?.status, 'CANCELLED');
+    assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'REASSIGNMENT_REQUIRED');
+    assert.equal((await DispatchJobModel.findById(dispatchJobId).lean().exec())?.status, 'PENDING');
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'TRIP_CANCELLED' }), 1, 'cancellation notification persists even with hospital sockets disconnected');
+    assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, false, 'cancelled trip cannot be resubscribed');
+
+    // A replacement ambulance is accepted for the same emergency; its assignment must supersede the stale cancellation alert.
+    await AmbulanceModel.updateOne({ _id: ambulanceId }, { $set: { currentStatus: 'MAINTENANCE' } });
+    await AmbulanceModel.create({
+      _id: secondAmbulanceId, registrationNumber: 'TRB-' + suffix, vehicleNumber: 'TRW-' + suffix,
+      providerId, ambulanceType: 'ALS', capabilities: ['Emergency'], currentStatus: 'BUSY',
+      verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE', currentLatitude: 26.9124, currentLongitude: 75.7873,
+      location: { type: 'Point', coordinates: [75.7873, 26.9124] }, locationUpdatedAt: new Date(Date.now() - 5000),
+      locationSourceTimestamp: new Date(Date.now() - 5000), locationAccuracyMeters: 7,
+    });
+    await AmbulanceDriverModel.create({
+      _id: secondDriverId, fullName: 'Replacement Tracking Driver', email: 'replacement-driver-' + suffix + '@example.test',
+      phone: '0000000000', passwordHash: 'test-only', authProvider: 'LOCAL', licenseNumber: 'TRW-L-' + suffix,
+      providerId, assignedAmbulanceId: secondAmbulanceId, availabilityStatus: 'BUSY', profileCompletionStatus: 'COMPLETE',
+      licenseVerificationStatus: 'VERIFIED', accountStatus: 'ACTIVE',
+    });
+    const acceptedAt = new Date();
+    await TripModel.create({
+      _id: secondTripId, emergencyRequestId: emergencyId, providerId, ambulanceId: secondAmbulanceId, driverId: secondDriverId,
+      destinationHospitalId: hospitalId, status: 'ACCEPTED', acceptedAt,
+      statusHistory: [{ status: 'ACCEPTED', changedAt: acceptedAt, actorId: secondDriverId, actorRole: 'AMBULANCE_DRIVER' }],
+    });
+    await EmergencyRequestModel.updateOne({ _id: emergencyId }, { $set: { ambulanceId: secondAmbulanceId, ambulanceProviderId: providerId, driverId: secondDriverId } });
+    await DispatchJobModel.updateOne({ _id: dispatchJobId }, {
+      $set: { status: 'ACCEPTED', generation: 2, currentAttemptId: 'replacement-' + suffix, currentProviderId: providerId,
+        currentAmbulanceId: secondAmbulanceId, currentDriverId: secondDriverId, acceptedTripId: secondTripId, attempts: [] },
+    });
+    const reassignedAlert = await recordHospitalCoordinationEvent({ emergencyId: String(emergencyId), tripId: String(secondTripId), type: 'AMBULANCE_ASSIGNED' });
+    assert.equal(reassignedAlert?.type, 'AMBULANCE_REASSIGNED', 'a changed accepted ambulance is recorded as a reassignment');
+    assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'HOSPITAL_NOTIFIED');
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'AMBULANCE_REASSIGNED' }), 1);
+
+    // Refresh/reconnect recovery uses the persisted inbox, not an in-memory socket queue.
+    const hospitalRecoverySocket = await connect(url, hospitalToken); sockets.push(hospitalRecoverySocket);
+    const hospitalSecondRecoverySocket = await connect(url, hospitalToken); sockets.push(hospitalSecondRecoverySocket);
+    assert.equal((await subscribe(hospitalRecoverySocket, { type: 'hospital-operations', id: String(hospitalId) })).ok, true);
+    assert.equal((await subscribe(hospitalSecondRecoverySocket, { type: 'hospital-operations', id: String(hospitalId) })).ok, true);
+    const recoveredInbox = await fetch(url + '/api/v1/hospital/coordination/notifications?state=ALL', { headers: hospitalCookie });
+    assert.equal(recoveredInbox.status, 200);
+    const recoveredAlerts = (await recoveredInbox.json() as { data: { items: Array<{ type: string; state: string; ambulanceId?: string }> } }).data.items;
+    assert.ok(recoveredAlerts.some((item) => item.type === 'TRIP_CANCELLED' && item.state === 'SUPERSEDED'));
+    assert.ok(recoveredAlerts.some((item) => item.type === 'AMBULANCE_REASSIGNED' && item.ambulanceId === String(secondAmbulanceId)));
+
+    const replacementTelemetry = await updateDriverLocation(String(secondDriverId), {
+      latitude: 26.91241, longitude: 75.78731, accuracy: 6, timestamp: new Date(),
+    });
+    assert.equal(replacementTelemetry.ambulanceId, String(secondAmbulanceId));
+    const hospitalCoordinationResponse = await fetch(url + '/api/v1/hospital/coordination/emergencies/' + emergencyId, { headers: hospitalCookie });
+    assert.equal(hospitalCoordinationResponse.status, 200);
+    const hospitalCoordination = (await hospitalCoordinationResponse.json() as { data: { trip: { id: string; status: string }; ambulance: { id: string; location: { coordinatesAreLive: boolean } } } }).data;
+    assert.equal(hospitalCoordination.trip.id, String(secondTripId));
+    assert.equal(hospitalCoordination.ambulance.id, String(secondAmbulanceId));
+    assert.equal(hospitalCoordination.ambulance.location.coordinatesAreLive, true, 'hospital detail exposes current location and freshness only for its own active trip');
+
+    assert.equal((await subscribe(userSocket, { type: 'trip', id: String(secondTripId) })).ok, true);
+    await arrivedPickup(String(secondDriverId), String(secondTripId));
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'AMBULANCE_AT_PICKUP' }), 1);
+    await patientPickedUp(String(secondDriverId), String(secondTripId));
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'PATIENT_PICKED_UP' }), 1);
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'EN_ROUTE_TO_HOSPITAL' }), 1, 'patient pickup also persists the en-route milestone');
+    await arrivedHospital(String(secondDriverId), String(secondTripId));
     assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'AT_HOSPITAL', 'hospital coordination changes only after authoritative arrival action');
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'AMBULANCE_ARRIVED' }), 1);
     const terminalStatus = new Promise<{ data: { status: string } }>((resolve) => userSocket.once('tracking:status', resolve));
-    await completeTrip(String(driverId), String(tripId));
+    await completeTrip(String(secondDriverId), String(secondTripId));
     assert.equal((await terminalStatus).data.status, 'COMPLETED');
-    assert.equal((await TripModel.findById(tripId).lean().exec())?.status, 'COMPLETED');
-    assert.equal((await subscribe(userSocket, { type: 'trip', id: String(tripId) })).ok, false, 'terminal trips cannot be resubscribed for live events');
-    assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.currentStatus, 'AVAILABLE');
-    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.availabilityStatus, 'ONLINE');
+    assert.equal((await TripModel.findById(secondTripId).lean().exec())?.status, 'COMPLETED');
+    assert.equal((await subscribe(userSocket, { type: 'trip', id: String(secondTripId) })).ok, false, 'terminal trips cannot be resubscribed for live events');
+    assert.equal((await AmbulanceModel.findById(secondAmbulanceId).lean().exec())?.currentStatus, 'AVAILABLE');
+    assert.equal((await AmbulanceDriverModel.findById(secondDriverId).lean().exec())?.availabilityStatus, 'ONLINE');
     assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'RESOLVED');
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'TRIP_COMPLETED' }), 1);
     await delay(50);
     let tripRoomLocationReceived = false;
     userSocket.on('tracking:location', () => { tripRoomLocationReceived = true; });
-    broadcastEvent('trip:' + tripId, 'tracking:location', { emergencyRequestId: String(emergencyId), tripId: String(tripId), latitude: telemetry.latitude, longitude: telemetry.longitude, coordinatesAreLive: false });
+    broadcastEvent('trip:' + secondTripId, 'tracking:location', { emergencyRequestId: String(emergencyId), tripId: String(secondTripId), latitude: replacementTelemetry.latitude, longitude: replacementTelemetry.longitude, coordinatesAreLive: false });
     await delay(100);
     assert.equal(tripRoomLocationReceived, false, 'trip room is cleaned after terminal status delivery');
 
@@ -260,18 +331,21 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     assert.equal(recoveredSnapshot.trip.status, 'COMPLETED');
     assert.equal(recoveredSnapshot.trackingActive, false);
     assert.equal(recoveredSnapshot.location, null, 'completed trips must not expose a live or last-known vehicle location');
+
   } finally {
     sockets.forEach((socket) => socket.disconnect());
     if (stopSockets) await stopSockets();
     else if (server?.listening) await new Promise<void>((resolve) => server!.close(() => resolve()));
     await Promise.all([
-      TripModel.deleteMany({ _id: tripId }),
+      TripModel.deleteMany({ _id: { $in: [tripId, secondTripId] } }),
+      DispatchJobModel.deleteMany({ _id: dispatchJobId }),
+      HospitalCoordinationNotificationModel.deleteMany({ emergencyId }),
       HospitalPatientModel.deleteMany({ emergencyId }),
       EmergencyRequestModel.deleteMany({ _id: emergencyId }),
-      AmbulanceDriverModel.deleteMany({ _id: driverId }),
-      AmbulanceModel.deleteMany({ _id: ambulanceId }),
+      AmbulanceDriverModel.deleteMany({ _id: { $in: [driverId, secondDriverId] } }),
+      AmbulanceModel.deleteMany({ _id: { $in: [ambulanceId, secondAmbulanceId] } }),
       AmbulanceProviderModel.deleteMany({ _id: providerId }),
-      HospitalModel.deleteMany({ _id: hospitalId }),
+      HospitalModel.deleteMany({ _id: { $in: [hospitalId, otherHospitalId] } }),
       UserModel.deleteMany({ _id: { $in: [userId, outsiderId] } }),
     ]);
     await mongoose.disconnect();
