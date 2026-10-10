@@ -166,7 +166,7 @@ export const EmergencyPage = () => {
         distanceType: typeof active.routeDistanceMeters === 'number' ? 'DRIVING' : facility.distanceType,
         estimatedTime: typeof active.etaMinutes === 'number' ? active.etaMinutes + ' min' : 'Driving ETA unavailable',
       });
-      setSelectedSituationId(situationIdForLabel(active.situationType));
+      setSelectedSituationId(active.category ?? situationIdForLabel(active.situationType));
       if (typeof active.latitude === 'number' && typeof active.longitude === 'number') {
         setConfirmedLocation({
           latitude: active.latitude, longitude: active.longitude, label: active.location || 'Previously confirmed location',
@@ -278,6 +278,7 @@ export const EmergencyPage = () => {
       const request = await emergencyApi.create({
         hospitalId: refreshedFacility.id,
         situationType: selectedSituation.label,
+        category: selectedSituation.id,
         location: confirmedLocation.label,
         latitude: confirmedLocation.latitude,
         longitude: confirmedLocation.longitude,
