@@ -1,6 +1,6 @@
 export type HospitalAvailability = 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE' | 'UNKNOWN';
-export type HospitalEmergencyStatus = 'RECEIVED' | 'REVIEWING' | 'PREPARING' | 'AMBULANCE_COORDINATION' | 'RESOLVED' | 'CANCELLED' | 'REASSIGNMENT_REQUIRED';
-export type HospitalPatientStatus = 'INCOMING' | 'HOSPITAL_NOTIFIED' | 'AT_HOSPITAL' | 'RESOLVED' | 'CANCELLED';
+export type HospitalEmergencyStatus = 'RECEIVED' | 'REVIEWING' | 'PREPARING' | 'AMBULANCE_COORDINATION' | 'RESOLVED' | 'CANCELLED';
+export type HospitalPatientStatus = 'INCOMING' | 'HOSPITAL_NOTIFIED' | 'AT_HOSPITAL' | 'RESOLVED' | 'CANCELLED' | 'REASSIGNMENT_REQUIRED';
 
 export interface HospitalProfile {
   id: string;
