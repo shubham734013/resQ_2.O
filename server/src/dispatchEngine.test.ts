@@ -32,7 +32,7 @@ test('dispatch state machine allows only defined lifecycle transitions', () => {
   assert.equal(isAllowedDispatchTransition('PENDING', 'SEARCHING'), true);
   assert.equal(isAllowedDispatchTransition('OFFERED', 'ACCEPTED'), true);
   assert.equal(isAllowedDispatchTransition('OFFERED', 'EXHAUSTED'), false);
-  assert.equal(isAllowedDispatchTransition('ACCEPTED', 'PENDING'), false);
+  assert.equal(isAllowedDispatchTransition('ACCEPTED', 'PENDING'), true, 'a pre-transport trip cancellation can return the accepted dispatch job to the queue');
   assert.equal(isAllowedDispatchTransition('EXHAUSTED', 'ESCALATED'), true);
   assert.equal(isAllowedDispatchTransition('CANCELLED', 'PENDING'), false);
   assert.deepEqual(DISPATCH_ALLOWED_TRANSITIONS.CANCELLED, []);
