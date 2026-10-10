@@ -110,5 +110,5 @@ export const getTripNavigationRoute = async (identity: AuthenticatedIdentity, tr
   const promise = calculateGoogleRoutes({ origin, destination: { latitude: destination.latitude, longitude: destination.longitude }, travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE' });
   routeCache.set(key, { expiresAt: now + 20_000, promise });
   while (routeCache.size > 200) routeCache.delete(routeCache.keys().next().value as string);
-  try { return await promise; } catch (error) { routeCache.delete(key); throw error; }
+  try { return await promise; } catch (error) { if (routeCache.get(key)?.promise === promise) routeCache.delete(key); throw error; }
 };
