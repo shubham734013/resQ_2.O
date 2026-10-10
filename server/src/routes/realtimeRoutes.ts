@@ -4,8 +4,6 @@ import { authenticate } from '../middlewares/authenticate.js';
 import type { AuthenticatedRequest } from '../types/auth.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
-import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
-import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { registerRealtimeClient, unregisterRealtimeClient } from '../services/realtimeService.js';
 import { AppError } from '../utils/AppError.js';
