@@ -13,7 +13,8 @@ const requiredIndexes = [
   { collection: AmbulanceDriverModel.collection, name: 'dispatchReservationId_1', key: { dispatchReservationId: 1 } },
 ];
 
-type IndexInfo = { name?: string; key: Record<string, unknown>; unique?: boolean };\nconst indexesFor = async <T extends { indexes: () => Promise<unknown[]> }>(collection: T): Promise<IndexInfo[]> => {
+type IndexInfo = { name?: string; key: Record<string, unknown>; unique?: boolean };
+const indexesFor = async <T extends { indexes: () => Promise<unknown[]> }>(collection: T): Promise<IndexInfo[]> => {
   try { return await collection.indexes(); }
   catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 26) return [];
