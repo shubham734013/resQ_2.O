@@ -29,6 +29,11 @@ const copy = (value: Record<string, unknown> & { _id: Types.ObjectId }) => ({
   lastDeliveryAttemptAt: value.lastDeliveryAttemptAt,
 });
 
+const eventTripStatus: Partial<Record<HospitalCoordinationNotificationType, string>> = {
+  AMBULANCE_ASSIGNED: 'ACCEPTED', AMBULANCE_REASSIGNED: 'ACCEPTED', AMBULANCE_AT_PICKUP: 'AT_PICKUP',
+  PATIENT_PICKED_UP: 'PATIENT_ONBOARD', EN_ROUTE_TO_HOSPITAL: 'TO_HOSPITAL', AMBULANCE_ARRIVED: 'AT_HOSPITAL',
+  TRIP_COMPLETED: 'COMPLETED', TRIP_CANCELLED: 'CANCELLED', EMERGENCY_CANCELLED: 'CANCELLED',
+};
 const eventCopy: Record<HospitalCoordinationNotificationType, { title: string; message: (code: string, eta?: number) => string }> = {
   EMERGENCY_RECEIVED: { title: 'New emergency request', message: (code) => `Emergency ${code} requires hospital review.` },
   EMERGENCY_CANCELLED: { title: 'Emergency cancelled', message: (code) => `Emergency ${code} was cancelled. Do not prepare for this arrival.` },
@@ -101,7 +106,7 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
       hospitalId: emergency.hospitalId, emergencyId: emergencyObjectId, tripId: trip?._id, ambulanceId,
       ambulanceRegistration: ambulance?.registrationNumber, ambulanceVehicleNumber: ambulance?.vehicleNumber,
       dedupeKey, type: effectiveType, state: 'UNREAD', requestCode: emergency.requestCode,
-      emergencyCategory: emergency.category ?? emergency.situationType, tripStatus: trip?.status,
+      emergencyCategory: emergency.category ?? emergency.situationType, tripStatus: eventTripStatus[effectiveType] ?? trip?.status,
       title: descriptor.title, message: descriptor.message(emergency.requestCode, emergency.etaMinutes),
       etaMinutes: emergency.etaMinutes, deliveryAttemptCount: 0,
     }]);
@@ -122,7 +127,7 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
       id: String(created._id), hospitalId: String(emergency.hospitalId), emergencyId: String(emergencyObjectId),
       tripId: trip ? String(trip._id) : undefined, type: effectiveType, state: 'UNREAD',
       requestCode: emergency.requestCode, emergencyCategory: emergency.category ?? emergency.situationType,
-      tripStatus: trip?.status, title: descriptor.title, message: descriptor.message(emergency.requestCode, emergency.etaMinutes),
+      tripStatus: eventTripStatus[effectiveType] ?? trip?.status, title: descriptor.title, message: descriptor.message(emergency.requestCode, emergency.etaMinutes),
       ambulanceId: ambulanceId ? String(ambulanceId) : undefined,
       ambulanceRegistration: ambulance?.registrationNumber, ambulanceVehicleNumber: ambulance?.vehicleNumber,
       etaMinutes: emergency.etaMinutes, createdAt: created.createdAt,
