@@ -161,7 +161,7 @@ export const EmergencyPage = () => {
       setEmergencyRequestId(active.id);
       setSelectedFacility({
         ...facility,
-        distance: typeof active.routeDistanceMeters === 'number' ? formatDistance(active.routeDistanceMeters) : facility.distance,
+        distance: typeof active.routeDistanceMeters === 'number' ? formatDistance(active.routeDistanceMeters) : facility.distance || 'Unavailable',
         distanceMeters: active.routeDistanceMeters ?? facility.distanceMeters,
         distanceType: typeof active.routeDistanceMeters === 'number' ? 'DRIVING' : facility.distanceType,
         estimatedTime: typeof active.etaMinutes === 'number' ? active.etaMinutes + ' min' : 'Driving ETA unavailable',
