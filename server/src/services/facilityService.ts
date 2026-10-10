@@ -24,13 +24,30 @@ type HospitalFacility = {
   location?: { type: 'Point'; coordinates: [number, number] };
 };
 
-type Category = 'emergency' | 'trauma' | 'urgent_care' | 'pediatric';
+type Category =
+  | 'emergency'
+  | 'trauma'
+  | 'urgent_care'
+  | 'pediatric'
+  | 'cardiology'
+  | 'neurology'
+  | 'orthopaedics'
+  | 'maternity'
+  | 'multispeciality'
+  | 'general';
+
 const categoryFor = (hospital: Pick<HospitalFacility, 'hospitalType' | 'services' | 'capabilities'>): Category => {
   const text = [hospital.hospitalType, ...hospital.services, ...hospital.capabilities].join(' ').toLowerCase();
   if (text.includes('trauma')) return 'trauma';
-  if (text.includes('pediatric') || text.includes('paediatric')) return 'pediatric';
+  if (text.includes('cardio') || text.includes('heart')) return 'cardiology';
+  if (text.includes('neuro') || text.includes('brain') || text.includes('spine')) return 'neurology';
+  if (text.includes('ortho') || text.includes('bone') || text.includes('joint')) return 'orthopaedics';
+  if (text.includes('pediatric') || text.includes('paediatric') || text.includes('child')) return 'pediatric';
+  if (text.includes('maternity') || text.includes('gynec') || text.includes('obstetric')) return 'maternity';
+  if (text.includes('multi')) return 'multispeciality';
   if (text.includes('urgent')) return 'urgent_care';
-  return 'emergency';
+  if (text.includes('emergency') || text.includes('critical')) return 'emergency';
+  return 'general';
 };
 
 export const hospitalToFacility = (hospital: HospitalFacility, distanceMeters?: unknown) => {
@@ -72,7 +89,13 @@ export const searchFacilities = async (query: FacilitySearchQuery) => {
       emergency: /emergency|critical/i,
       trauma: /trauma/i,
       urgent_care: /urgent/i,
-      pediatric: /pediatric|paediatric/i,
+      pediatric: /pediatric|paediatric|child/i,
+      cardiology: /cardio|heart/i,
+      neurology: /neuro|brain|spine/i,
+      orthopaedics: /ortho|bone|joint/i,
+      maternity: /maternity|obgyn|gynec|obstetric/i,
+      multispeciality: /multi/i,
+      general: /general/i,
     };
     const categoryRegex = categoryMap[query.category];
     if (categoryRegex) andFilters.push({ $or: [{ hospitalType: categoryRegex }, { services: categoryRegex }, { capabilities: categoryRegex }] });

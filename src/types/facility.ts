@@ -3,7 +3,13 @@ export type FacilityCategory =
   | 'emergency'
   | 'trauma'
   | 'urgent_care'
-  | 'pediatric';
+  | 'pediatric'
+  | 'cardiology'
+  | 'neurology'
+  | 'orthopaedics'
+  | 'maternity'
+  | 'multispeciality'
+  | 'general';
 
 export interface RouteSummary {
   distance: string;
@@ -16,7 +22,7 @@ export interface Facility {
   id: string;
   name: string;
   type: string;
-  category: 'emergency' | 'trauma' | 'urgent_care' | 'pediatric';
+  category: FacilityCategory;
   distance: string;
   distanceMeters?: number;
   estimatedTime: string;

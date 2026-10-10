@@ -2,7 +2,19 @@ import { z } from 'zod';
 
 export const facilitySearchQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  category: z.enum(['all', 'emergency', 'trauma', 'urgent_care', 'pediatric']).default('all'),
+  category: z.enum([
+    'all',
+    'emergency',
+    'trauma',
+    'urgent_care',
+    'pediatric',
+    'cardiology',
+    'neurology',
+    'orthopaedics',
+    'maternity',
+    'multispeciality',
+    'general',
+  ]).default('all'),
   emergencyOnly: z.coerce.boolean().default(false),
   latitude: z.coerce.number().finite().min(-90).max(90).optional(),
   longitude: z.coerce.number().finite().min(-180).max(180).optional(),

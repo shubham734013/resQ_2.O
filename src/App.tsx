@@ -20,11 +20,17 @@ import { AmbulanceProviderDashboardPage } from './pages/AmbulanceProviderDashboa
 import { AdminOverviewPage, AdminEmergenciesPage, AdminReportsPage, AdminAnalyticsPage, AdminSettingsPage } from './pages/AdminPage';
 import { AdminUsersManagementPage, AdminHospitalsManagementPage, AdminProvidersManagementPage, AdminAmbulancesManagementPage, AdminDriversManagementPage } from './pages/AdminManagementPages';
 import { AdminUserDetailPage, AdminHospitalDetailPage, AdminProviderDetailPage, AdminAmbulanceDetailPage, AdminDriverDetailPage } from './pages/AdminDetailPages';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false, retry: 1 } } });
 
 export function App() {
-  return <QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider><Routes>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <ErrorBoundary>
+            <Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/admin/login" element={<AdminLoginPage />} />
     <Route path="/register" element={<RegistrationRoleSelect />} />
@@ -55,6 +61,11 @@ export function App() {
       </Route>
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes></AuthProvider></BrowserRouter></QueryClientProvider>;
+          </Routes>
+        </ErrorBoundary>
+      </AuthProvider>
+    </BrowserRouter>
+  </QueryClientProvider>
+);
 }
 export default App;

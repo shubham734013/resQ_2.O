@@ -117,76 +117,97 @@ export const MapView = ({
     let cancelled = false;
     const renderOverlays = async () => {
       if (!mapRef.current || status !== 'ready') return;
-      const googleMaps = await loadGoogleMaps();
-      const markerLibrary = await googleMaps.maps.importLibrary('marker');
-      if (cancelled) return;
-      const AdvancedMarkerElement = (markerLibrary as unknown as { AdvancedMarkerElement: AdvancedMarkerConstructor }).AdvancedMarkerElement;
-      markersRef.current.forEach((marker) => { marker.map = null; });
-      markersRef.current = [];
-      polylinesRef.current.forEach((line) => line.setMap(null));
-      polylinesRef.current = [];
+      try {
+        const googleMaps = await loadGoogleMaps();
+        if (cancelled || !mapRef.current) return;
+        const markerLibrary = await googleMaps.maps.importLibrary('marker');
+        if (cancelled || !mapRef.current) return;
+        const AdvancedMarkerElement = (markerLibrary as unknown as { AdvancedMarkerElement?: AdvancedMarkerConstructor })?.AdvancedMarkerElement;
 
-      const allPoints: Array<{ lat: number; lng: number }> = [];
-      if (userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)) {
-        const marker = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position: toGoogle(userLocation.latitude, userLocation.longitude),
-          title: 'Your current location',
-          content: markerElement('You'),
+        markersRef.current.forEach((marker) => {
+          try { marker.map = null; } catch { /* ignore */ }
         });
-        markersRef.current.push(marker);
-        allPoints.push(toGoogle(userLocation.latitude, userLocation.longitude));
-      }
-
-      for (const item of markers) {
-        const marker = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position: toGoogle(item.latitude, item.longitude),
-          title: item.title,
-          content: markerElement(item.title, item.isEmergency),
-          gmpClickable: Boolean(item.onClick),
+        markersRef.current = [];
+        polylinesRef.current.forEach((line) => {
+          try { line.setMap(null); } catch { /* ignore */ }
         });
-        if (item.onClick) marker.addListener('click', item.onClick);
-        markersRef.current.push(marker);
-        allPoints.push(toGoogle(item.latitude, item.longitude));
-      }
+        polylinesRef.current = [];
 
-      if (destination) {
-        const marker = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position: toGoogle(destination.latitude, destination.longitude),
-          title: destination.name,
-          content: markerElement(destination.name, destination.isEmergency),
-        });
-        markersRef.current.push(marker);
-        allPoints.push(toGoogle(destination.latitude, destination.longitude));
-      }
+        const allPoints: Array<{ lat: number; lng: number }> = [];
 
-      if (activeRoute?.googlePath?.length) {
-        polylinesRef.current.push(new googleMaps.maps.Polyline({
-          map: mapRef.current,
-          path: activeRoute.googlePath.map((point) => toGoogle(point.latitude, point.longitude)),
-          strokeColor: '#2563eb',
-          strokeOpacity: 0.95,
-          strokeWeight: 6,
-        }));
-      }
+        const createMarker = (lat: number, lng: number, title: string, isEmergency = false, onClick?: () => void) => {
+          if (!mapRef.current || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+          const pos = toGoogle(lat, lng);
+          allPoints.push(pos);
+          try {
+            if (AdvancedMarkerElement) {
+              const marker = new AdvancedMarkerElement({
+                map: mapRef.current,
+                position: pos,
+                title,
+                content: markerElement(title, isEmergency),
+                gmpClickable: Boolean(onClick),
+              });
+              if (onClick) marker.addListener('click', onClick);
+              markersRef.current.push(marker);
+            }
+          } catch (markerErr) {
+            console.warn('AdvancedMarkerElement failed to instantiate, fallback omitted:', markerErr);
+          }
+        };
 
-      for (const route of alternativeRoutes) {
-        if (!route.googlePath?.length) continue;
-        polylinesRef.current.push(new googleMaps.maps.Polyline({
-          map: mapRef.current,
-          path: route.googlePath.map((point) => toGoogle(point.latitude, point.longitude)),
-          strokeColor: '#64748b',
-          strokeOpacity: 0.55,
-          strokeWeight: 4,
-        }));
-      }
+        if (userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)) {
+          createMarker(userLocation.latitude, userLocation.longitude, 'You');
+        }
 
-      if (allPoints.length > 1 && !activeRoute?.googlePath?.length) {
-        const bounds = new googleMaps.maps.LatLngBounds();
-        allPoints.forEach((point) => bounds.extend(point));
-        mapRef.current.fitBounds(bounds);
+        for (const item of markers) {
+          if (Number.isFinite(item.latitude) && Number.isFinite(item.longitude)) {
+            createMarker(item.latitude, item.longitude, item.title, item.isEmergency, item.onClick);
+          }
+        }
+
+        if (destination && Number.isFinite(destination.latitude) && Number.isFinite(destination.longitude)) {
+          createMarker(destination.latitude, destination.longitude, destination.name, destination.isEmergency);
+        }
+
+        if (activeRoute?.googlePath?.length) {
+          const path = activeRoute.googlePath
+            .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+            .map((point) => toGoogle(point.latitude, point.longitude));
+          if (path.length) {
+            polylinesRef.current.push(new googleMaps.maps.Polyline({
+              map: mapRef.current,
+              path,
+              strokeColor: '#2563eb',
+              strokeOpacity: 0.95,
+              strokeWeight: 6,
+            }));
+          }
+        }
+
+        for (const route of alternativeRoutes) {
+          if (!route.googlePath?.length) continue;
+          const path = route.googlePath
+            .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+            .map((point) => toGoogle(point.latitude, point.longitude));
+          if (path.length) {
+            polylinesRef.current.push(new googleMaps.maps.Polyline({
+              map: mapRef.current,
+              path,
+              strokeColor: '#64748b',
+              strokeOpacity: 0.55,
+              strokeWeight: 4,
+            }));
+          }
+        }
+
+        if (allPoints.length > 1 && !activeRoute?.googlePath?.length) {
+          const bounds = new googleMaps.maps.LatLngBounds();
+          allPoints.forEach((point) => bounds.extend(point));
+          mapRef.current.fitBounds(bounds);
+        }
+      } catch (overlayErr) {
+        console.warn('Map overlay rendering error caught safely:', overlayErr);
       }
     };
     void renderOverlays();

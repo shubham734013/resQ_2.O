@@ -6,6 +6,7 @@ import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { TripModel } from '../models/Trip.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { broadcastEvent } from './realtimeService.js';
 import { AppError } from '../utils/AppError.js';
 import type { z } from 'zod';
 import type { createEmergencyRequestSchema } from '../schemas/emergency.js';
@@ -64,6 +65,17 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
     throw new AppError('HOSPITAL_NOT_OPERATIONAL', 'The selected hospital is not currently accepting emergency requests through ResQ', 409);
   }
 
+  // Idempotency: Reuse recent unhandled request created within the last 30 seconds
+  const recentExisting = await EmergencyRequestModel.findOne({
+    userId: userObjectId,
+    hospitalId,
+    status: { $in: ['RECEIVED', 'REVIEWING'] },
+    createdAt: { $gte: new Date(Date.now() - 30000) },
+  }).lean().exec();
+  if (recentExisting) {
+    return output(recentExisting);
+  }
+
   const now = new Date();
   const request = await EmergencyRequestModel.create({
     requestCode: 'RSQ-' + cryptoSafeCode(),
@@ -100,7 +112,10 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
   ).lean().exec();
 
   if (!linked) throw new AppError('EMERGENCY_LINK_FAILED', 'Emergency request could not be linked to the hospital case', 500);
-  return output(linked);
+  const out = output(linked);
+  broadcastEvent(`hospital:${hospitalId}`, 'hospital:incoming-patient', out);
+  broadcastEvent('operations', 'emergency:created', out);
+  return out;
 };
 
 const cryptoSafeCode = () => randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
@@ -248,7 +263,11 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
   }
 
   if (!updatedRequest) throw new AppError('EMERGENCY_CANCEL_FAILED', 'Emergency cancellation did not complete', 500);
-  return output(updatedRequest);
+  const out = output(updatedRequest);
+  broadcastEvent(`hospital:${current.hospitalId}`, 'hospital:incoming-patient', out);
+  broadcastEvent(`emergency:${emergencyId}`, 'tracking:status', out);
+  broadcastEvent('operations', 'emergency:cancelled', out);
+  return out;
 };
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');

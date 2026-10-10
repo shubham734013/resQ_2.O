@@ -12,6 +12,7 @@ import {
 } from '../hooks/useHospitalManagement';
 import type { HospitalEmergencyStatus, HospitalEmergencySummary } from '../types/hospitalManagement';
 import { MapView } from '../components/map/MapView';
+import { IncomingAmbulanceAlertPanel } from '../components/hospital/IncomingAmbulanceAlertPanel';
 
 const wrap = 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8';
 const box = 'border border-slate-200 bg-white';
@@ -36,9 +37,10 @@ export const HospitalPage = () => {
 
 const HospitalOverviewPage = () => {
   const profile = useHospitalProfile();
-  const emergencies = useHospitalEmergencies({ page: 1, limit: 5 });
+  const emergencies = useHospitalEmergencies({ page: 1, limit: 10 });
   const patients = useHospitalPatients({ page: 1, limit: 5 });
   const ambulances = useHospitalAmbulances({ page: 1, limit: 5 });
+  const statusMutation = useHospitalEmergencyStatusMutation();
   if (profile.isLoading || emergencies.isLoading) return <PageShell><Loading /></PageShell>;
   if (profile.isError) return <PageShell><ErrorState retry={() => void profile.refetch()} /></PageShell>;
   const p = profile.data;
@@ -51,6 +53,15 @@ const HospitalOverviewPage = () => {
   ] as const;
   return <PageShell>
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs uppercase tracking-wider text-slate-500">Hospital Operations</p><h2 className="mt-1 text-2xl font-semibold">{p.name}</h2><p className="mt-1 text-sm text-slate-500">{p.address ?? 'Address not provided'}{p.city ? `, ${p.city}` : ''}</p></div><StatusBadge variant={statusVariant(p.verificationStatus)} label={p.verificationStatus} /></div>
+    <div className="mt-6">
+      <IncomingAmbulanceAlertPanel
+        emergencies={emergencies.data?.items ?? []}
+        onUpdateStatus={(id, status) => statusMutation.mutate({ id, status })}
+        isUpdating={statusMutation.isPending}
+        updatingId={statusMutation.variables?.id}
+        onRefresh={() => void emergencies.refetch()}
+      />
+    </div>
     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{metrics.map(([label, value, Icon]) => <div key={label} className={`${box} p-4`}><div className="flex justify-between"><p className="text-sm text-slate-500">{label}</p><Icon className="h-4 w-4 text-slate-400" /></div><p className="mt-3 text-2xl font-semibold">{value}</p></div>)}</div>
     <div className="mt-6 grid gap-6 lg:grid-cols-2">
       <section className={box}><header className="border-b border-slate-200 p-4"><h3 className="font-semibold">Emergency operations</h3><Freshness value={p.updatedAt} /></header>{emergencies.isError ? <ErrorState retry={() => void emergencies.refetch()} /> : emergencies.data?.items.length ? emergencies.data.items.map((e) => <div key={e.id} className="border-b border-slate-100 p-4"><div className="flex justify-between gap-3"><div><p className="font-semibold">{e.requestCode} · {e.situationType}</p><p className="mt-1 text-sm text-slate-500">{e.location ?? 'Location not provided'}</p></div><StatusBadge variant={statusVariant(e.status)} label={e.status} /></div><p className="mt-3 text-xs text-slate-500">Received {new Date(e.reportedAt).toLocaleString()}{e.etaMinutes !== undefined ? ` · ETA ${e.etaMinutes} min` : ''}</p></div>) : <p className="p-6 text-sm text-slate-500">No incoming emergency requests.</p>}</section>
@@ -113,6 +124,14 @@ const HospitalEmergenciesPage = () => {
 
   return <PageShell>
     <div className="space-y-4">
+      <IncomingAmbulanceAlertPanel
+        emergencies={items}
+        onUpdateStatus={(id, status) => mutation.mutate({ id, status })}
+        isUpdating={mutation.isPending}
+        updatingId={mutation.variables?.id}
+        onRefresh={() => void q.refetch()}
+      />
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Emergency queue summary">
         {summaryItems.map(({ key, label }) => (
           <div key={key} className={`${box} p-4`}>

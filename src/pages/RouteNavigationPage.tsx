@@ -9,6 +9,7 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
 import type { UserLocation } from '../types/facility';
 import type { NavigationMode } from '../types/route';
@@ -49,11 +50,20 @@ export const RouteNavigationPage = () => {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('route-recommended');
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [isMobilePanelExpanded, setIsMobilePanelExpanded] = useState<boolean>(true);
-  const isRouteUnavailable = isRouteError || (!isRouteLoading && Boolean(facility) && !location);
-
   const activeRoute = useMemo(() => {
     return availableRoutes.find((r) => r.id === selectedRouteId) || availableRoutes[0] || null;
   }, [availableRoutes, selectedRouteId]);
+
+  const isRouteUnavailable = !isRouteLoading && (isRouteError || !activeRoute || (Boolean(facility) && !location));
+
+  const externalDirectionsUrl = useMemo(() => {
+    if (!facility) return '';
+    if (typeof facility.latitude === 'number' && typeof facility.longitude === 'number' && Number.isFinite(facility.latitude) && Number.isFinite(facility.longitude)) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${facility.latitude},${facility.longitude}`;
+    }
+    const destQuery = [facility.name, facility.address].filter(Boolean).join(', ');
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destQuery)}`;
+  }, [facility]);
 
   const alternativeRoutes = useMemo(() => {
     return availableRoutes.filter((r) => r.id !== activeRoute?.id);
@@ -117,7 +127,7 @@ export const RouteNavigationPage = () => {
   };
 
   // 1. Loading State
-  if (isLoading) {
+  if (isLoading || isRouteLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-4 min-h-[60vh]">
         <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -154,35 +164,50 @@ export const RouteNavigationPage = () => {
   }
 
   // 3. Route Unavailable Fallback State
-  if (isRouteUnavailable || isRouteLoading) {
+  if (isRouteUnavailable) {
     return (
       <div className="flex-1 max-w-md w-full mx-auto p-6 sm:p-12 text-center space-y-4 my-auto">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
           <AlertTriangle className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-lg font-bold text-slate-900">Google Maps route unavailable</h2>
+          <h2 className="text-lg font-bold text-slate-900">In-App Route Unavailable</h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-            {permissionState !== 'granted' ? 'Allow location access to calculate a real driving route.' : <>Unable to compute a real driving route to <strong className="text-slate-800">{facility.name}</strong> at this time.</>}
+            {permissionState !== 'granted'
+              ? 'Enable location access to calculate a real driving route, or navigate directly in Google Maps.'
+              : <>Unable to compute a driving route to <strong className="text-slate-800">{facility.name}</strong> right now. You can launch Google Maps directions directly.</>}
           </p>
         </div>
-        <div className="pt-2 flex flex-col sm:flex-row justify-center gap-2">
-          <Button
-            variant="outline"
-            size="md"
-            icon={<RefreshCw className="w-4 h-4" />}
-            onClick={() => { if (permissionState !== 'granted') refreshLocation(); else void refetchRoute(); }}
-          >
-            {permissionState !== 'granted' ? 'Try location again' : 'Retry Route'}
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            icon={<Phone className="w-4 h-4" />}
-            onClick={handleCallFacility}
-          >
-            Call Facility Directly
-          </Button>
+        <div className="pt-2 flex flex-col gap-2">
+          {externalDirectionsUrl && (
+            <a
+              href={externalDirectionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open in Google Maps App
+            </a>
+          )}
+          <div className="flex flex-col sm:flex-row justify-center gap-2">
+            <Button
+              variant="outline"
+              size="md"
+              icon={<RefreshCw className="w-4 h-4" />}
+              onClick={() => { if (permissionState !== 'granted') refreshLocation(); else void refetchRoute(); }}
+            >
+              {permissionState !== 'granted' ? 'Try location again' : 'Retry Route'}
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              icon={<Phone className="w-4 h-4" />}
+              onClick={handleCallFacility}
+            >
+              Call Facility Directly
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -206,6 +231,17 @@ export const RouteNavigationPage = () => {
               {isEmergency ? 'Emergency Flow' : 'Facility Details'}
             </span>
           </button>
+          {externalDirectionsUrl && (
+            <a
+              href={externalDirectionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md border border-slate-200 text-blue-600 text-xs font-semibold px-3 py-2 rounded-xl shadow-md hover:bg-blue-50 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Google Maps</span>
+            </a>
+          )}
         </div>
       )}
 

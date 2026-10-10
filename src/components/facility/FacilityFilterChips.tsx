@@ -10,10 +10,15 @@ export interface FilterChipsProps {
 
 const CATEGORIES: { id: FacilityCategory; label: string }[] = [
   { id: 'all', label: 'All Facilities' },
-  { id: 'emergency', label: 'Emergency Dept' },
-  { id: 'trauma', label: 'Trauma Centers' },
+  { id: 'emergency', label: 'Emergency & Trauma' },
+  { id: 'cardiology', label: 'Cardiology' },
+  { id: 'neurology', label: 'Neurology' },
+  { id: 'orthopaedics', label: 'Orthopaedics' },
+  { id: 'pediatric', label: 'Paediatrics' },
+  { id: 'maternity', label: 'Maternity' },
+  { id: 'multispeciality', label: 'Multispeciality' },
   { id: 'urgent_care', label: 'Urgent Care' },
-  { id: 'pediatric', label: 'Pediatric' },
+  { id: 'general', label: 'General Hospital' },
 ];
 
 export const FacilityFilterChips = ({

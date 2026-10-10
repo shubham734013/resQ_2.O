@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import { CheckCircle2, Hospital, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Clock, Hospital, RefreshCw } from 'lucide-react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/common/Button';
@@ -24,6 +24,103 @@ const navigationFor=(route:RouteOptionItem)=>({
  instruction:route.instructions[0]?.instruction ?? 'Follow the highlighted route',
  eta:route.duration,distance:route.distance,currentStepIndex:0,
 });
+
+const DispatchCountdownCard = ({
+  request,
+  onAccept,
+  onReject,
+  isAccepting,
+  isRejecting,
+}: {
+  request: { id: string; requestCode: string; situationType: string; location?: string; hospitalId: string; hospitalName?: string };
+  onAccept: () => void;
+  onReject: () => void;
+  isAccepting: boolean;
+  isRejecting: boolean;
+}) => {
+  const [secondsLeft, setSecondsLeft] = useState(45);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      onReject();
+      return;
+    }
+    const timer = setInterval(() => {
+      setSecondsLeft((s) => s - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [secondsLeft, onReject]);
+
+  const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 45) * 100));
+
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">Incoming dispatch offer</p>
+          <h1 className="mt-1 text-3xl font-bold">Emergency Request</h1>
+        </div>
+        <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 px-3.5 py-1.5 rounded-full text-xs font-bold font-mono">
+          <Clock className="w-4 h-4 animate-spin text-rose-600" />
+          <span>{secondsLeft}s left</span>
+        </div>
+      </div>
+
+      <div className="mt-4 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div
+          className={`h-full transition-all duration-1000 ${
+            secondsLeft <= 10 ? 'bg-rose-600' : secondsLeft <= 20 ? 'bg-amber-500' : 'bg-emerald-500'
+          }`}
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+        <div>
+          <p className="text-xs text-slate-500">Request code</p>
+          <p className="font-mono font-bold text-slate-900 text-lg">{request.requestCode}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Situation</p>
+          <p className="font-semibold text-slate-900">{request.situationType}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Patient pickup location</p>
+          <p className="font-semibold text-slate-900">{request.location ?? 'Coordinates provided by dispatch'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Destination hospital</p>
+          <p className="font-semibold text-slate-900">
+            {request.hospitalName ? `${request.hospitalName}` : `Hospital ID: ${request.hospitalId}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <Button
+          size="lg"
+          variant="emergency"
+          fullWidth
+          onClick={onAccept}
+          disabled={isAccepting || secondsLeft <= 0}
+          className="font-bold min-h-12"
+        >
+          {isAccepting ? 'Accepting...' : 'Accept Request'}
+        </Button>
+        <Button
+          size="lg"
+          variant="secondary"
+          fullWidth
+          onClick={onReject}
+          disabled={isRejecting}
+          className="min-h-12"
+        >
+          Decline
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 export const AmbulancePage=()=>{
  const navigate=useNavigate();
@@ -68,16 +165,28 @@ export const AmbulancePage=()=>{
  const hospital=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedHospital(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
  const complete=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.completeTrip(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
 
- const routeDestination=activeTrip?.status==='TO_HOSPITAL' || activeTrip?.status==='AT_HOSPITAL'
+ const toHospital=activeTrip?.status==='PATIENT_ONBOARD' || activeTrip?.status==='TO_HOSPITAL' || activeTrip?.status==='AT_HOSPITAL';
+ const routeDestination=toHospital
    ? (activeRequest.data && typeof activeRequest.data.hospitalLatitude==='number' && typeof activeRequest.data.hospitalLongitude==='number'
-      ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:null)
+      ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:destination)
    : destination;
 
- if(routeMode==='request' && selectedRequest) return <AmbulanceLayout><div className="mx-auto w-full max-w-2xl px-4 py-8"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Incoming emergency</p><h1 className="mt-1 text-3xl font-bold">Emergency request</h1><div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 space-y-4"><div><p className="text-xs text-slate-500">Request</p><p className="font-semibold">{selectedRequest.requestCode}</p></div><div><p className="text-xs text-slate-500">Situation</p><p className="font-semibold">{selectedRequest.situationType}</p></div><div><p className="text-xs text-slate-500">Pickup</p><p className="font-semibold">{selectedRequest.location??'Coordinates provided by dispatch'}</p></div><div><p className="text-xs text-slate-500">Hospital</p><p className="font-semibold">Destination hospital ID: {selectedRequest.hospitalId}</p></div></div><div className="mt-5 grid gap-2 sm:grid-cols-2"><Button size="lg" variant="emergency" fullWidth onClick={()=>accept.mutate(selectedRequest.id)} disabled={accept.isPending}>Accept Request</Button><Button size="lg" variant="secondary" fullWidth onClick={()=>reject.mutate(selectedRequest.id)} disabled={reject.isPending}>Reject</Button></div></div></AmbulanceLayout>;
+ if(routeMode==='request' && selectedRequest) {
+   return (
+     <AmbulanceLayout>
+       <DispatchCountdownCard
+         request={selectedRequest}
+         onAccept={()=>accept.mutate(selectedRequest.id)}
+         onReject={()=>reject.mutate(selectedRequest.id)}
+         isAccepting={accept.isPending}
+         isRejecting={reject.isPending}
+       />
+     </AmbulanceLayout>
+   );
+ }
 
  if(routeMode==='navigation' && activeTrip && routeItem && routeDestination){
-   const toHospital=activeTrip.status==='TO_HOSPITAL';
-   return <AmbulanceLayout><NavigationPanel title={toHospital?'Transporting to Hospital':'Navigate to Patient'} destinationName={toHospital?'Destination hospital':(selectedRequest?.location??'Patient pickup')} destinationAddress={selectedRequest?.location??'Dispatch coordinates'} destinationCoordinates={routeDestination} navigation={navigationFor(routeItem)} userLocation={currentLocation} route={routeItem} onAction={()=>toHospital?hospital.mutate(activeTrip.id):pickup.mutate(activeTrip.id)} actionLabel={toHospital?'Arrived at Hospital':'Arrived at Patient'} onCall={profile.data?.phone?()=>window.location.assign('tel:'+profile.data.phone):undefined}/></AmbulanceLayout>;
+   return <AmbulanceLayout><NavigationPanel title={toHospital?'Transporting to Hospital':'Navigate to Patient'} destinationName={toHospital?(activeRequest.data?.hospitalName??'Destination hospital'):(selectedRequest?.location??'Patient pickup')} destinationAddress={toHospital?(activeRequest.data?.hospitalName ? `${activeRequest.data.hospitalName} Emergency Department` : 'Hospital Intake'):(selectedRequest?.location??'Dispatch coordinates')} destinationCoordinates={routeDestination} navigation={navigationFor(routeItem)} userLocation={currentLocation} route={routeItem} onAction={()=>toHospital?hospital.mutate(activeTrip.id):pickup.mutate(activeTrip.id)} actionLabel={toHospital?'Arrived at Hospital':'Arrived at Patient'} onCall={profile.data?.phone?()=>window.location.assign('tel:'+profile.data.phone):undefined}/></AmbulanceLayout>;
  }
 
  if(routeMode==='trip' && activeTrip?.status==='AT_PICKUP') return <AmbulanceLayout><div className="mx-auto w-full max-w-2xl px-4 py-8"><CheckCircle2 className="h-7 w-7 text-emerald-600"/><h1 className="mt-2 text-2xl font-bold">Arrived at Patient</h1><p className="mt-2 text-sm text-slate-500">Record patient handover only when the patient is onboard.</p><Button className="mt-6 min-h-14" size="lg" fullWidth onClick={()=>onboard.mutate(activeTrip.id)} disabled={onboard.isPending}>Patient Picked Up</Button></div></AmbulanceLayout>;
