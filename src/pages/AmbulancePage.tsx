@@ -123,7 +123,12 @@ export const AmbulancePage=()=>{
  const destination=selectedRequest && typeof selectedRequest.latitude==='number' && typeof selectedRequest.longitude==='number'
    ? {latitude:selectedRequest.latitude,longitude:selectedRequest.longitude}:null;
  const origin=location?{latitude:location.latitude,longitude:location.longitude}:null;
-  const route=useAmbulanceRoute(origin,destination,!activeTrip);
+  const toHospital=activeTrip?.status==='PATIENT_ONBOARD' || activeTrip?.status==='TO_HOSPITAL' || activeTrip?.status==='AT_HOSPITAL';
+ const routeDestination=toHospital
+   ? (activeRequest.data && typeof activeRequest.data.hospitalLatitude==='number' && typeof activeRequest.data.hospitalLongitude==='number'
+      ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:destination)
+   : destination;
+ const route=useAmbulanceRoute(origin,destination,!activeTrip);
  const liveRoute=useQuery({
    queryKey:['ambulance-driver','live-route',activeTrip?.id,toHospital?'HOSPITAL':'PICKUP',origin?.latitude.toFixed(3),origin?.longitude.toFixed(3)],
    queryFn:()=>trackingApi.getRoute(activeTrip!.id),
@@ -194,11 +199,7 @@ export const AmbulancePage=()=>{
  const hospital=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedHospital(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
  const complete=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.completeTrip(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
 
- const toHospital=activeTrip?.status==='PATIENT_ONBOARD' || activeTrip?.status==='TO_HOSPITAL' || activeTrip?.status==='AT_HOSPITAL';
- const routeDestination=toHospital
-   ? (activeRequest.data && typeof activeRequest.data.hospitalLatitude==='number' && typeof activeRequest.data.hospitalLongitude==='number'
-      ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:destination)
-   : destination;
+
 
  if(routeMode==='request') {
    return (
