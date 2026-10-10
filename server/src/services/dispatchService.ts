@@ -11,13 +11,14 @@ import { HospitalModel } from '../models/Hospital.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { calculateGoogleRoutes } from './mapsService.js';
 import { broadcastEvent } from './realtimeService.js';
+import { recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
 import { AppError } from '../utils/AppError.js';
 
 export const DISPATCH_ALLOWED_TRANSITIONS = {
   PENDING: ['SEARCHING', 'CANCELLED'],
   SEARCHING: ['OFFERED', 'EXHAUSTED', 'PENDING', 'CANCELLED'],
   OFFERED: ['PENDING', 'ACCEPTED', 'CANCELLED'],
-  ACCEPTED: ['CANCELLED'],
+  ACCEPTED: ['CANCELLED', 'PENDING'],
   EXHAUSTED: ['PENDING', 'ESCALATED', 'CANCELLED'],
   CANCELLED: [],
   ESCALATED: ['PENDING', 'CANCELLED'],
@@ -564,6 +565,8 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
   if (!jobBefore) throw new AppError('DISPATCH_NOT_FOUND', 'Dispatch job not found', 404);
   if (jobBefore.status === 'ACCEPTED' && jobBefore.currentDriverId && String(jobBefore.currentDriverId) === String(did) && jobBefore.acceptedTripId) {
     const existing = await TripModel.findById(jobBefore.acceptedTripId).lean().exec();
+    try { await recordHospitalCoordinationEvent({ emergencyId: String(existing.emergencyRequestId), tripId: String(existing._id), type: 'AMBULANCE_ASSIGNED' }); }
+    catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
     if (existing) return { dispatchJobId: String(jid), tripId: String(existing._id), emergencyRequestId: String(existing.emergencyRequestId), status: 'ACCEPTED' as const, duplicate: true };
   }
   if (!isDispatchOfferAcceptable(jobBefore.status, jobBefore.deadlineAt, now) || String(jobBefore.currentDriverId) !== String(did) || !jobBefore.currentAttemptId) {
@@ -595,7 +598,7 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
       }
       const activeTrip = await TripModel.exists({ status: { $in: DISPATCH_ACTIVE_TRIP_STATUSES }, $or: [{ ambulanceId: attempt.ambulanceId }, { driverId: did }] }).session(session).exec();
       if (activeTrip) throw new AppError('ACTIVE_TRIP_EXISTS', 'Driver or ambulance already has an active trip', 409);
-      const existingTrip = await TripModel.findOne({ emergencyRequestId: job.emergencyRequestId }).session(session).lean().exec();
+      const existingTrip = await TripModel.findOne({ emergencyRequestId: job.emergencyRequestId, status: { $in: DISPATCH_ACTIVE_TRIP_STATUSES } }).session(session).lean().exec();
       if (existingTrip) throw new AppError('TRIP_ALREADY_EXISTS', 'An active or historical trip already exists for this emergency', 409);
       const hospital = await HospitalModel.findOne({ _id: job.hospitalId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED', emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] } }).select('hospitalType services capabilities').session(session).lean().exec();
       if (!hospital || !hospitalMatchesDispatchCategory(hospital, job.category)) throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Selected hospital is no longer eligible; do not transport the patient to this destination', 409);
@@ -635,6 +638,8 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
   }
   const acceptedResult = result as { tripId: string; emergencyRequestId: string; hospitalId: string; requestCode: string; etaMinutes?: number; routeSource: string } | null;
   if (!acceptedResult) throw new AppError('DISPATCH_ACCEPT_FAILED', 'Offer acceptance could not be committed', 500);
+  try { await recordHospitalCoordinationEvent({ emergencyId: acceptedResult.emergencyRequestId, tripId: acceptedResult.tripId, type: 'AMBULANCE_ASSIGNED' }); }
+  catch (error) { console.error('Hospital assignment notification will reconcile from persisted trip:', error instanceof Error ? error.message : 'notification persistence failed'); }
   const acceptedEvent = { event: 'QUEUE_REFRESH', status: 'AMBULANCE_ASSIGNED', timestamp: new Date().toISOString() };
   broadcastEvent(`hospital:${acceptedResult.hospitalId}`, 'hospital:incoming-patient', acceptedEvent);
   broadcastEvent('operations', 'dispatch:accepted', { event: 'QUEUE_REFRESH', status: 'ACCEPTED', timestamp: acceptedEvent.timestamp });
