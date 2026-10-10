@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import jwt from 'jsonwebtoken';
 import mongoose, { Types } from 'mongoose';
 import { io as connectSocket, type Socket } from 'socket.io-client';
+import type { TrackingEnvelope } from '../src/services/trackingSocket.js';
 import { UserModel } from './models/User.js';
 import { HospitalModel } from './models/Hospital.js';
 import { AmbulanceProviderModel } from './models/AmbulanceProvider.js';
@@ -172,6 +173,40 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     const hospitalSnapshot = (await hospitalSnapshotResponse.json() as { data: { trip: { status: string }; location: { updatedAt: string } } }).data;
     assert.equal(userSnapshot.trip.status, hospitalSnapshot.trip.status);
     assert.equal(userSnapshot.location.updatedAt, hospitalSnapshot.location.updatedAt, 'user and hospital snapshots must share the persisted GPS timestamp');
+    const firstHospitalNotification = new Promise<TrackingEnvelope<{ id: string; type: string }>>((resolve) => hospitalSocket.once('hospital:coordination-notification', resolve));
+    const secondHospitalNotification = new Promise<TrackingEnvelope<{ id: string; type: string }>>((resolve) => hospitalSecondSocket.once('hospital:coordination-notification', resolve));
+    const { recordHospitalCoordinationEvent } = await import('./services/hospitalCoordinationService.js');
+    const firstPersistedAlert = await recordHospitalCoordinationEvent({ emergencyId: String(emergencyId), tripId: String(tripId), type: 'AMBULANCE_ASSIGNED' });
+    const duplicatePersistedAlert = await recordHospitalCoordinationEvent({ emergencyId: String(emergencyId), tripId: String(tripId), type: 'AMBULANCE_ASSIGNED' });
+    assert.equal(firstPersistedAlert?.id, duplicatePersistedAlert?.id, 'duplicate lifecycle events must reuse the same notification record');
+    assert.equal(await HospitalCoordinationNotificationModel.countDocuments({ emergencyId, type: 'AMBULANCE_ASSIGNED' }), 1, 'unique notification record is persisted exactly once');
+    const [firstNotice, secondNotice] = await Promise.all([firstHospitalNotification, secondHospitalNotification]);
+    assert.equal(firstNotice.data.id, firstPersistedAlert?.id);
+    assert.equal(secondNotice.data.id, firstPersistedAlert?.id, 'all active sessions for this hospital receive the persisted event');
+    assert.equal((await HospitalPatientModel.findOne({ emergencyId }).lean().exec())?.coordinationStatus, 'HOSPITAL_NOTIFIED');
+
+    const hospitalCookie = { Cookie: 'resq_access_token=' + encodeURIComponent(hospitalToken) };
+    const inboxFirst = await fetch(url + '/api/v1/hospital/coordination/notifications?state=UNREAD', { headers: hospitalCookie });
+    assert.equal(inboxFirst.status, 200);
+    const inboxFirstData = (await inboxFirst.json() as { data: { items: Array<{ id: string; type: string; state: string }>; unreadCount: number } }).data;
+    assert.equal(inboxFirstData.items.filter((item) => item.id === firstPersistedAlert?.id).length, 1);
+    assert.ok(inboxFirstData.unreadCount >= 1, 'persisted unread count is available independently of realtime delivery');
+    const inboxRefresh = await fetch(url + '/api/v1/hospital/coordination/notifications?state=UNREAD', { headers: hospitalCookie });
+    const inboxRefreshData = (await inboxRefresh.json() as { data: { items: Array<{ id: string }> } }).data;
+    assert.equal(inboxRefreshData.items.filter((item) => item.id === firstPersistedAlert?.id).length, 1, 'browser refresh recovers the same record without creating duplicates');
+
+    const otherHospitalCookie = { Cookie: 'resq_access_token=' + encodeURIComponent(otherHospitalToken) };
+    const crossHospitalDetail = await fetch(url + '/api/v1/hospital/coordination/emergencies/' + emergencyId, { headers: otherHospitalCookie });
+    assert.equal(crossHospitalDetail.status, 404, 'another hospital cannot read this emergency detail');
+    const crossHospitalAck = await fetch(url + '/api/v1/hospital/coordination/notifications/' + firstPersistedAlert?.id + '/acknowledge', { method: 'POST', headers: { ...otherHospitalCookie, 'Content-Type': 'application/json' }, body: '{}' });
+    assert.equal(crossHospitalAck.status, 404, 'another hospital cannot acknowledge this notification');
+    const acknowledged = await fetch(url + '/api/v1/hospital/coordination/notifications/' + firstPersistedAlert?.id + '/acknowledge', { method: 'POST', headers: { ...hospitalCookie, 'Content-Type': 'application/json' }, body: '{}' });
+    assert.equal(acknowledged.status, 200);
+    assert.equal(((await acknowledged.json() as { data: { state: string } }).data).state, 'ACKNOWLEDGED');
+    const inboxAfterAck = await fetch(url + '/api/v1/hospital/coordination/notifications?state=ALL', { headers: hospitalCookie });
+    const inboxAfterAckData = (await inboxAfterAck.json() as { data: { items: Array<{ id: string; state: string }> } }).data;
+    assert.equal(inboxAfterAckData.items.find((item) => item.id === firstPersistedAlert?.id)?.state, 'ACKNOWLEDGED', 'acknowledgement state survives a refresh');
+
 
     const userLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => userSocket.once('tracking:location', resolve));
     const hospitalLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => hospitalSocket.once('tracking:location', resolve));
