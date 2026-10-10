@@ -36,7 +36,7 @@ const canAccessTrip = async (identity: AuthenticatedIdentity, tripId: Types.Obje
 const canAccessEmergency = async (identity: AuthenticatedIdentity, id: Types.ObjectId): Promise<boolean> => {
   const emergency = await EmergencyRequestModel.findById(id).select('userId hospitalId ambulanceProviderId').lean().exec();
   if (!emergency) return false;
-  const trip = await TripModel.findOne({ emergencyRequestId: id }).select('driverId providerId').lean().exec();
+  const trip = await TripModel.findOne({ emergencyRequestId: id }).select('driverId providerId destinationHospitalId').lean().exec();
   return canAccessTrackingSnapshot(identity, emergency, trip);
 };
 const authorized = async (identity: AuthenticatedIdentity, request: RoomRequest): Promise<boolean> => {
@@ -101,7 +101,33 @@ export const publishSocketEvent = (channel: string, event: string, envelope: Env
   else if (/^trip:[a-f0-9]{24}$/i.test(channel)) room = channel;
   else if (/^hospital:[a-f0-9]{24}$/i.test(channel)) room = channel.replace(/^hospital:/, 'hospital-operations:');
   if (room) {
-    io.to(room).emit(event, envelope);
+    const raw = envelope.data && typeof envelope.data === 'object' ? envelope.data as Record<string, unknown> : {};
+    let data: unknown = envelope.data;
+    if (event === 'tracking:status') {
+      data = {
+        tripId: typeof raw.id === 'string' ? raw.id : typeof raw.tripId === 'string' ? raw.tripId : undefined,
+        emergencyRequestId: raw.emergencyRequestId,
+        status: raw.status,
+        acceptedAt: raw.acceptedAt,
+        arrivedAtPickupAt: raw.arrivedAtPickupAt,
+        patientPickedUpAt: raw.patientPickedUpAt,
+        arrivedAtHospitalAt: raw.arrivedAtHospitalAt,
+        completedAt: raw.completedAt,
+        updatedAt: raw.updatedAt,
+      };
+    } else if (event === 'dispatch:accepted' || event === 'hospital:incoming-patient') {
+      data = {
+        tripId: typeof raw.tripId === 'string' ? raw.tripId : typeof raw.id === 'string' ? raw.id : undefined,
+        emergencyRequestId: raw.emergencyRequestId,
+        hospitalId: raw.hospitalId ?? raw.destinationHospitalId,
+        status: raw.status,
+        requestCode: raw.requestCode,
+      };
+    } else if (event === 'dispatch:declined') {
+      data = { emergencyRequestId: raw.id, requestCode: raw.requestCode, status: raw.status };
+    }
+    const socketEnvelope = { ...envelope, data };
+    io.to(room).emit(event, socketEnvelope);
     const status = envelope.data && typeof envelope.data === 'object' && 'status' in envelope.data ? String((envelope.data as { status: unknown }).status) : '';
     if (room.startsWith('trip:') && event === 'tracking:status' && ['COMPLETED', 'CANCELLED'].includes(status)) {
       // Deliver the terminal state once, then remove every socket from the trip room.
