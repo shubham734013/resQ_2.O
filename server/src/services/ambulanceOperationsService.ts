@@ -93,6 +93,7 @@ export const getProviderRequest = async (pid: string, id: string) => {
 };
 export const assignRequest = async (pid: string, rid: string, aid: string) => {
   await operationalProvider(pid);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(rid, 'request') })) throw new AppError('DISPATCH_ENGINE_MANAGED', 'This request is controlled by the automatic dispatch engine. Use dispatch job operations instead of legacy direct assignment.', 409);
   const p = oid(pid, 'provider'), aId = oid(aid, 'ambulance');
   const a = await AmbulanceModel.findOne({ _id: aId, providerId: p, currentStatus: 'AVAILABLE', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE' }).exec();
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Ambulance is unavailable or not verified', 409);
@@ -126,6 +127,7 @@ export const getDriverRequest = async (did: string, id: string) => {
 };
 export const acceptRequest = async (did: string, id: string) => {
   const d = await operationalDriver(did);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(id, 'request') })) throw new AppError('DISPATCH_OFFER_REQUIRED', 'This request must be accepted through its authenticated, unexpired dispatch offer.', 409);
   if (d.availabilityStatus === 'OFFLINE' || !d.assignedAmbulanceId) throw new AppError('DRIVER_UNAVAILABLE', 'Driver is offline or has no assigned ambulance', 409);
   const a = await AmbulanceModel.findOne({ _id: d.assignedAmbulanceId, providerId: d.providerId, currentStatus: 'BUSY', verificationStatus: 'VERIFIED', accountStatus: 'ACTIVE' }).exec();
   if (!a) throw new AppError('AMBULANCE_UNAVAILABLE', 'Assigned ambulance is not operational', 409);
@@ -143,6 +145,7 @@ export const acceptRequest = async (did: string, id: string) => {
 };
 export const rejectRequest = async (did: string, id: string) => {
   const d = await operationalDriver(did);
+  if (await DispatchJobModel.exists({ emergencyRequestId: oid(id, 'request') })) throw new AppError('DISPATCH_OFFER_REQUIRED', 'This request must be rejected through its authenticated dispatch offer.', 409);
   const x = await EmergencyRequestModel.findOneAndUpdate({ _id: oid(id, 'request'), status: 'AMBULANCE_COORDINATION', driverId: { $exists: false }, ambulanceId: d.assignedAmbulanceId }, { $unset: { ambulanceId: 1, ambulanceProviderId: 1 } }, { new: true }).lean().exec();
   if (!x) throw new AppError('REQUEST_ALREADY_ASSIGNED', 'Request is no longer available', 409);
   const a = d.assignedAmbulanceId ? await AmbulanceModel.findOne({ _id: d.assignedAmbulanceId, providerId: d.providerId }).exec() : null;
