@@ -31,6 +31,7 @@ export interface EmergencyRequestDocument {
   driverId?: Types.ObjectId;
   patientId?: Types.ObjectId;
   etaMinutes?: number;
+  routeDistanceMeters?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +61,7 @@ const schema = new Schema<EmergencyRequestDocument>({
   driverId: { type: Schema.Types.ObjectId, ref: 'AmbulanceDriver', index: true },
   patientId: { type: Schema.Types.ObjectId, ref: 'HospitalPatient', index: true },
   etaMinutes: Number,
+  routeDistanceMeters: Number,
 }, { timestamps: true });
 
 schema.index({ idempotencyKey: 1 }, { unique: true, sparse: true, name: 'emergency_idempotency_key_unique' });
