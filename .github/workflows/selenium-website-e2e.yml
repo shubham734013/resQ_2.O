@@ -72,7 +72,7 @@ jobs:
         uses: browser-actions/setup-chrome@v1
 
       - name: Remove runner ChromeDriver if its version differs from the provisioned browser
-        run: sudo rm -f /usr/local/bin/chromedriver
+        run: sudo rm -f /usr/local/bin/chromedriver /usr/bin/chromedriver
 
       - name: Export Chrome binary path
         run: echo "CHROME_BIN=${{ steps.setup-chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
