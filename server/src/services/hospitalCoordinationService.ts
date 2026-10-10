@@ -80,7 +80,7 @@ export const recordHospitalCoordinationEvent = async ({ emergencyId, tripId, typ
   if (emergency.status === 'CANCELLED' && type !== 'EMERGENCY_CANCELLED') return null;
 
   const trip = tripId
-    ? await TripModel.findOne({ _id: idOf(tripId, 'trip'), emergencyRequestId: emergencyObjectId, destinationHospitalId: emergency.hospitalId }).select('_id status ambulanceId destinationHospitalId').lean().exec()
+    ? await TripModel.findOne({ _id: idOf(tripId, 'trip'), emergencyRequestId: emergencyObjectId, destinationHospitalId: emergency.hospitalId }).select('_id status ambulanceId destinationHospitalId createdAt').lean().exec()
     : await TripModel.findOne({ emergencyRequestId: emergencyObjectId, destinationHospitalId: emergency.hospitalId }).sort({ createdAt: -1 }).select('_id status ambulanceId destinationHospitalId').lean().exec();
   if (tripId && !trip) throw new AppError('COORDINATION_TRIP_MISMATCH', 'Trip does not belong to this hospital emergency.', 409);
   if (trip && String(trip.destinationHospitalId) !== String(emergency.hospitalId)) throw new AppError('COORDINATION_HOSPITAL_MISMATCH', 'Trip destination does not match the selected hospital.', 409);
