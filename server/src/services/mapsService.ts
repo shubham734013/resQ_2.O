@@ -19,7 +19,47 @@ interface GoogleRoute {
   polyline?: { encodedPolyline?: string };
   legs?: Array<{ steps?: GoogleStep[] }>;
 }
-interface GoogleRoutesResponse { routes?: GoogleRoute[]; }
+interface GoogleRoutesResponse extends GoogleApiErrorPayload { routes?: GoogleRoute[]; }
+interface GoogleApiErrorPayload {
+  error?: {
+    status?: string;
+    message?: string;
+    details?: Array<{ reason?: string; metadata?: Record<string, unknown> }>;
+  };
+}
+
+export const describeGoogleRoutesFailure = (httpStatus: number, payload: GoogleApiErrorPayload | null): { code: string; message: string; statusCode: number } => {
+  const googleStatus = payload?.error?.status?.toUpperCase() ?? '';
+  const reasons = (payload?.error?.details ?? []).map((detail) => String(detail.reason ?? '')).join(' ').toUpperCase();
+
+  if (httpStatus === 401 || httpStatus === 403 || googleStatus === 'PERMISSION_DENIED' || /API_KEY|SERVICE_DISABLED|BILLING/.test(reasons)) {
+    return {
+      code: 'ROUTES_API_CONFIGURATION_ERROR',
+      message: 'Google Routes API rejected the server key. Check that Routes API is enabled, billing is active, and the server key is allowed to use Routes API.',
+      statusCode: 502,
+    };
+  }
+  if (httpStatus === 429 || googleStatus === 'RESOURCE_EXHAUSTED') {
+    return {
+      code: 'ROUTES_API_QUOTA_EXCEEDED',
+      message: 'Google Routes API quota or rate limit was reached. Check Google Cloud quotas and billing, then retry.',
+      statusCode: 503,
+    };
+  }
+  if (httpStatus === 400 || googleStatus === 'INVALID_ARGUMENT') {
+    return {
+      code: 'ROUTES_API_INVALID_REQUEST',
+      message: 'Google Routes API rejected the route request. Check the selected travel mode and origin/destination coordinates.',
+      statusCode: 400,
+    };
+  }
+  return {
+    code: 'ROUTE_PROVIDER_UNAVAILABLE',
+    message: 'Google Routes could not calculate a route right now. Check server connectivity and Google Maps Platform status, then retry.',
+    statusCode: 502,
+  };
+};
+
 
 const decodePolyline = (encoded: string): Array<{ latitude: number; longitude: number }> => {
   const points: Array<{ latitude: number; longitude: number }> = [];
@@ -75,7 +115,7 @@ export const calculateGoogleRoutes = async (input: RouteInput) => {
   const apiKey = (env.GOOGLE_ROUTES_API_KEY || env.GOOGLE_MAPS_SERVER_API_KEY)?.trim();
   if (!apiKey) throw new AppError('MAPS_API_KEY_MISSING', 'Server-side Google Maps key is not configured', 503);
 
-  const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+  let response: Response;\n  try {\n    response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
