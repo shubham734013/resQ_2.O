@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
+    "seed:demo": "tsx src/scripts/seedDemoData.ts",
     "audit:db": "tsx src/scripts/auditDatabase.ts",
     "repair:test-data": "tsx src/scripts/repairTestData.ts",
     "enrich:hospital-coords": "tsx src/scripts/enrichHospitalCoordinates.ts",
