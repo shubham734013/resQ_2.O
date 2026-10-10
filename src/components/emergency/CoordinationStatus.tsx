@@ -14,6 +14,7 @@ import {
   AlertOctagon,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Facility } from '../../types/facility';
 import { emergencyApi } from '../../services/emergencyApi';
 import { Button } from '../common/Button';
@@ -36,6 +37,7 @@ export const CoordinationStatus = ({
   className = '',
 }: CoordinationStatusProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showExitModal, setShowExitModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -48,7 +50,8 @@ export const CoordinationStatus = ({
   });
 
   const data = request.data;
-  const ready = Boolean(data);
+  const requestSubmitted = Boolean(emergencyRequestId);
+  const ready = Boolean(data) || (requestSubmitted && !request.isError);
   const isCancellable =
     ready &&
     data?.status &&
@@ -65,11 +68,15 @@ export const CoordinationStatus = ({
             ? 'Resolved'
             : data?.status === 'CANCELLED'
               ? 'Cancelled'
-              : ready
-                ? 'Received by hospital queue'
-                : isCreatingRequest
-                  ? 'Creating emergency request'
-                  : 'Emergency request not created';
+              : requestSubmitted && request.isError
+                ? 'Request saved · status unavailable'
+                : requestSubmitted && request.isLoading
+                  ? 'Request saved · loading status'
+                  : ready
+                    ? 'Received by hospital queue'
+                    : isCreatingRequest
+                      ? 'Creating emergency request'
+                      : 'Emergency request not created';
 
   const callHospital = () => {
     if (facility.phone) window.location.href = `tel:${facility.phone.replace(/[^0-9+]/g, '')}`;
@@ -92,6 +99,8 @@ export const CoordinationStatus = ({
     setCancelError(null);
     try {
       await emergencyApi.cancel(emergencyRequestId);
+      await queryClient.invalidateQueries({ queryKey: ['emergency-requests'] });
+      await queryClient.invalidateQueries({ queryKey: ['emergency-request', emergencyRequestId] });
       setShowExitModal(false);
       onExit();
     } catch (err) {
@@ -135,7 +144,7 @@ export const CoordinationStatus = ({
         {ready && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800">ResQ request</p>
-            <p className="mt-1 font-bold text-emerald-950">{data?.requestCode}</p>
+            <p className="mt-1 font-bold text-emerald-950">{data?.requestCode ?? emergencyRequestId}</p>
             <p className="mt-1 text-xs text-emerald-800">
               Persisted in the selected hospital&apos;s emergency queue. Hospital response controls the next coordination step.
             </p>
