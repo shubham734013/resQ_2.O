@@ -50,7 +50,7 @@ test('driving ETA ranks ahead of straight-line fallback and route ETA ranks rout
 
 test('driver location freshness rejects stale and implausibly future-dated telemetry', () => {
   const now = new Date('2026-10-10T10:00:00.000Z');
-  assert.equal(isDispatchLocationFresh(new Date(now.getTime() - 30_000), now), true);
+  assert.equal(isDispatchLocationFresh(new Date(now.getTime() - Math.floor(DISPATCH_LOCATION_FRESHNESS_MS / 2)), now), true);
   assert.equal(isDispatchLocationFresh(new Date(now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS - 1), now), false);
   assert.equal(isDispatchLocationFresh(new Date(now.getTime() + 10_000), now), false);
   assert.equal(isDispatchLocationFresh(undefined, now), false);
