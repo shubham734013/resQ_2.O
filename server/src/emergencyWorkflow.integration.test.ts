@@ -19,7 +19,7 @@ const { createEmergencyRequest, cancelUserEmergencyRequest } = await import('./s
 
 test('SOS persists a hospital case, safely replays idempotent requests, rejects key reuse, and cancels both records', { skip: !enabled }, async () => {
   if (!uri) return;
-  const databaseName = new URL(uri).pathname.replace(/^\\//, '').split('?')[0] ?? '';
+  const databaseName = new URL(uri).pathname.replace(/^\//, '').split('?')[0] ?? '';
   assert.match(databaseName, /test|sos/i, 'SOS_TEST_MONGODB_URI must use a dedicated test database');
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
 
