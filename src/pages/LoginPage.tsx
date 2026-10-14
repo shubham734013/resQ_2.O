@@ -50,12 +50,96 @@ export const LoginPage=({admin=false}:{admin?:boolean})=>{
     {!admin&&<div className="mt-5 rounded-lg bg-slate-50 p-1 grid grid-cols-2 sm:grid-cols-4 gap-1" aria-label="Account type">
       {([{value:'USER',label:'User'},{value:'HOSPITAL',label:'Hospital'},{value:'AMBULANCE_PROVIDER',label:'Ambulance Provider'},{value:'AMBULANCE_DRIVER',label:'Ambulance Driver'}] as const).map(option=><button key={option.value} type="button" disabled={isSubmitting} onClick={()=>setRoleHint(option.value)} aria-pressed={roleHint===option.value} className={`min-h-10 rounded-md px-2 text-xs sm:text-sm font-semibold ${roleHint===option.value?'bg-white shadow-sm text-slate-950':'text-slate-500'} disabled:opacity-60`}>{option.label}</button>)}
     </div>}
-    <form onSubmit={handleSubmit} className="mt-5 space-y-4"><label className="block"><span className="text-sm font-medium text-slate-700">Email</span><input required disabled={isSubmitting} value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" className="mt-1.5 w-full h-11 rounded-lg border border-slate-300 px-3 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 disabled:bg-slate-100"/></label><label className="block"><span className="text-sm font-medium text-slate-700">Password</span><input required disabled={isSubmitting} value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" className="mt-1.5 w-full h-11 rounded-lg border border-slate-300 px-3 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 disabled:bg-slate-100"/></label>
+
+    {/* Quick demo account filler for development and testing */}
+    <div className="mt-4 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-2">
+      <div className="flex items-center justify-between text-amber-900 font-semibold">
+        <span>⚡ Quick Demo Credentials</span>
+        <span className="text-[11px] font-normal text-amber-700">1-click fill</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {!admin ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setRoleHint('HOSPITAL');
+                setEmail('demo.hospital@resq.local');
+                setPassword('Password@123');
+                setError('');
+              }}
+              className="px-2 py-1 bg-white hover:bg-amber-100/60 border border-amber-300 rounded text-slate-800 font-medium transition-colors"
+            >
+              🏥 Demo Hospital
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRoleHint('USER');
+                setEmail('demo.user@resq.local');
+                setPassword('Password@123');
+                setError('');
+              }}
+              className="px-2 py-1 bg-white hover:bg-amber-100/60 border border-amber-300 rounded text-slate-800 font-medium transition-colors"
+            >
+              👤 Demo Citizen
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRoleHint('AMBULANCE_DRIVER');
+                setEmail('demo.driver@resq.local');
+                setPassword('Password@123');
+                setError('');
+              }}
+              className="px-2 py-1 bg-white hover:bg-amber-100/60 border border-amber-300 rounded text-slate-800 font-medium transition-colors"
+            >
+              🚑 Demo Driver
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRoleHint('AMBULANCE_PROVIDER');
+                setEmail('demo.provider@resq.local');
+                setPassword('Password@123');
+                setError('');
+              }}
+              className="px-2 py-1 bg-white hover:bg-amber-100/60 border border-amber-300 rounded text-slate-800 font-medium transition-colors"
+            >
+              🏢 Demo Provider
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('admin@resq.local');
+              setPassword('Shubh@m2006734013');
+              setError('');
+            }}
+            className="px-2.5 py-1 bg-white hover:bg-amber-100/60 border border-amber-300 rounded text-slate-800 font-medium transition-colors"
+          >
+            🛡️ Demo Admin Account
+          </button>
+        )}
+      </div>
+    </div>
+
+    <form onSubmit={handleSubmit} className="mt-4 space-y-4"><label className="block"><span className="text-sm font-medium text-slate-700">Email</span><input required disabled={isSubmitting} value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" className="mt-1.5 w-full h-11 rounded-lg border border-slate-300 px-3 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 disabled:bg-slate-100"/></label><label className="block"><span className="text-sm font-medium text-slate-700">Password</span><input required disabled={isSubmitting} value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" className="mt-1.5 w-full h-11 rounded-lg border border-slate-300 px-3 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 disabled:bg-slate-100"/></label>
       {error&&<p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700" role="alert">{error}</p>}
       <button type="submit" disabled={isSubmitting} className="w-full h-11 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-60 inline-flex items-center justify-center gap-2">{isSubmitting&&<Loader2 className="h-4 w-4 animate-spin"/>}{isSubmitting?'Signing in…':'Sign in'}</button>
     </form>
     {!admin&&(roleHint==='USER'||roleHint==='AMBULANCE_PROVIDER')&&<SocialAuthButtons roleHint={roleHint} onSuccess={finishLogin} onError={setError}/>}
-    {!admin&&<p className="mt-6 text-center text-sm text-slate-500">New to ResQ? <Link className="font-semibold text-slate-900 hover:underline" to="/register">Create an account</Link></p>}
-    {admin&&<p className="mt-6 text-center text-sm"><Link className="text-slate-600 hover:text-slate-950" to="/login">Back to standard sign in</Link></p>}
+    
+    <div className="mt-6 pt-5 border-t border-slate-100 text-center space-y-2">
+      <p className="text-sm text-slate-600">
+        Looking for hospitals without signing in?{' '}
+        <Link className="font-semibold text-slate-900 hover:underline inline-flex items-center gap-1" to="/search">
+          Browse Hospital Directory →
+        </Link>
+      </p>
+      {!admin&&<p className="text-xs text-slate-500">New to ResQ? <Link className="font-semibold text-slate-900 hover:underline" to="/register">Create an account</Link></p>}
+      {admin&&<p className="text-xs text-slate-500"><Link className="text-slate-600 hover:text-slate-950" to="/login">Back to standard sign in</Link></p>}
+    </div>
   </section></main>;
 };
