@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bookmark, BookmarkCheck, Navigation, Phone, ShieldAlert } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Navigation, Phone, ShieldAlert, Building2, Calendar } from 'lucide-react';
 import type { Facility } from '../../types/facility';
 import { Button } from '../common/Button';
 import { useRemoveSavedFacility, useSaveFacility, useSavedFacilities } from '../../hooks/useUser';
+import { CareRequestModal } from './CareRequestModal';
+import { AppointmentBookingModal } from './AppointmentBookingModal';
 
 export interface FacilityActionsProps {
   facility: Facility;
@@ -30,6 +32,9 @@ export const FacilityActions = ({
   const [overrideSaved, setOverrideSaved] = useState<boolean | null>(null);
   const isSaved = overrideSaved ?? isServerSaved;
 
+  const [isCareRequestOpen, setIsCareRequestOpen] = useState(false);
+  const [isAppointmentOpen, setIsAppointmentOpen] = useState(false);
+
   const handleDirections = () => {
     if (onDirections) { onDirections(); return; }
     navigate(`/route/${facility.id}${fromEmergency ? '?emergency=true' : ''}`);
@@ -44,21 +49,68 @@ export const FacilityActions = ({
   };
 
   return (
-    <div className={`${isStickyBottom ? 'fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg md:relative md:border-0 md:bg-transparent md:p-0 md:shadow-none' : ''} ${className}`}>
-      <div className="max-w-4xl mx-auto space-y-2">
-        {fromEmergency && (
-          <div className="p-3 bg-rose-50/90 border border-rose-200 rounded-xl space-y-2 text-xs text-rose-950">
-            <div className="flex items-center gap-1.5 font-semibold text-rose-900"><ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" /><span>Emergency Coordination Flow Active</span></div>
-            <p className="text-[11px] text-rose-800 leading-relaxed">You selected this facility from the Emergency Flow. Lock in this facility to continue coordination.</p>
-            <Button variant="emergency" size="sm" fullWidth onClick={() => navigate(`/sos?facility=${facility.id}`)} icon={<ShieldAlert className="w-3.5 h-3.5 text-white" />} aria-label={`Confirm emergency coordination with ${facility.name}`}>Continue Coordination with this Facility</Button>
+    <>
+      <div className={`${isStickyBottom ? 'fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg md:relative md:border-0 md:bg-transparent md:p-0 md:shadow-none' : ''} ${className}`}>
+        <div className="max-w-4xl mx-auto space-y-2.5">
+          {fromEmergency && (
+            <div className="p-3 bg-rose-50/90 border border-rose-200 rounded-xl space-y-2 text-xs text-rose-950">
+              <div className="flex items-center gap-1.5 font-semibold text-rose-900"><ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" /><span>Emergency Coordination Flow Active</span></div>
+              <p className="text-[11px] text-rose-800 leading-relaxed">You selected this facility from the Emergency Flow. Lock in this facility to continue coordination.</p>
+              <Button variant="emergency" size="sm" fullWidth onClick={() => navigate(`/sos?facility=${facility.id}`)} icon={<ShieldAlert className="w-3.5 h-3.5 text-white" />} aria-label={`Confirm emergency coordination with ${facility.name}`}>Continue Coordination with this Facility</Button>
+            </div>
+          )}
+
+          {/* Primary Action Buttons for Normal Healthcare Requests and Appointments */}
+          {!fromEmergency && (
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="md"
+                icon={<Building2 className="w-4 h-4 text-blue-600" />}
+                onClick={() => setIsCareRequestOpen(true)}
+                aria-label={`Request direct non-emergency care from ${facility.name}`}
+                className="w-full text-slate-800 border-slate-300 hover:bg-blue-50 hover:border-blue-300"
+              >
+                Request Care
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
+                icon={<Calendar className="w-4 h-4 text-indigo-600" />}
+                onClick={() => setIsAppointmentOpen(true)}
+                aria-label={`Book appointment at ${facility.name}`}
+                className="w-full text-slate-800 border-slate-300 hover:bg-indigo-50 hover:border-indigo-300"
+              >
+                Book Appointment
+              </Button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="md" icon={<Phone className="w-4 h-4" />} onClick={handleCall} aria-label={`Call ${facility.name} at ${facility.phone}`} className="flex-1">Call</Button>
+            <Button variant="outline" size="md" icon={isSaved ? <BookmarkCheck className="w-4 h-4 text-emerald-600"/> : <Bookmark className="w-4 h-4"/>} onClick={toggleSaved} disabled={save.isPending||remove.isPending} aria-label={isSaved ? `Remove ${facility.name} from saved facilities` : `Save ${facility.name}`}>{isSaved ? 'Saved' : 'Save'}</Button>
+            <Button variant="primary" size="md" icon={<Navigation className="w-4 h-4" />} onClick={handleDirections} aria-label={`Get directions to ${facility.name}`} className="flex-1">Get Directions</Button>
           </div>
-        )}
-        <div className="flex items-center gap-2.5">
-          <Button variant="secondary" size="lg" icon={<Phone className="w-4 h-4" />} onClick={handleCall} aria-label={`Call ${facility.name} at ${facility.phone}`} className="flex-1">Call</Button>
-          <Button variant="outline" size="lg" icon={isSaved ? <BookmarkCheck className="w-4 h-4"/> : <Bookmark className="w-4 h-4"/>} onClick={toggleSaved} disabled={save.isPending||remove.isPending} aria-label={isSaved ? `Remove ${facility.name} from saved facilities` : `Save ${facility.name}`}>{isSaved ? 'Saved' : 'Save'}</Button>
-          <Button variant="primary" size="lg" icon={<Navigation className="w-4 h-4" />} onClick={handleDirections} aria-label={`Get directions to ${facility.name}`} className="flex-1">Get Directions</Button>
         </div>
       </div>
-    </div>
+
+      {/* Direct Care Request Modal */}
+      <CareRequestModal
+        facility={facility}
+        isOpen={isCareRequestOpen}
+        onClose={() => setIsCareRequestOpen(false)}
+      />
+
+      {/* Appointment Booking Modal */}
+      <AppointmentBookingModal
+        facility={facility}
+        isOpen={isAppointmentOpen}
+        onClose={() => setIsAppointmentOpen(false)}
+        onSwitchToCareRequest={() => {
+          setIsAppointmentOpen(false);
+          setIsCareRequestOpen(true);
+        }}
+      />
+    </>
   );
 };

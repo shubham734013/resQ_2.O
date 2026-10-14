@@ -41,17 +41,23 @@ Maps/location:
 
 The backend is authoritative for authentication, ownership, role permissions, operational state, and lifecycle transitions.
 
-## Emergency lifecycle
+## Independent Core Workflows
 
-USER → facility discovery → situation selection → location confirmation → facility recommendation → emergency request → HOSPITAL review → preparation → ambulance coordination → PROVIDER dispatch → DRIVER acceptance → pickup → patient onboard → hospital arrival → handover → trip completion → emergency resolution.
+### Workflow A: Emergency SOS & Dispatch (Core Realtime EMS)
+USER → facility discovery → situation selection → location confirmation → facility recommendation → emergency request (`RSQ-...`) → HOSPITAL review → preparation → ambulance coordination → PROVIDER dispatch → DRIVER acceptance → pickup → patient onboard → hospital arrival → handover → trip completion → emergency resolution.
 
 Emergency statuses:
-RECEIVED, REVIEWING, PREPARING, AMBULANCE_COORDINATION, RESOLVED, CANCELLED.
+`RECEIVED`, `REVIEWING`, `PREPARING`, `AMBULANCE_COORDINATION`, `RESOLVED`, `CANCELLED`.
 
 Trip statuses:
-ASSIGNED, ACCEPTED, TO_PICKUP, AT_PICKUP, PATIENT_ONBOARD, TO_HOSPITAL, AT_HOSPITAL, COMPLETED, CANCELLED.
+`ASSIGNED`, `ACCEPTED`, `TO_PICKUP`, `AT_PICKUP`, `PATIENT_ONBOARD`, `TO_HOSPITAL`, `AT_HOSPITAL`, `COMPLETED`, `CANCELLED`.
 
-Critical cancellation and trip-completion paths use MongoDB transactions.
+Critical cancellation and trip-completion paths use multi-document MongoDB transactions.
+
+### Workflow B: Direct Hospital Requests & Appointments (Non-Emergency Care)
+CITIZEN → select hospital facility → submit non-emergency care request (`REQ-...`) or select appointment slot (`APT-...`) → atomic concurrency-safe reservation (`bookedCount < maxCapacity`) → HOSPITAL review → accept with instructions / reject with reason / propose alternative slot → real-time notifications to citizen and hospital.
+
+**Strict Separation Guarantee**: Normal care requests never create ambulance dispatch jobs, trips, or emergency-priority alerts. Emergency SOS remains completely prominent, functional, and isolated.
 
 ## Live ambulance location
 
@@ -101,9 +107,9 @@ Backend:
 
 Comprehensive audit matrices, technical reports, test evidence, and deployment checklists are maintained in the `docs/` directory:
 
-1. **[Feature Audit Matrix](docs/RESQ_FEATURE_AUDIT.md)**: Feature-by-feature evaluation across Citizen, Hospital, Provider, Driver, and Admin portals.
-2. **[Implementation Report](docs/RESQ_IMPLEMENTATION_REPORT.md)**: Code changes, database isolation guards, and architectural completions.
-3. **[Test Evidence & Quality Gates](docs/RESQ_TEST_EVIDENCE.md)**: Full logs and execution evidence for 136 backend tests, 29 Selenium browser tests, and live lifecycle verification.
+1. **[Feature Audit Matrix](docs/RESQ_FEATURE_AUDIT.md)**: Feature-by-feature evaluation across Citizen, Hospital, Provider, Driver, Admin, and Normal Care portals.
+2. **[Implementation Report](docs/RESQ_IMPLEMENTATION_REPORT.md)**: Code changes, database isolation guards, concurrency controls, and architectural completions.
+3. **[Test Evidence & Quality Gates](docs/RESQ_TEST_EVIDENCE.md)**: Full logs and execution evidence for 154 backend tests, 33 Selenium browser tests, and live lifecycle verification.
 4. **[Deployment & Production Checklist](docs/RESQ_DEPLOYMENT_CHECKLIST.md)**: Environment variable specifications, database indexing, and health checks.
 
 ## Environment

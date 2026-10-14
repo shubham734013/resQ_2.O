@@ -66,3 +66,56 @@ hospitalRouter.get('/ambulances/:id', getAmbulanceController);
 hospitalRouter.get('/coordination/notifications', validateQuery(hospitalCoordinationNotificationListQuerySchema), listCoordinationNotificationsController);
 hospitalRouter.post('/coordination/notifications/:id/acknowledge', acknowledgeCoordinationNotificationController);
 hospitalRouter.get('/coordination/emergencies/:id', getCoordinationDetailController);
+
+// Hospital Care Notifications
+import {
+  listHospitalNotificationsController,
+  markHospitalNotificationReadController,
+} from '../controllers/hospitalCareNotificationController.js';
+
+hospitalRouter.get('/notifications', listHospitalNotificationsController);
+hospitalRouter.post('/notifications/:id/read', markHospitalNotificationReadController);
+
+// Hospital Care Requests
+import {
+  listIncomingCareRequestsController,
+  getHospitalCareRequestByIdController,
+  respondCareRequestController,
+} from '../controllers/hospitalCareRequestController.js';
+import {
+  respondCareRequestSchema,
+  listCareRequestsQuerySchema,
+} from '../schemas/hospitalCareRequest.js';
+
+hospitalRouter.get('/care-requests', validateQuery(listCareRequestsQuerySchema), listIncomingCareRequestsController);
+hospitalRouter.get('/care-requests/:id', getHospitalCareRequestByIdController);
+hospitalRouter.post('/care-requests/:id/respond', validateBody(respondCareRequestSchema), respondCareRequestController);
+
+// Hospital Appointments & Availability
+import {
+  listHospitalAppointmentsController,
+  getHospitalAppointmentByIdController,
+  confirmHospitalAppointmentController,
+  rejectHospitalAppointmentController,
+  proposeAlternativeSlotController,
+  completeHospitalAppointmentController,
+  getHospitalAvailabilitySettingsController,
+  updateHospitalAvailabilitySettingsController,
+} from '../controllers/hospitalAppointmentController.js';
+import {
+  listAppointmentsQuerySchema,
+  confirmAppointmentSchema,
+  rejectAppointmentSchema,
+  proposeAlternativeSlotSchema,
+  updateAvailabilitySchema,
+} from '../schemas/hospitalAppointment.js';
+
+hospitalRouter.get('/appointments', validateQuery(listAppointmentsQuerySchema), listHospitalAppointmentsController);
+hospitalRouter.get('/appointments/:id', getHospitalAppointmentByIdController);
+hospitalRouter.post('/appointments/:id/confirm', validateBody(confirmAppointmentSchema), confirmHospitalAppointmentController);
+hospitalRouter.post('/appointments/:id/reject', validateBody(rejectAppointmentSchema), rejectHospitalAppointmentController);
+hospitalRouter.post('/appointments/:id/propose-alternative', validateBody(proposeAlternativeSlotSchema), proposeAlternativeSlotController);
+hospitalRouter.post('/appointments/:id/complete', completeHospitalAppointmentController);
+hospitalRouter.get('/appointment-availability', getHospitalAvailabilitySettingsController);
+hospitalRouter.put('/appointment-availability', validateBody(updateAvailabilitySchema), updateHospitalAvailabilitySettingsController);
+

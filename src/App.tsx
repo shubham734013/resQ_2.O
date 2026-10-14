@@ -12,6 +12,8 @@ import { EmergencyPage } from './pages/EmergencyPage';
 import { FacilityDetailPage } from './pages/FacilityDetailPage';
 import { RouteNavigationPage } from './pages/RouteNavigationPage';
 import { HospitalPage } from './pages/HospitalPage';
+import { HospitalAppointmentsPage } from './pages/HospitalAppointmentsPage';
+import { CitizenAppointmentsPage } from './pages/CitizenAppointmentsPage';
 import { AmbulancePage } from './pages/AmbulancePage';
 import { AdminLoginPage, UnauthorizedPage } from './pages/AuthPages';
 import { LoginPage } from './pages/LoginPage';
@@ -51,12 +53,14 @@ export function App() {
         <Route element={<RoleRoute allowedRoles={['USER']} />}>
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/appointments" element={<CitizenAppointmentsPage />} />
+          <Route path="/my-requests" element={<CitizenAppointmentsPage />} />
           <Route path="/sos" element={<EmergencyPage />} />
         </Route>
       </Route>
     </Route>
     <Route element={<ProtectedRoute />}>
-      <Route element={<RoleRoute allowedRoles={['HOSPITAL']} />}><Route path="/hospital" element={<HospitalLayout />}><Route index element={<HospitalPage />} /><Route path="emergencies" element={<HospitalPage />} /><Route path="patients" element={<HospitalPage />} /><Route path="ambulances" element={<HospitalPage />} /><Route path="resources" element={<HospitalPage />} /><Route path="profile" element={<HospitalPage />} /></Route></Route>
+      <Route element={<RoleRoute allowedRoles={['HOSPITAL']} />}><Route path="/hospital" element={<HospitalLayout />}><Route index element={<HospitalPage />} /><Route path="emergencies" element={<HospitalPage />} /><Route path="appointments" element={<HospitalAppointmentsPage />} /><Route path="patients" element={<HospitalPage />} /><Route path="ambulances" element={<HospitalPage />} /><Route path="resources" element={<HospitalPage />} /><Route path="profile" element={<HospitalPage />} /></Route></Route>
       <Route element={<RoleRoute allowedRoles={['AMBULANCE_DRIVER']} />}><Route path="/ambulance/*" element={<AmbulancePage />} /></Route>
       <Route element={<RoleRoute allowedRoles={['AMBULANCE_PROVIDER']} />}><Route path="/ambulance-provider/*" element={<AmbulanceProviderDashboardPage />} /><Route path="/ambulance/provider" element={<AmbulanceProviderDashboardPage />} /></Route>
       <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>

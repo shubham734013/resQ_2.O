@@ -8,7 +8,7 @@ import { TripModel } from '../models/Trip.js';
 import { AppError } from '../utils/AppError.js';
 import { canAccessTrackingSnapshot } from './trackingAuthorization.js';
 
-type RoomRequest = { type: 'emergency' | 'trip' | 'hospital-operations'; id: string };
+type RoomRequest = { type: 'emergency' | 'trip' | 'hospital-operations' | 'user'; id: string };
 type Envelope = { channel: string; event: string; data: unknown; timestamp: string };
 let io: Server | null = null;
 
@@ -23,7 +23,11 @@ const tokenFromSocket = (socket: Socket): string | undefined => {
   try { return decodeURIComponent(item.slice('resq_access_token='.length)); } catch { return undefined; }
 };
 const validId = (id: string) => /^[a-f0-9]{24}$/i.test(id) && Types.ObjectId.isValid(id);
-const roomFor = (request: RoomRequest) => request.type === 'hospital-operations' ? `hospital-operations:${request.id}` : `${request.type}:${request.id}`;
+const roomFor = (request: RoomRequest) => {
+  if (request.type === 'hospital-operations') return `hospital-operations:${request.id}`;
+  if (request.type === 'user') return `user:${request.id}`;
+  return `${request.type}:${request.id}`;
+};
 
 const canAccessTrip = async (identity: AuthenticatedIdentity, tripId: Types.ObjectId): Promise<boolean> => {
   if (identity.role === 'ADMIN') return true;
@@ -43,6 +47,7 @@ const authorized = async (identity: AuthenticatedIdentity, request: RoomRequest)
   if (request.type === 'emergency') return canAccessEmergency(identity, new Types.ObjectId(request.id));
   if (request.type === 'trip') return canAccessTrip(identity, new Types.ObjectId(request.id));
   if (request.type === 'hospital-operations') return identity.role === 'ADMIN' || (identity.role === 'HOSPITAL' && identity.id === request.id);
+  if (request.type === 'user') return identity.role === 'ADMIN' || (identity.role === 'USER' && identity.id === request.id);
   return false;
 };
 
@@ -64,7 +69,7 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
       void (async () => {
         if (!raw || typeof raw !== 'object') { ack?.({ ok: false, error: 'INVALID_SUBSCRIPTION' }); return; }
         const candidate = raw as Partial<RoomRequest>;
-        if (!['emergency', 'trip', 'hospital-operations'].includes(String(candidate.type)) || typeof candidate.id !== 'string') { ack?.({ ok: false, error: 'INVALID_SUBSCRIPTION' }); return; }
+        if (!['emergency', 'trip', 'hospital-operations', 'user'].includes(String(candidate.type)) || typeof candidate.id !== 'string') { ack?.({ ok: false, error: 'INVALID_SUBSCRIPTION' }); return; }
         const request: RoomRequest = { type: candidate.type as RoomRequest['type'], id: candidate.id };
         const identity = socket.data.identity as AuthenticatedIdentity;
         if (!(await authorized(identity, request))) { ack?.({ ok: false, error: 'FORBIDDEN' }); return; }
@@ -77,7 +82,7 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
       void (async () => {
         if (!raw || typeof raw !== 'object') { ack?.({ ok: false }); return; }
         const request = raw as Partial<RoomRequest>;
-        if (!['emergency', 'trip', 'hospital-operations'].includes(String(request.type)) || typeof request.id !== 'string' || !validId(request.id)) { ack?.({ ok: false }); return; }
+        if (!['emergency', 'trip', 'hospital-operations', 'user'].includes(String(request.type)) || typeof request.id !== 'string' || !validId(request.id)) { ack?.({ ok: false }); return; }
         await socket.leave(roomFor(request as RoomRequest));
         ack?.({ ok: true });
       })().catch(() => ack?.({ ok: false }));
@@ -92,6 +97,7 @@ export const publishSocketEvent = (channel: string, event: string, envelope: Env
   if (/^emergency:[a-f0-9]{24}$/i.test(channel)) room = channel;
   else if (/^trip:[a-f0-9]{24}$/i.test(channel)) room = channel;
   else if (/^hospital:[a-f0-9]{24}$/i.test(channel)) room = channel.replace(/^hospital:/, 'hospital-operations:');
+  else if (/^user:[a-f0-9]{24}$/i.test(channel)) room = channel;
   if (room) {
     const raw = envelope.data && typeof envelope.data === 'object' ? envelope.data as Record<string, unknown> : {};
     let data: unknown = envelope.data;
