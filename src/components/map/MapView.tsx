@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { LocateFixed, Minus, Plus, RefreshCw, Layers, Compass } from 'lucide-react';
 import type { MapViewProps } from '../../types/route';
-import type { GoogleMapInstance, GoogleMarkerOverlay, GooglePolyline, GoogleTrafficLayer } from '../../types/googleMaps';
+import type { GoogleMapInstance, GoogleMarkerOverlay, GoogleOverlayView, GooglePolyline, GoogleTrafficLayer, GoogleMapsApi } from '../../types/googleMaps';
 import { loadGoogleMaps } from '../../services/googleMapsLoader';
 
 interface AdvancedMarkerConstructor {
@@ -95,7 +95,7 @@ const createDefaultMarkerElement = (title: string, subtitle?: string, isEmergenc
 };
 
 const createOverlayMarker = (
-  googleMaps: any,
+  googleMaps: GoogleMapsApi,
   map: GoogleMapInstance,
   position: { lat: number; lng: number },
   content: HTMLElement,
@@ -127,7 +127,7 @@ const createOverlayMarker = (
     });
   }
 
-  overlay.onAdd = function () {
+  overlay.onAdd = function (this: GoogleOverlayView) {
     const panes = this.getPanes?.();
     if (panes?.overlayMouseTarget) {
       panes.overlayMouseTarget.appendChild(el);
@@ -136,7 +136,7 @@ const createOverlayMarker = (
     }
   };
 
-  overlay.draw = function () {
+  overlay.draw = function (this: GoogleOverlayView) {
     const projection = this.getProjection?.();
     if (!projection) return;
     const gMaps = (window as unknown as { google?: { maps: { LatLng: new (lat: number, lng: number) => unknown } } })?.google?.maps;
@@ -467,22 +467,9 @@ export const MapView = ({
     };
     void renderOverlays();
     return () => { cancelled = true; };
-  }, [activeRoute, alternativeRoutes, currentStepIndex, destination, isNavigating, markers, status, userLocation]);
+  }, [activeRoute, alternativeRoutes, currentStepIndex, destination, isNavigating, markers, status, userLocation, validMapId]);
 
-  useEffect(() => {
-    if (recenterTrigger && mapRef.current && status === 'ready') {
-      recenter();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recenterTrigger]);
-
-  const changeZoom = (delta: number) => {
-    const next = Math.min(20, Math.max(2, zoomLevel + delta));
-    setZoomLevel(next);
-    mapRef.current?.setZoom(next);
-  };
-
-  const recenter = () => {
+  const recenter = useCallback(() => {
     if (!userLocation) {
       onRecenter?.();
       return;
@@ -496,7 +483,19 @@ export const MapView = ({
     mapRef.current?.setZoom(17);
     setZoomLevel(17);
     onRecenter?.();
+  }, [userLocation, onRecenter]);
+
+  const changeZoom = (delta: number) => {
+    const next = Math.min(20, Math.max(2, zoomLevel + delta));
+    setZoomLevel(next);
+    mapRef.current?.setZoom(next);
   };
+
+  useEffect(() => {
+    if (recenterTrigger && mapRef.current && status === 'ready') {
+      recenter();
+    }
+  }, [recenterTrigger, status, recenter]);
 
   return (
     <div className={`relative w-full min-w-0 h-[320px] sm:h-[400px] lg:h-[520px] overflow-hidden bg-slate-950 ${className}`} role="region" aria-label="Google Maps">

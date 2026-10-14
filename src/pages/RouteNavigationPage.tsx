@@ -80,7 +80,9 @@ export const RouteNavigationPage = () => {
   const hasRealOrigin = Boolean(
     customOrigin || (location && Number.isFinite(location.latitude) && (location.latitude !== 0 || location.longitude !== 0))
   );
-  const originCoords = customOrigin ?? (location ? { latitude: location.latitude, longitude: location.longitude } : null);
+  const originCoords = useMemo(() => (
+    customOrigin ?? (location ? { latitude: location.latitude, longitude: location.longitude } : null)
+  ), [customOrigin, location]);
   const nearbyFacilities = useNearbyFacilities(originCoords?.latitude ?? null, originCoords?.longitude ?? null);
 
   // Facilities list for auto-matching destination search query

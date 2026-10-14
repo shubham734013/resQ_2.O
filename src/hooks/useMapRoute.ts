@@ -128,15 +128,21 @@ export function useMapRoute(
   location: UserLocation | null,
   options?: MapRouteOptions,
 ) {
-  const origin = options?.customOrigin
-    && Number.isFinite(options.customOrigin.latitude) && options.customOrigin.latitude >= -90 && options.customOrigin.latitude <= 90
-    && Number.isFinite(options.customOrigin.longitude) && options.customOrigin.longitude >= -180 && options.customOrigin.longitude <= 180
-    ? { latitude: options.customOrigin.latitude, longitude: options.customOrigin.longitude }
-    : location
-      && Number.isFinite(location.latitude) && location.latitude >= -90 && location.latitude <= 90
-      && Number.isFinite(location.longitude) && location.longitude >= -180 && location.longitude <= 180
-      ? { latitude: location.latitude, longitude: location.longitude }
-      : null;
+  const customOriginLat = options?.customOrigin?.latitude;
+  const customOriginLng = options?.customOrigin?.longitude;
+  const locationLat = location?.latitude;
+  const locationLng = location?.longitude;
+  const origin = useMemo(() => {
+    if (typeof customOriginLat === 'number' && Number.isFinite(customOriginLat) && customOriginLat >= -90 && customOriginLat <= 90
+      && typeof customOriginLng === 'number' && Number.isFinite(customOriginLng) && customOriginLng >= -180 && customOriginLng <= 180) {
+      return { latitude: customOriginLat, longitude: customOriginLng };
+    }
+    if (typeof locationLat === 'number' && Number.isFinite(locationLat) && locationLat >= -90 && locationLat <= 90
+      && typeof locationLng === 'number' && Number.isFinite(locationLng) && locationLng >= -180 && locationLng <= 180) {
+      return { latitude: locationLat, longitude: locationLng };
+    }
+    return null;
+  }, [customOriginLat, customOriginLng, locationLat, locationLng]);
 
   const facilityLat = facility?.latitude;
   const facilityLng = facility?.longitude;
@@ -158,13 +164,24 @@ export function useMapRoute(
     ? { latitude: geocodeFacilityQuery.data.latitude, longitude: geocodeFacilityQuery.data.longitude }
     : null;
 
-  const destination = options?.customDestination
-    ? { latitude: options.customDestination.latitude, longitude: options.customDestination.longitude, name: options.customDestination.name }
-    : hasFacilityCoords
-      ? { latitude: facilityLat, longitude: facilityLng, name: facility?.name }
-      : geocodedCoords
-        ? { latitude: geocodedCoords.latitude, longitude: geocodedCoords.longitude, name: facility?.name }
-        : null;
+  const customDestLat = options?.customDestination?.latitude;
+  const customDestLng = options?.customDestination?.longitude;
+  const customDestName = options?.customDestination?.name;
+  const facilityName = facility?.name;
+  const geocodedLat = geocodedCoords?.latitude;
+  const geocodedLng = geocodedCoords?.longitude;
+  const destination = useMemo(() => {
+    if (typeof customDestLat === 'number' && typeof customDestLng === 'number') {
+      return { latitude: customDestLat, longitude: customDestLng, name: customDestName };
+    }
+    if (hasFacilityCoords) {
+      return { latitude: facilityLat!, longitude: facilityLng!, name: facilityName };
+    }
+    if (typeof geocodedLat === 'number' && typeof geocodedLng === 'number') {
+      return { latitude: geocodedLat, longitude: geocodedLng, name: facilityName };
+    }
+    return null;
+  }, [customDestLat, customDestLng, customDestName, hasFacilityCoords, facilityLat, facilityLng, facilityName, geocodedLat, geocodedLng]);
 
   const query = useQuery({
     queryKey: ['google-route', origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude],

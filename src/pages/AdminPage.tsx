@@ -71,9 +71,10 @@ export const AdminHospitalsPage = () => {
   const verification = useUpdateHospitalVerification();
   const status = useUpdateHospitalStatus();
 
+  const hospitalList = q.data?.items;
   const hospitalMarkers = useMemo(() => {
-    if (!q.data?.items) return [];
-    return q.data.items
+    if (!hospitalList) return [];
+    return hospitalList
       .filter((h) => typeof h.latitude === 'number' && typeof h.longitude === 'number' && Number.isFinite(h.latitude) && Number.isFinite(h.longitude))
       .map((h) => ({
         id: h.id,
@@ -84,7 +85,7 @@ export const AdminHospitalsPage = () => {
         subtitle: `${h.hospitalType} · ${h.city ?? ''}`,
         isEmergency: h.emergencyAvailability === 'AVAILABLE',
       }));
-  }, [q.data?.items]);
+  }, [hospitalList]);
 
   const mapCenter = useMemo(() => {
     if (hospitalMarkers.length > 0) {
@@ -169,9 +170,10 @@ export const AdminAmbulancesPage = () => {
   const [page, setPage] = useState(1);
   const q = useAdminAmbulances({ page, limit: 20, search });
 
+  const ambulanceList = q.data?.items;
   const ambulanceMarkers = useMemo(() => {
-    if (!q.data?.items) return [];
-    return q.data.items
+    if (!ambulanceList) return [];
+    return ambulanceList
       .filter((a) => typeof a.currentLatitude === 'number' && typeof a.currentLongitude === 'number' && Number.isFinite(a.currentLatitude) && Number.isFinite(a.currentLongitude))
       .map((a) => ({
         id: a.id,
@@ -186,7 +188,7 @@ export const AdminAmbulancesPage = () => {
           isAvailable: a.currentStatus === 'AVAILABLE',
         },
       }));
-  }, [q.data?.items]);
+  }, [ambulanceList]);
 
   const mapCenter = useMemo(() => {
     if (ambulanceMarkers.length > 0) {

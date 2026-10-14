@@ -126,14 +126,24 @@ export const AmbulancePage=()=>{
  const incoming=requests.data?.items.find(r=>!r.driverId && ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION'].includes(r.status))??requests.data?.items[0]??null;
  const incomingOffer=offers.data?.[0]??null;
  const selectedRequest=routeMode==='request'?incoming:activeRequest.data??incoming;
- const destination=selectedRequest && typeof selectedRequest.latitude==='number' && typeof selectedRequest.longitude==='number'
-   ? {latitude:selectedRequest.latitude,longitude:selectedRequest.longitude}:null;
- const origin=location?{latitude:location.latitude,longitude:location.longitude}:null;
-  const toHospital=activeTrip?.status==='PATIENT_ONBOARD' || activeTrip?.status==='TO_HOSPITAL' || activeTrip?.status==='AT_HOSPITAL';
- const routeDestination=toHospital
-   ? (activeRequest.data && typeof activeRequest.data.hospitalLatitude==='number' && typeof activeRequest.data.hospitalLongitude==='number'
-      ? {latitude:activeRequest.data.hospitalLatitude,longitude:activeRequest.data.hospitalLongitude}:destination)
-   : destination;
+ const destination = useMemo(() => (
+   selectedRequest && typeof selectedRequest.latitude === 'number' && typeof selectedRequest.longitude === 'number'
+     ? { latitude: selectedRequest.latitude, longitude: selectedRequest.longitude }
+     : null
+ ), [selectedRequest]);
+ const origin = useMemo(() => (
+   location ? { latitude: location.latitude, longitude: location.longitude } : null
+ ), [location]);
+ const toHospital = activeTrip?.status === 'PATIENT_ONBOARD' || activeTrip?.status === 'TO_HOSPITAL' || activeTrip?.status === 'AT_HOSPITAL';
+ const hospitalLat = activeRequest.data?.hospitalLatitude;
+ const hospitalLng = activeRequest.data?.hospitalLongitude;
+ const routeDestination = useMemo(() => (
+   toHospital
+     ? (typeof hospitalLat === 'number' && typeof hospitalLng === 'number'
+        ? { latitude: hospitalLat, longitude: hospitalLng }
+        : destination)
+     : destination
+ ), [toHospital, hospitalLat, hospitalLng, destination]);
  const route=useAmbulanceRoute(origin,destination,!activeTrip);
  const liveRoute=useQuery({
    queryKey:['ambulance-driver','live-route',activeTrip?.id,toHospital?'HOSPITAL':'PICKUP',origin?.latitude.toFixed(3),origin?.longitude.toFixed(3)],
@@ -146,6 +156,32 @@ export const AmbulancePage=()=>{
  const routeItem=activeTrip
    ? (activeTrip.status==='AT_HOSPITAL'||liveRoute.isError?null:liveRoute.data?.routes[0]?trackingRouteOption(liveRoute.data.routes[0]):null)
    : route.routes[0]??null;
+
+ const mapMarkers = useMemo(() => {
+   const list = [];
+   if (destination) {
+     list.push({
+       id: 'pickup',
+       latitude: destination.latitude,
+       longitude: destination.longitude,
+       title: selectedRequest?.location || 'Patient Pickup',
+       subtitle: 'Pickup Coordinates',
+       isEmergency: true,
+     });
+   }
+   if (routeDestination && toHospital) {
+     list.push({
+       id: 'hospital',
+       type: 'HOSPITAL' as const,
+       latitude: routeDestination.latitude,
+       longitude: routeDestination.longitude,
+       title: activeRequest.data?.hospitalName || 'Destination Hospital',
+       subtitle: 'Emergency Intake',
+       isEmergency: true,
+     });
+   }
+   return list;
+ }, [destination, routeDestination, toHospital, selectedRequest?.location, activeRequest.data?.hospitalName]);
  const invalidate=useCallback(()=>Promise.all([qc.invalidateQueries({queryKey:['ambulance-driver']})]),[qc]);
  const startDutyMutation=useMutation({
    mutationFn:(fix:{latitude:number;longitude:number;accuracy:number;timestamp:number})=>ambulanceDriverApi.startDuty(fix),
@@ -244,32 +280,6 @@ export const AmbulancePage=()=>{
  if(routeMode==='profile') return <AmbulanceLayout><div className="mx-auto w-full max-w-2xl px-4 py-8"><p className="text-xs uppercase tracking-wider text-slate-500">Driver profile</p><h1 className="mt-1 text-3xl font-bold">{profile.data?.fullName??'Driver'}</h1><div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 space-y-3"><p><span className="text-slate-500">Phone:</span> {profile.data?.phone}</p><p><span className="text-slate-500">License:</span> {profile.data?.licenseNumber}</p><p><span className="text-slate-500">Verification:</span> {profile.data?.licenseVerificationStatus}</p></div></div></AmbulanceLayout>;
 
  if(routeMode==='trips') return <AmbulanceLayout><div className="mx-auto w-full max-w-3xl px-4 py-8"><h1 className="text-2xl font-bold">Trip history</h1><div className="mt-5 space-y-3">{(trips.data?.items??[]).map(t=><div className="rounded-lg border border-slate-200 bg-white p-4" key={t.id}><div className="flex justify-between"><span className="font-semibold">{t.status}</span><span className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleString()}</span></div><p className="mt-2 text-sm text-slate-500">Request {t.emergencyRequestId}</p></div>)}</div></div></AmbulanceLayout>;
-
-  const mapMarkers = useMemo(() => {
-    const list = [];
-    if (destination) {
-      list.push({
-        id: 'pickup',
-        latitude: destination.latitude,
-        longitude: destination.longitude,
-        title: selectedRequest?.location || 'Patient Pickup',
-        subtitle: 'Pickup Coordinates',
-        isEmergency: true,
-      });
-    }
-    if (routeDestination && toHospital) {
-      list.push({
-        id: 'hospital',
-        type: 'HOSPITAL' as const,
-        latitude: routeDestination.latitude,
-        longitude: routeDestination.longitude,
-        title: activeRequest.data?.hospitalName || 'Destination Hospital',
-        subtitle: 'Emergency Intake',
-        isEmergency: true,
-      });
-    }
-    return list;
-  }, [destination, routeDestination, toHospital, selectedRequest?.location, activeRequest.data?.hospitalName]);
 
   return (
     <AmbulanceLayout>

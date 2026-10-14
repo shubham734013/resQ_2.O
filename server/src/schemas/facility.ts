@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const facilitySearchQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
+  query: z.string().trim().max(100).optional(),
+  search: z.string().trim().max(100).optional(),
   category: z.enum([
     'all',
     'emergency',
@@ -25,4 +27,7 @@ export const facilitySearchQuerySchema = z.object({
   if ((value.latitude === undefined) !== (value.longitude === undefined)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['latitude'], message: 'latitude and longitude must be provided together' });
   }
-});
+}).transform((data) => ({
+  ...data,
+  q: data.q ?? data.query ?? data.search,
+}));
