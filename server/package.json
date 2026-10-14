@@ -18,7 +18,8 @@
     "diagnose:hospitals": "tsx src/scripts/diagnoseHospitalDirectory.ts",
     "ensure:emergency-idempotency-index": "tsx src/scripts/ensureEmergencyIdempotencyIndex.ts",
     "ensure:dispatch-indexes": "tsx src/scripts/ensureDispatchIndexes.ts",
-    "ensure:trip-reassignment-index": "tsx src/scripts/ensureTripReassignmentIndex.ts"
+    "ensure:trip-reassignment-index": "tsx src/scripts/ensureTripReassignmentIndex.ts",
+    "test:e2e": "tsx src/scripts/verifyE2EWorkflow.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
