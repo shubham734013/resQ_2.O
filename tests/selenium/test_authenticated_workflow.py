@@ -55,6 +55,17 @@ class ResQAuthenticatedWorkflowTests(unittest.TestCase):
         except Exception as exc:
             raise unittest.SkipTest(f"Chrome WebDriver could not be initialized: {exc}")
 
+        import urllib.request
+        api_base = os.environ.get("VITE_API_BASE_URL", "http://localhost:5001/api/v1").rstrip("/")
+        try:
+            req = urllib.request.Request(f"{api_base}/health", headers={"User-Agent": "ResQ-Test"})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                pass
+        except Exception as exc:
+            if hasattr(cls, "driver"):
+                cls.driver.quit()
+            raise unittest.SkipTest(f"ResQ backend API is not available at {api_base}: {exc}")
+
     @classmethod
     def tearDownClass(cls) -> None:
         if hasattr(cls, "driver"):
