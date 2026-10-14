@@ -137,7 +137,8 @@ class ResQAuthenticatedWorkflowTests(unittest.TestCase):
             }
             label = role_labels.get(role, "User")
             role_btn = self.wait.until(EC.element_to_be_clickable((By.XPATH, f"//button[normalize-space()='{label}']")))
-            role_btn.click()
+            self.driver.execute_script("arguments[0].click();", role_btn)
+            self.wait.until(lambda d: role_btn.get_attribute("aria-pressed") == "true")
 
         email_input = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="email"]')))
         password_input = self.driver.find_element(By.CSS_SELECTOR, 'input[type="password"]')
@@ -213,6 +214,53 @@ class ResQAuthenticatedWorkflowTests(unittest.TestCase):
         self.wait.until(lambda d: urlparse(d.current_url).path != "/login")
         self.open_path("/admin")
         self.wait.until(lambda d: urlparse(d.current_url).path in ("/unauthorized", "/login", "/admin/login", "/"))
+
+    def test_ambulance_provider_login_and_dashboard(self) -> None:
+        self.login_as("AMBULANCE_PROVIDER", ACCOUNTS["AMBULANCE_PROVIDER"], DEMO_PASSWORD)
+        self.wait.until(lambda d: urlparse(d.current_url).path != "/login")
+        self.wait.until(lambda d: "provider" in urlparse(d.current_url).path.lower())
+        self.assert_page_not_blank()
+        self.wait.until(
+            lambda d: any(term in d.find_element(By.TAG_NAME, "body").text.lower() for term in ("fleet", "provider", "ambulances", "drivers", "request queue"))
+        )
+
+    def test_admin_reports_and_analytics_views(self) -> None:
+        self.login_as("ADMIN", ACCOUNTS["ADMIN"], ADMIN_PASSWORD, is_admin=True)
+        self.wait.until(lambda d: urlparse(d.current_url).path != "/admin/login")
+        self.open_path("/admin/reports")
+        self.assert_page_not_blank()
+        self.wait.until(
+            lambda d: any(term in d.find_element(By.TAG_NAME, "body").text.lower() for term in ("reports", "export csv", "date range", "overview"))
+        )
+        self.open_path("/admin/analytics")
+        self.assert_page_not_blank()
+        self.wait.until(
+            lambda d: any(term in d.find_element(By.TAG_NAME, "body").text.lower() for term in ("analytics", "resolution", "hospital", "fleet"))
+        )
+
+    def test_user_saved_facilities_view(self) -> None:
+        self.login_as("USER", ACCOUNTS["USER"], DEMO_PASSWORD)
+        self.wait.until(lambda d: urlparse(d.current_url).path != "/login")
+        self.open_path("/saved")
+        self.assert_page_not_blank()
+        self.wait.until(
+            lambda d: any(term in d.find_element(By.TAG_NAME, "body").text.lower() for term in ("saved", "facilities", "hospital", "access"))
+        )
+
+    def test_hospital_patients_and_profile_views(self) -> None:
+        self.login_as("HOSPITAL", ACCOUNTS["HOSPITAL"], DEMO_PASSWORD)
+        self.wait.until(lambda d: urlparse(d.current_url).path != "/login")
+        self.open_path("/hospital/patients")
+        self.assert_page_not_blank()
+        self.wait.until(
+            lambda d: any(term in d.find_element(By.TAG_NAME, "body").text.lower() for term in ("patient", "coordination", "cases", "incoming"))
+        )
+        self.open_path("/hospital/profile")
+        self.assert_page_not_blank()
+        self.wait.until(
+            lambda d: any(term in d.find_element(By.TAG_NAME, "body").text.lower() for term in ("profile", "trauma", "sms", "services"))
+        )
+
 
 
 if __name__ == "__main__":
