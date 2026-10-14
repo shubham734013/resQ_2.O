@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { connectDatabase, disconnectDatabase } from '../config/database.js';
+import { randomUUID } from 'node:crypto';
+import bcrypt from 'bcrypt';
+import { connectTestDatabase } from '../config/testDatabase.js';
+import { disconnectDatabase } from '../config/database.js';
 import { UserModel } from '../models/User.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
@@ -11,28 +14,189 @@ import { DispatchJobModel } from '../models/DispatchJob.js';
 import { TripModel } from '../models/Trip.js';
 import { createEmergencyRequest } from '../services/emergencyService.js';
 import { startDriverDuty, endDriverDuty, updateDriverLocation } from '../services/driverDutyService.js';
-import { listDriverDispatchOffers, acceptDispatchOffer } from '../services/dispatchService.js';
+import { listDriverDispatchOffers, acceptDispatchOffer, processDispatchTick } from '../services/dispatchService.js';
 import { getEmergencyTrackingSnapshot } from '../services/trackingService.js';
 import { arrivedPickup, patientPickedUp, arrivedHospital, completeTrip } from '../services/ambulanceOperationsService.js';
 import type { AuthenticatedIdentity } from '../types/auth.js';
 
-export const runE2EVerification = async () => {
-  await connectDatabase();
-  console.log('🚀 Running ResQ 2.0 End-to-End Emergency Workflow Acceptance Verification...\n');
+const DEMO_PASSWORD = 'Password@123';
+const BCRYPT_ROUNDS = 10;
 
-  // Step 1: Load and verify demo accounts
-  console.log('--- Step 1: Verifying Demo Accounts in Database ---');
+const ensureDemoAccountsExist = async () => {
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
+
+  // 1. User
+  await UserModel.findOneAndUpdate(
+    { email: 'demo.user@resq.local' },
+    {
+      $set: {
+        name: 'Demo Citizen (Shubham)',
+        email: 'demo.user@resq.local',
+        phone: '9876543210',
+        passwordHash,
+        authProvider: 'LOCAL',
+        role: 'USER',
+        address: 'Malviya Nagar, Sector 4',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        country: 'India',
+        latitude: 26.8529,
+        longitude: 75.8055,
+        accountStatus: 'ACTIVE',
+        emailVerified: true,
+        phoneVerified: true,
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+
+  // 2. Hospital
+  const hospital = await HospitalModel.findOneAndUpdate(
+    { email: 'demo.hospital@resq.local' },
+    {
+      $set: {
+        name: 'SMS Multispeciality & Trauma Hospital (Demo)',
+        registrationNumber: 'HOSP-DEMO-SMS-01',
+        email: 'demo.hospital@resq.local',
+        phone: '9876543213',
+        passwordHash,
+        address: 'Jawaharlal Nehru Marg, Ashok Nagar',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        country: 'India',
+        latitude: 26.8917,
+        longitude: 75.8155,
+        location: {
+          type: 'Point',
+          coordinates: [75.8155, 26.8917],
+        },
+        hospitalType: 'Government Multispeciality & Trauma',
+        services: ['Emergency', 'Trauma', 'Cardiology', 'Neurology', 'Pediatric', 'ICU', 'Burn Care', 'Orthopedics'],
+        capabilities: ['24/7 Trauma Unit', 'Cath Lab', 'Emergency Surgery', 'Cardiac ICU', 'Pediatric ICU'],
+        resourceSummary: new Map([
+          ['icuBeds', 12],
+          ['emergencyBeds', 24],
+          ['ventilators', 8],
+          ['operationTheatres', 6],
+        ]),
+        emergencyAvailability: 'AVAILABLE',
+        publicContactInformation: '24/7 Emergency Line: +91-141-2560291',
+        operationalDescription: 'Level 1 Trauma Center with 24/7 active emergency intake and resuscitation teams.',
+        verificationStatus: 'VERIFIED',
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+
+  // 3. Ambulance Provider
+  const provider = await AmbulanceProviderModel.findOneAndUpdate(
+    { email: 'demo.provider@resq.local' },
+    {
+      $set: {
+        name: 'Apex LifeCare Ambulances (Demo)',
+        registrationNumber: 'PRV-DEMO-001',
+        email: 'demo.provider@resq.local',
+        phone: '9876543211',
+        passwordHash,
+        authProvider: 'LOCAL',
+        profileCompletionStatus: 'COMPLETE',
+        serviceType: 'Emergency 24x7 ALS & BLS Fleet',
+        address: 'Tonk Road, Lal Kothi',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        country: 'India',
+        latitude: 26.8850,
+        longitude: 75.8010,
+        verificationStatus: 'VERIFIED',
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+
+  // 4. Ambulance
+  const ambulance = await AmbulanceModel.findOneAndUpdate(
+    { registrationNumber: 'AMB-DEMO-ALS-01' },
+    {
+      $set: {
+        registrationNumber: 'AMB-DEMO-ALS-01',
+        vehicleNumber: 'RJ-14-EA-1001',
+        providerId: provider._id,
+        ambulanceType: 'ALS',
+        capabilities: ['ICU', 'Ventilator', 'Defibrillator', 'Oxygen', 'Cardiac Monitor', 'Suction Unit'],
+        currentStatus: 'OFFLINE',
+        currentLatitude: 26.8950,
+        currentLongitude: 75.8020,
+        location: {
+          type: 'Point',
+          coordinates: [75.8020, 26.8950],
+        },
+        locationUpdatedAt: new Date(),
+        locationSourceTimestamp: new Date(),
+        locationAccuracyMeters: 10,
+        serviceArea: 'Jaipur Metropolitan',
+        verificationStatus: 'VERIFIED',
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+
+  // 5. Ambulance Driver
+  await AmbulanceDriverModel.findOneAndUpdate(
+    { email: 'demo.driver@resq.local' },
+    {
+      $set: {
+        fullName: 'Rajesh Sharma (Demo Driver)',
+        email: 'demo.driver@resq.local',
+        phone: '9876543212',
+        passwordHash,
+        authProvider: 'LOCAL',
+        licenseNumber: 'DL-RJ-2024-998877',
+        licenseVerificationStatus: 'VERIFIED',
+        profileCompletionStatus: 'COMPLETE',
+        address: 'Tonk Phatak',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        country: 'India',
+        registeredLatitude: 26.8950,
+        registeredLongitude: 75.8020,
+        providerId: provider._id,
+        assignedAmbulanceId: ambulance._id,
+        availabilityStatus: 'OFFLINE',
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+
+  return { hospital, provider, ambulance };
+};
+
+export const runE2EVerification = async () => {
+  // Enforce explicit test database connection; fail closed on missing/unsafe target
+  const { databaseName, sanitizedUri } = await connectTestDatabase();
+  console.log(`🚀 Running ResQ 2.0 End-to-End Emergency Workflow Acceptance Verification against [${databaseName}] (${sanitizedUri})...\n`);
+
+  const testRunId = `e2e-${randomUUID()}`;
+  console.log(`📌 Test Run Identifier: ${testRunId}\n`);
+
+  // Step 1: Ensure demo accounts exist in isolated test database
+  console.log('--- Step 1: Verifying/Ensuring Demo Accounts in Test Database ---');
+  await ensureDemoAccountsExist();
+
   const user = await UserModel.findOne({ email: 'demo.user@resq.local' }).lean().exec();
   const hospital = await HospitalModel.findOne({ email: 'demo.hospital@resq.local' }).lean().exec();
   const provider = await AmbulanceProviderModel.findOne({ email: 'demo.provider@resq.local' }).lean().exec();
   const ambulance = await AmbulanceModel.findOne({ vehicleNumber: 'RJ-14-EA-1001' }).lean().exec();
   const driver = await AmbulanceDriverModel.findOne({ email: 'demo.driver@resq.local' }).lean().exec();
 
-  assert.ok(user, 'demo.user@resq.local must exist');
-  assert.ok(hospital, 'demo.hospital@resq.local must exist');
-  assert.ok(provider, 'demo.provider@resq.local must exist');
-  assert.ok(ambulance, 'Ambulance RJ-14-EA-1001 must exist');
-  assert.ok(driver, 'demo.driver@resq.local must exist');
+  assert.ok(user, 'demo.user@resq.local must exist in test database');
+  assert.ok(hospital, 'demo.hospital@resq.local must exist in test database');
+  assert.ok(provider, 'demo.provider@resq.local must exist in test database');
+  assert.ok(ambulance, 'Ambulance RJ-14-EA-1001 must exist in test database');
+  assert.ok(driver, 'demo.driver@resq.local must exist in test database');
 
   assert.equal(hospital.verificationStatus, 'VERIFIED');
   assert.equal(hospital.accountStatus, 'ACTIVE');
@@ -42,9 +206,13 @@ export const runE2EVerification = async () => {
   assert.equal(ambulance.accountStatus, 'ACTIVE');
   assert.equal(driver.licenseVerificationStatus, 'VERIFIED');
   assert.equal(driver.accountStatus, 'ACTIVE');
-  console.log('✅ All 5 demo accounts verified active and eligible in Atlas DB.\n');
+  console.log('✅ All 5 demo accounts verified active and eligible in test DB.\n');
 
-  // Reset driver & ambulance to clean state if leftover from previous test
+  // Record initial pre-test status to avoid resetting shared state indiscriminately
+  const initialAmbulanceStatus = ambulance.currentStatus;
+  const initialDriverStatus = driver.availabilityStatus;
+
+  // Clear any dangling reservation that might have been left by an interrupted run
   await AmbulanceModel.updateOne({ _id: ambulance._id }, {
     $set: { currentStatus: 'OFFLINE' },
     $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 },
@@ -71,16 +239,16 @@ export const runE2EVerification = async () => {
     assert.equal(dutyResult.dutyState, 'AVAILABLE');
     console.log(`✅ Driver ${driver.fullName} is now ON DUTY (ONLINE) with GPS coordinates [26.8950, 75.8020].\n`);
 
-    // Step 3: Citizen initiates SOS Emergency
+    // Step 3: Citizen initiates SOS Emergency with unique test run key
     console.log('--- Step 3: Citizen Triggers SOS Emergency Request ---');
-    const idempotencyKey = `e2e-test-${Date.now()}`;
+    const idempotencyKey = `idemp-${testRunId}`;
     const emergencyResult = await createEmergencyRequest(
       String(user._id),
       {
         hospitalId: String(hospital._id),
         situationType: 'Chest Pain',
         category: 'chest_pain',
-        location: 'Malviya Nagar, Sector 4, Jaipur',
+        location: `Confirmed test pickup (${testRunId})`,
         latitude: 26.8529,
         longitude: 75.8055,
       },
@@ -100,11 +268,12 @@ export const runE2EVerification = async () => {
 
     // Step 4: Dispatch Engine processes candidates and offers to driver
     console.log('--- Step 4: Dispatch Engine Execution ---');
-    // Poll for dispatch offer (allowing background worker route calculation & transaction commit)
+    await processDispatchTick();
     let offers: Awaited<ReturnType<typeof listDriverDispatchOffers>> = [];
     for (let i = 0; i < 20; i++) {
       offers = await listDriverDispatchOffers(String(driver._id));
       if (offers.length > 0) break;
+      await processDispatchTick();
       await new Promise((r) => setTimeout(r, 500));
     }
 
@@ -202,7 +371,7 @@ export const runE2EVerification = async () => {
     console.log('All 6 acceptance criteria verified with real DB state.');
     console.log('======================================================\n');
   } finally {
-    // Cleanup the transient test emergency, job, and trip records
+    // Explicit cleanup ownership: only delete records created by this particular test run
     if (emergencyId) {
       await EmergencyRequestModel.deleteOne({ _id: emergencyId }).exec();
       await HospitalPatientModel.deleteMany({ emergencyId }).exec();
@@ -211,16 +380,16 @@ export const runE2EVerification = async () => {
     if (tripId) {
       await TripModel.deleteOne({ _id: tripId }).exec();
     }
-    // Ensure demo ambulance & driver are restored to clean initial status
+    // Safely restore ambulance & driver state
     await AmbulanceModel.updateOne({ _id: ambulance._id }, {
-      $set: { currentStatus: 'OFFLINE' },
+      $set: { currentStatus: initialAmbulanceStatus === 'BUSY' ? 'AVAILABLE' : initialAmbulanceStatus },
       $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 },
     }).exec();
     await AmbulanceDriverModel.updateOne({ _id: driver._id }, {
-      $set: { availabilityStatus: 'OFFLINE' },
+      $set: { availabilityStatus: initialDriverStatus === 'BUSY' ? 'AVAILABLE' : initialDriverStatus },
       $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 },
     }).exec();
-    console.log('🧹 Test records safely cleaned up from database.');
+    console.log(`🧹 Test run [${testRunId}] records safely cleaned up from database.`);
   }
 };
 

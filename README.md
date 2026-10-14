@@ -97,39 +97,69 @@ Backend:
 `cd server && npm install`
 `cd server && npm run dev`
 
+## Core Deliverables & Production Documentation
+
+Comprehensive audit matrices, technical reports, test evidence, and deployment checklists are maintained in the `docs/` directory:
+
+1. **[Feature Audit Matrix](docs/RESQ_FEATURE_AUDIT.md)**: Feature-by-feature evaluation across Citizen, Hospital, Provider, Driver, and Admin portals.
+2. **[Implementation Report](docs/RESQ_IMPLEMENTATION_REPORT.md)**: Code changes, database isolation guards, and architectural completions.
+3. **[Test Evidence & Quality Gates](docs/RESQ_TEST_EVIDENCE.md)**: Full logs and execution evidence for 136 backend tests, 29 Selenium browser tests, and live lifecycle verification.
+4. **[Deployment & Production Checklist](docs/RESQ_DEPLOYMENT_CHECKLIST.md)**: Environment variable specifications, database indexing, and health checks.
+
 ## Environment
 
 Frontend variables are listed in `.env.example`.
 
 Backend requires:
-- MONGODB_URI
-- JWT_SECRET
-- JWT_REFRESH_SECRET
-- RESQ_ADMIN_EMAIL
-- RESQ_ADMIN_PASSWORD
-- CORS_ORIGINS in production
-- corresponding Google/Microsoft credentials
-- GOOGLE_MAPS_SERVER_API_KEY for server-side Maps features
+- `MONGODB_URI`: Primary database connection (Atlas replica set recommended).
+- `TEST_MONGODB_URI`: Dedicated test database for destructive test execution (must contain `test` in name).
+- `JWT_SECRET`: Secret key for access token signing ($\ge 32$ chars).
+- `JWT_REFRESH_SECRET`: Secret key for refresh token signing ($\ge 32$ chars).
+- `RESQ_ADMIN_EMAIL` & `RESQ_ADMIN_PASSWORD`: Superadmin credentials.
+- `CORS_ORIGINS`: Allowed origins in production.
+- Google / Microsoft OAuth credentials (optional).
+- Server-side Google Maps keys (`GOOGLE_GEOCODING_API_KEY`, `GOOGLE_ROUTES_API_KEY`, `GOOGLE_PLACES_API_KEY`).
 
-Never commit real secrets.
+Never commit real secrets to source control.
 
-## Validation
+## Validation & Testing
 
-Frontend:
-`npm run typecheck`
-`npm run lint`
-`npm run build`
+### 1. Static Analysis & Builds
+```bash
+# Frontend
+npm run typecheck
+npm run lint
+npm run build
 
-Backend:
-`cd server && npm run typecheck`
-`cd server && npm run lint`
-`cd server && npm test`
-`cd server && npm run build`
+# Backend
+npm run typecheck --prefix server
+npm run lint --prefix server
+npm run build --prefix server
+```
 
-Transactional workflows require a MongoDB deployment that supports transactions, such as MongoDB Atlas or a replica set.
+### 2. Backend Automated Test Suite
+```bash
+TEST_MONGODB_URI="mongodb+srv://.../resq_automated_test?retryWrites=true&w=majority" npm test --prefix server
+```
 
-## Product boundaries
+### 3. Selenium Automated Browser Suite
+```bash
+RESQ_BASE_URL="http://localhost:5173" tests/selenium/.venv/bin/python3 -m unittest discover -s tests/selenium -p "test_*.py" -v
+```
+
+### 4. End-to-End Emergency Lifecycle Verification
+```bash
+TEST_MONGODB_URI="mongodb+srv://.../resq_automated_test?retryWrites=true&w=majority" npm run test:e2e --prefix server
+```
+*Note: Destructive test scripts fail closed if `TEST_MONGODB_URI` is omitted or points to a non-test database like `ResQ`.*
+
+## Realtime Architecture
+
+ResQ 2.0 employs a dual-channel real-time architecture:
+- **Socket.IO**: Bi-directional event communication powering live driver GPS telemetry and multi-client fanout across authenticated rooms (`emergency:*`, `trip:*`, `hospital:*`).
+- **Server-Sent Events (SSE)**: Fallback stream at `/api/v1/realtime/stream` for environments restricting WebSockets.
+- **Authoritative REST Snapshots**: Clients recovering from disconnections poll `/api/v1/tracking/...` to restore state before re-establishing subscriptions.
+
+## Product Boundaries
 
 ResQ coordinates emergency access and transport. It does not diagnose patients and does not guarantee admission, beds, ICU access, treatment, ambulance availability, or clinical outcomes unless the corresponding operational commitment is explicitly modeled and verified.
-
-The initial real-time strategy uses TanStack Query polling on operational views. WebSockets/SSE are intentionally not introduced without a demonstrated need.
