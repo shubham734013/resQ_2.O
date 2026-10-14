@@ -20,7 +20,7 @@ const { acceptDispatchOffer, rejectDispatchOffer, processDispatchTick, retryDisp
 const { cancelUserEmergencyRequest } = await import('./services/emergencyService.js');
 type DispatchCandidate = import('./services/dispatchService.js').DispatchCandidate;
 
-const uri = process.env.DISPATCH_TEST_MONGODB_URI;
+const uri = process.env.DISPATCH_TEST_MONGODB_URI || process.env.TEST_MONGODB_URI;
 const enabled = Boolean(uri && /test|dispatch/i.test(new URL(uri).pathname));
 
 test('concurrent reservations and duplicate acceptances create one active trip', { skip: !enabled }, async () => {

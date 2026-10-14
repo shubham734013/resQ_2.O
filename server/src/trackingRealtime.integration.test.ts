@@ -21,7 +21,7 @@ process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
 process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough';
 process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
 process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
-const uri = process.env.TRACKING_TEST_MONGODB_URI;
+const uri = process.env.TRACKING_TEST_MONGODB_URI || process.env.TEST_MONGODB_URI;
 const databaseName = uri ? new URL(uri).pathname.replace(/^\//, '').split('?')[0] ?? '' : '';
 const enabled = Boolean(uri && /test|tracking/i.test(databaseName));
 

@@ -13,7 +13,7 @@ process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough
 process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
 process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
 
-const uri = process.env.SOS_TEST_MONGODB_URI;
+const uri = process.env.SOS_TEST_MONGODB_URI || process.env.TEST_MONGODB_URI;
 const enabled = Boolean(uri && /test|sos/i.test(new URL(uri).pathname));
 const { createEmergencyRequest, cancelUserEmergencyRequest } = await import('./services/emergencyService.js');
 

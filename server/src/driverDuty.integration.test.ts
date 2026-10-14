@@ -16,7 +16,7 @@ process.env.DRIVER_LOCATION_UPDATE_INTERVAL_MS ??= '4000';
 process.env.DRIVER_LOCATION_STALE_AFTER_MS ??= '15000';
 process.env.DRIVER_LOCATION_MAX_AGE_MS ??= '30000';
 
-const uri = process.env.DRIVER_DUTY_TEST_MONGODB_URI;
+const uri = process.env.DRIVER_DUTY_TEST_MONGODB_URI || process.env.TEST_MONGODB_URI;
 const enabled = Boolean(uri && /test|driver.?duty/i.test(new URL(uri).pathname));
 const { startDriverDuty, endDriverDuty, updateDriverLocation } = await import('./services/driverDutyService.js');
 

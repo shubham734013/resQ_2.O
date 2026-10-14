@@ -41,7 +41,7 @@ export const LoginPage=({admin=false}:{admin?:boolean})=>{
     navigate(isTargetMatch&&from?from:roleHome[user.role],{replace:true});
   },[location.state,navigate]);
   const handleSubmit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();setError('');if(!email.trim()||!password){setError('Enter your email and password.');return;}setIsSubmitting(true);try{
-    if(admin){const user=(await authApi.adminLogin({email,password})).data.user;if(user.role!=='ADMIN'){setError('This account is not an administrator account.');return;}const authenticated=await refreshUser();if(!authenticated){setError('Your session could not be established. Please try again.');return;}finishLogin(authenticated);}
+    if(admin){const user=(await authApi.adminLogin({email,password})).data.user;if(user.role!=='ADMIN'){setError('This account is not an administrator account.');return;}try{localStorage.setItem('resq_has_session','true');}catch{/* ignore */}const authenticated=await refreshUser();if(!authenticated){setError('Your session could not be established. Please try again.');return;}finishLogin(authenticated);}
     else {const user=await login({email,password,roleHint});if(user.role!==roleHint){await logout();setError(`Wrong account type. You selected ${roleHint.replaceAll('_',' ').toLowerCase()}, but this account is ${user.role.replaceAll('_',' ').toLowerCase()}. Select the correct account type and try again.`);return;}finishLogin(user);}
   }catch(error){setError(errorMessage(error));}finally{setIsSubmitting(false);}};
   return <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10"><section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
