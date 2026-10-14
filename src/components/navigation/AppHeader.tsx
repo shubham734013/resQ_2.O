@@ -31,6 +31,47 @@ export const AppHeader = ({ userLocation, isUpdatingLocation = false, onRefreshL
 
   return (
     <header role="banner" className={`bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] ${className}`}>
+      {/* Top Enterprise Utility Bar */}
+      <div className="hidden lg:block bg-slate-900 text-slate-300 text-[11px] px-4 sm:px-6 lg:px-8 py-1.5 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 font-semibold text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>ResQ Network Active</span>
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400">99.99% Platform SLA Uptime</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400">HL7 FHIR v4 Ready</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+              Enterprise Portals:
+            </span>
+            <NavLink to="/hospital" className="hover:text-teal-400 text-slate-300 font-medium transition-colors">
+              Hospital Ops
+            </NavLink>
+            <span className="text-slate-700">|</span>
+            <NavLink to="/ambulance-provider" className="hover:text-teal-400 text-slate-300 font-medium transition-colors">
+              Fleet CAD
+            </NavLink>
+            <span className="text-slate-700">|</span>
+            <NavLink to="/ambulance" className="hover:text-teal-400 text-slate-300 font-medium transition-colors">
+              Driver Console
+            </NavLink>
+            <span className="text-slate-700">|</span>
+            <NavLink to="/admin" className="hover:text-teal-400 text-slate-300 font-medium transition-colors">
+              Governance
+            </NavLink>
+            <span className="text-slate-700">|</span>
+            <a href="tel:112" className="text-rose-400 hover:text-rose-300 font-bold">
+              Dispatch: 112
+            </a>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-5 shrink-0">
           <NavLink to="/" className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 rounded-lg p-1" aria-label="ResQ Home">
@@ -38,12 +79,12 @@ export const AppHeader = ({ userLocation, isUpdatingLocation = false, onRefreshL
               <Compass className="w-5 h-5 text-teal-400 group-hover:rotate-45 transition-transform duration-300" aria-hidden="true" />
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-slate-950 text-lg tracking-tight leading-none flex items-center gap-1">
+              <span className="font-black text-slate-950 text-lg tracking-tight leading-none flex items-center gap-1">
                 ResQ
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-teal-500"></span>
               </span>
-              <span className="text-[10px] text-teal-700 font-semibold tracking-wide uppercase hidden sm:inline leading-tight mt-0.5">
-                Emergency & Care
+              <span className="text-[10px] text-teal-700 font-bold tracking-wide uppercase hidden sm:inline leading-tight mt-0.5">
+                Health Technologies™
               </span>
             </div>
           </NavLink>

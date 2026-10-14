@@ -120,7 +120,20 @@ export const HomePage = () => {
           className="w-[430px] lg:w-[480px] shrink-0 bg-white border-r border-slate-200/90 flex flex-col h-full shadow-xs z-10"
         >
           {/* Top Panel: Quick Navigation & Search */}
-          <div className="p-4 border-b border-slate-100 space-y-3 bg-white shrink-0">
+          <div className="p-4 border-b border-slate-100 space-y-2.5 bg-white shrink-0">
+            {/* Enterprise Healthcare Network Live Ticker */}
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 text-white flex items-center justify-between text-[11px] shadow-xs">
+              <div className="flex items-center gap-1.5 font-bold text-teal-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>ResQ Network Active</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-300 text-[10px] font-medium">
+                <span>4.2m Avg Dispatch</span>
+                <span className="text-slate-600">•</span>
+                <span>99.99% SLA Uptime</span>
+              </div>
+            </div>
+
             {/* Quick Emergency & Care Action Cards */}
             <div className="grid grid-cols-2 gap-2">
               <button

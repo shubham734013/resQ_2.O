@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { AppHeader } from '../components/navigation/AppHeader';
 import { BottomNavigation } from '../components/navigation/BottomNavigation';
+import { EnterpriseFooter } from '../components/common/EnterpriseFooter';
 import { useLocationState } from '../hooks/useLocationState';
 
 export const AppLayout = () => {
@@ -11,6 +12,7 @@ export const AppLayout = () => {
   const isRoutePage = routeLocation.pathname.startsWith('/route');
   const isAmbulanceRoute = routeLocation.pathname.startsWith('/ambulance');
   const isAdminRoute = routeLocation.pathname.startsWith('/admin');
+  const isSplitMapPage = routeLocation.pathname === '/' || routeLocation.pathname === '/search';
 
   const context = {
     currentLocation,
@@ -37,6 +39,7 @@ export const AppLayout = () => {
       <main className="flex-1 flex flex-col pb-16 md:pb-0 overflow-x-hidden">
         <Outlet context={context} />
       </main>
+      {!isSplitMapPage && <EnterpriseFooter className="hidden md:block" />}
       <BottomNavigation />
     </div>
   );
