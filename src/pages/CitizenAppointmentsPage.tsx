@@ -65,19 +65,19 @@ export const CitizenAppointmentsPage = () => {
     switch (status) {
       case 'CONFIRMED':
       case 'ACCEPTED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">{status}</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">{status}</span>;
       case 'PENDING':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">PENDING</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">PENDING</span>;
       case 'ALTERNATIVE_PROPOSED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">NEW TIME PROPOSED</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">NEW TIME PROPOSED</span>;
       case 'COMPLETED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">COMPLETED</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">COMPLETED</span>;
       case 'CANCELLED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">CANCELLED</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">CANCELLED</span>;
       case 'REJECTED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">DECLINED</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">DECLINED</span>;
       default:
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">{status}</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">{status}</span>;
     }
   };
 
@@ -87,16 +87,21 @@ export const CitizenAppointmentsPage = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Hospital Requests & Appointments</h1>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200/60 text-teal-800 text-[11px] font-semibold mb-1">
+              <Calendar className="w-3.5 h-3.5 text-teal-600" />
+              <span>Patient Coordination Hub</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950">Hospital Requests & Appointments</h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Manage your direct hospital consultations, reserved time slots, and responses.
+              Manage your direct hospital consultations, reserved time slots, and provider responses.
             </p>
           </div>
           <Button
             variant="outline"
             size="sm"
-            icon={<Search className="w-4 h-4" />}
+            icon={<Search className="w-4 h-4 text-teal-600" />}
             onClick={() => navigate('/search')}
+            className="font-semibold shadow-xs"
           >
             Find Hospitals
           </Button>
@@ -106,9 +111,9 @@ export const CitizenAppointmentsPage = () => {
         <div className="flex border-b border-slate-200 gap-2">
           <button
             onClick={() => setActiveTab('appointments')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer ${
               activeTab === 'appointments'
-                ? 'border-indigo-600 text-indigo-700 bg-white rounded-t-lg'
+                ? 'border-indigo-600 text-indigo-700 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -123,16 +128,16 @@ export const CitizenAppointmentsPage = () => {
 
           <button
             onClick={() => setActiveTab('requests')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer ${
               activeTab === 'requests'
-                ? 'border-blue-600 text-blue-700 bg-white rounded-t-lg'
+                ? 'border-teal-600 text-teal-700 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
             <Building2 className="w-4 h-4" />
             <span>Direct Care Requests</span>
             {careRequestsQuery.data?.pagination.total ? (
-              <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">
+              <span className="px-1.5 py-0.2 bg-teal-100 text-teal-700 rounded-full text-xs font-bold">
                 {careRequestsQuery.data.pagination.total}
               </span>
             ) : null}
@@ -140,9 +145,9 @@ export const CitizenAppointmentsPage = () => {
 
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer ${
               activeTab === 'notifications'
-                ? 'border-slate-800 text-slate-900 bg-white rounded-t-lg'
+                ? 'border-slate-800 text-slate-900 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >

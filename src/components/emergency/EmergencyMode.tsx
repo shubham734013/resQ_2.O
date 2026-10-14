@@ -24,12 +24,12 @@ export const EmergencyMode = ({
   };
 
   return (
-    <div className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased ${className}`}>
+    <div className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-rose-100 selection:text-rose-900 ${className}`}>
       {/* Streamlined Emergency Header */}
       <header
         role="banner"
         aria-label="Emergency mode header"
-        className="bg-white border-b border-slate-200/90 sticky top-0 z-40 px-4 sm:px-6 py-3 shadow-xs"
+        className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40 px-4 sm:px-6 py-3 shadow-xs"
       >
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
           {/* Left: Exit Action & Mode Indicator */}
@@ -38,7 +38,7 @@ export const EmergencyMode = ({
               type="button"
               onClick={onExit}
               aria-label="Exit emergency mode"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/90 px-3 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Exit</span>
@@ -49,7 +49,7 @@ export const EmergencyMode = ({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
               </span>
-              <span className="font-bold text-slate-950 text-sm tracking-tight">
+              <span className="font-bold text-slate-950 text-sm tracking-tight flex items-center gap-1.5">
                 Emergency Mode
               </span>
             </div>
@@ -58,17 +58,16 @@ export const EmergencyMode = ({
           {/* Center: Step Progress (Tablet/Desktop) */}
           {stepNumber && totalSteps && (
             <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <span>Step {stepNumber} of {totalSteps}</span>
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200/80 font-mono font-semibold text-slate-700">
+                Step {stepNumber}/{totalSteps}
+              </span>
               {currentStepLabel && (
-                <>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-slate-700 font-semibold">{currentStepLabel}</span>
-                </>
+                <span className="text-slate-800 font-bold tracking-tight">{currentStepLabel}</span>
               )}
             </div>
           )}
 
-          {/* Right: Quick 911 Call Link */}
+          {/* Right: Quick 112 Call Link */}
           <div className="flex items-center gap-2">
             <Button
               variant="emergency"
@@ -76,7 +75,7 @@ export const EmergencyMode = ({
               icon={<Phone className="w-3.5 h-3.5 text-white" aria-hidden="true" />}
               onClick={handleCallEmergencyServices}
               aria-label="Call emergency services at 112"
-              className="tracking-tight text-xs font-semibold py-1.5 px-3"
+              className="tracking-tight text-xs font-bold py-1.5 px-3.5 shadow-sm"
             >
               <span>Call 112</span>
             </Button>
@@ -86,13 +85,17 @@ export const EmergencyMode = ({
         {/* Mobile Step Progress Bar */}
         {stepNumber && totalSteps && (
           <div className="sm:hidden mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Step {stepNumber} of {totalSteps}: <strong className="text-slate-800">{currentStepLabel}</strong></span>
-            <div className="flex items-center gap-1">
+            <span>Step {stepNumber} of {totalSteps}: <strong className="text-slate-900">{currentStepLabel}</strong></span>
+            <div className="flex items-center gap-1.5">
               {Array.from({ length: totalSteps }).map((_, i) => (
                 <div
                   key={i}
                   className={`h-1.5 rounded-full transition-all ${
-                    i + 1 <= stepNumber ? 'w-4 bg-slate-900' : 'w-2 bg-slate-200'
+                    i + 1 === stepNumber
+                      ? 'w-5 bg-rose-600'
+                      : i + 1 < stepNumber
+                        ? 'w-3 bg-slate-800'
+                        : 'w-2 bg-slate-200'
                   }`}
                 />
               ))}
@@ -107,7 +110,7 @@ export const EmergencyMode = ({
       </main>
 
       {/* Persistent Medical Notice Footer */}
-      <footer className="py-3 px-4 border-t border-slate-200/80 bg-white text-[11px] text-slate-500 text-center">
+      <footer className="py-3 px-4 border-t border-slate-200/80 bg-white/80 text-[11px] text-slate-500 text-center">
         <div className="max-w-3xl mx-auto flex items-center justify-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
           <span>

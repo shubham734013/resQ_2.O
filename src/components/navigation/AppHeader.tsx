@@ -30,31 +30,88 @@ export const AppHeader = ({ userLocation, isUpdatingLocation = false, onRefreshL
   ];
 
   return (
-    <header role="banner" className={`bg-white border-b border-slate-200/90 sticky top-0 z-30 ${className}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-15 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6 shrink-0">
-          <NavLink to="/" className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 rounded-md p-0.5" aria-label="ResQ Home">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-base shadow-xs group-hover:bg-slate-800 transition-colors"><Compass className="w-4 h-4 text-white" aria-hidden="true" /></div>
-            <div className="flex flex-col"><span className="font-bold text-slate-950 text-base tracking-tight leading-none">ResQ</span><span className="text-[10px] text-slate-500 font-medium tracking-tight hidden sm:inline leading-tight mt-0.5">Healthcare Navigation</span></div>
+    <header role="banner" className={`bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] ${className}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-5 shrink-0">
+          <NavLink to="/" className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 rounded-lg p-1" aria-label="ResQ Home">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-900 to-teal-950 text-white flex items-center justify-center font-bold text-base shadow-sm group-hover:from-slate-800 group-hover:to-teal-900 transition-all border border-teal-500/20">
+              <Compass className="w-5 h-5 text-teal-400 group-hover:rotate-45 transition-transform duration-300" aria-hidden="true" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-slate-950 text-lg tracking-tight leading-none flex items-center gap-1">
+                ResQ
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+              </span>
+              <span className="text-[10px] text-teal-700 font-semibold tracking-wide uppercase hidden sm:inline leading-tight mt-0.5">
+                Emergency & Care
+              </span>
+            </div>
           </NavLink>
-          <div className="hidden sm:block"><LocationIndicator location={userLocation} isUpdating={isUpdatingLocation} onRefresh={onRefreshLocation} /></div>
+          <div className="hidden sm:block">
+            <LocationIndicator location={userLocation} isUpdating={isUpdatingLocation} onRefresh={onRefreshLocation} />
+          </div>
         </div>
         <nav aria-label="Desktop primary navigation" className="hidden md:flex items-center gap-1 text-sm font-medium">
-          {navigation.map(({ path, label }) => <NavLink key={path} to={path} className={({ isActive }) => `px-3 py-1.5 rounded-md transition-colors ${isActive ? 'bg-slate-100 text-slate-950 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}>{label}</NavLink>)}
+          {navigation.map(({ path, label }) => (
+            <NavLink
+              key={path}
+              to={path}
+              className={({ isActive }) =>
+                `px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  isActive
+                    ? 'bg-teal-50 text-teal-900 border border-teal-200/80 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/70'
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
         </nav>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           {user ? (
             <>
-              <span className="hidden lg:block max-w-36 truncate text-xs text-slate-500" title={user.email}>{user.email}</span>
-              <button type="button" onClick={() => void handleLogout()} className="hidden sm:inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50" aria-label="Log out"><LogOut className="h-3.5 w-3.5" />Logout</button>
+              <span className="hidden lg:block max-w-36 truncate text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md" title={user.email}>
+                {user.name || user.email}
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="hidden sm:inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                aria-label="Log out"
+              >
+                <LogOut className="h-3.5 w-3.5" />Logout
+              </button>
             </>
           ) : (
-            <Button variant="secondary" size="sm" onClick={() => navigate('/login')} className="hidden sm:inline-flex">Sign In</Button>
+            <Button variant="secondary" size="sm" onClick={() => navigate('/login')} className="hidden sm:inline-flex font-semibold">
+              Sign In
+            </Button>
           )}
-          <Button variant="emergency" size="sm" icon={<ShieldAlert className="w-4 h-4 text-white" aria-hidden="true" />} onClick={() => navigate('/sos')} aria-label="Access Emergency SOS coordination" className="tracking-tight px-3 py-1.5 text-xs sm:text-sm font-semibold"><span className="hidden sm:inline">Emergency SOS</span><span className="sm:hidden">SOS</span></Button>
+          <button
+            type="button"
+            onClick={() => navigate('/sos')}
+            aria-label="Access Emergency SOS coordination"
+            className="resq-emergency-pulse inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-bold text-xs sm:text-sm tracking-tight shadow-md hover:shadow-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer active:scale-95"
+          >
+            <ShieldAlert className="w-4 h-4 text-white animate-pulse" aria-hidden="true" />
+            <span className="hidden sm:inline">Emergency SOS</span>
+            <span className="sm:hidden">SOS</span>
+          </button>
         </div>
       </div>
-      <div className="sm:hidden px-4 py-1.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between"><LocationIndicator location={userLocation} isUpdating={isUpdatingLocation} onRefresh={onRefreshLocation} compact className="border-none bg-transparent shadow-none p-0 text-[11px]" />{user ? <button type="button" onClick={() => void handleLogout()} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" aria-label="Log out"><LogOut className="h-3.5 w-3.5" />Logout</button> : <button type="button" onClick={() => navigate('/login')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700">Sign In</button>}</div>
+      <div className="sm:hidden px-4 py-2 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between">
+        <LocationIndicator location={userLocation} isUpdating={isUpdatingLocation} onRefresh={onRefreshLocation} compact className="border-none bg-transparent shadow-none p-0 text-[11px]" />
+        {user ? (
+          <button type="button" onClick={() => void handleLogout()} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700" aria-label="Log out">
+            <LogOut className="h-3.5 w-3.5" />Logout
+          </button>
+        ) : (
+          <button type="button" onClick={() => navigate('/login')} className="inline-flex items-center gap-1 text-xs font-semibold text-teal-800">
+            Sign In
+          </button>
+        )}
+      </div>
     </header>
   );
 };

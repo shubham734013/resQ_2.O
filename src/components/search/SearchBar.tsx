@@ -60,7 +60,7 @@ export const SearchBar = ({
         autoFocus={autoFocus}
         autoComplete="off"
         spellCheck="false"
-        className="w-full h-11 pl-10 pr-10 text-sm bg-white border border-slate-200 text-slate-900 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all shadow-xs"
+        className="w-full h-11 pl-10 pr-10 text-sm bg-white border border-slate-200 text-slate-900 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all shadow-xs"
       />
 
       {value && (
@@ -68,7 +68,7 @@ export const SearchBar = ({
           type="button"
           onClick={handleClear}
           aria-label="Clear search query"
-          className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+          className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 cursor-pointer"
         >
           <X className="w-4 h-4" aria-hidden="true" />
         </button>

@@ -333,12 +333,15 @@ export const EmergencyPage = () => {
   return (
     <EmergencyMode stepNumber={meta.step} totalSteps={5} currentStepLabel={meta.label} onExit={() => navigate('/')}>
       {activeRequestQuery.isLoading && !emergencyRequestId && (
-        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">Checking for an existing emergency request…</div>
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 text-xs font-medium text-slate-600 flex items-center gap-2.5 shadow-xs">
+          <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-ping" />
+          <span>Checking for an existing emergency request…</span>
+        </div>
       )}
       {activeRequestQuery.isError && !emergencyRequestId && (
-        <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          Could not check existing requests. Refresh this check before confirming SOS to avoid creating a duplicate.
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => void activeRequestQuery.refetch()}>Retry check</Button>
+        <div role="alert" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 space-y-2">
+          <p className="font-semibold">Could not check existing requests. Refresh this check before confirming SOS to avoid creating a duplicate.</p>
+          <Button variant="outline" size="sm" onClick={() => void activeRequestQuery.refetch()}>Retry check</Button>
         </div>
       )}
       {currentStep === 'situation' && (
@@ -360,29 +363,50 @@ export const EmergencyPage = () => {
       {currentStep === 'searching' && isSearching && <EmergencySearchState situationLabel={selectedSituation?.label} />}
       {currentStep === 'recommendations' && !isSearching && (
         <div className="flex-1 space-y-5">
-          <button type="button" onClick={() => setCurrentStep('location')} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">
-            <ArrowLeft className="h-3.5 w-3.5" /> Change location
+          <button
+            type="button"
+            onClick={() => setCurrentStep('location')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Change location</span>
           </button>
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">Hospitals for {selectedSituation?.label ?? 'your emergency'}</h2>
-            <p className="mt-1 text-xs text-slate-500">Verified facilities matched by declared capabilities, current emergency intake and geographic proximity. Driving ETAs are provided only when routing succeeds.</p>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200/60 text-teal-800 text-[11px] font-semibold">
+              <Building2 className="w-3.5 h-3.5 text-teal-600" />
+              <span>Verified Destination Triage</span>
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
+              Hospitals for {selectedSituation?.label ?? 'your emergency'}
+            </h2>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Verified facilities matched by declared clinical capabilities, emergency intake availability, and proximity.
+            </p>
           </div>
-          {coordinationError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{coordinationError}</div>}
+          {coordinationError && (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 font-medium">
+              {coordinationError}
+            </div>
+          )}
           {searchError && (
-            <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-white p-5 text-center">
-              <AlertTriangle className="mx-auto h-6 w-6 text-rose-700" />
+            <div role="alert" className="space-y-3.5 rounded-2xl border border-rose-200 bg-white p-6 text-center shadow-xs">
+              <AlertTriangle className="mx-auto h-7 w-7 text-rose-600" />
               <h3 className="text-sm font-bold text-slate-900">Hospital search needs attention</h3>
-              <p className="text-xs text-slate-600">{searchError}</p>
-              <Button variant="outline" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void handleLocationConfirm(flowLocation)}>Retry search</Button>
-              <Button variant="emergency" size="sm" icon={<Phone className="h-3.5 w-3.5" />} onClick={() => { window.location.href = 'tel:112'; }}>Call 112</Button>
+              <p className="text-xs text-slate-600 max-w-md mx-auto">{searchError}</p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
+                <Button variant="outline" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void handleLocationConfirm(flowLocation)}>Retry search</Button>
+                <Button variant="emergency" size="sm" icon={<Phone className="h-3.5 w-3.5" />} onClick={() => { window.location.href = 'tel:112'; }}>Call 112</Button>
+              </div>
             </div>
           )}
           {!searchError && recommendations.length === 0 && (
-            <div role="status" className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 text-center">
-              <Building2 className="mx-auto h-6 w-6 text-slate-500" />
+            <div role="status" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-xs">
+              <Building2 className="mx-auto h-8 w-8 text-slate-400" />
               <h3 className="text-sm font-bold text-slate-900">No eligible hospital found</h3>
-              <p className="text-xs text-slate-500">No verified hospital with a declared matching capability and eligible emergency intake was found within {Math.round(searchRadius / 1000)} km.</p>
-              <div className="flex flex-wrap justify-center gap-2">
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                No verified hospital with matching declared capabilities and open emergency intake was located within {Math.round(searchRadius / 1000)} km.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
                 <Button variant="emergency" size="md" icon={<Phone className="h-4 w-4" />} onClick={() => { window.location.href = 'tel:112'; }}>Call 112</Button>
                 {searchRadius < 100000 && <Button variant="outline" size="md" onClick={() => { const next = Math.min(100000, searchRadius * 2); setSearchRadius(next); void handleLocationConfirm(flowLocation); }}>Search a wider radius</Button>}
               </div>
@@ -390,7 +414,7 @@ export const EmergencyPage = () => {
           )}
           {recommendations.length > 0 && (
             <>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
                 <MapView
                   center={confirmedLocation ? { latitude: confirmedLocation.latitude, longitude: confirmedLocation.longitude } : undefined}
                   userLocation={confirmedLocation ?? undefined}
@@ -399,8 +423,16 @@ export const EmergencyPage = () => {
                   className="h-[260px] sm:h-[340px]"
                 />
               </div>
-              <div role="feed" aria-label="Verified emergency hospitals" className="space-y-3">
-                {recommendations.map((item, index) => <FacilityRecommendation key={item.facility.id} item={item} isPrimary={index === 0} onSelect={handleSelectRecommendation} onViewDetails={(chosen) => navigate(`/facility/${chosen.facility.id}?emergency=true`)} />)}
+              <div role="feed" aria-label="Verified emergency hospitals" className="space-y-3.5">
+                {recommendations.map((item, index) => (
+                  <FacilityRecommendation
+                    key={item.facility.id}
+                    item={item}
+                    isPrimary={index === 0}
+                    onSelect={handleSelectRecommendation}
+                    onViewDetails={(chosen) => navigate(`/facility/${chosen.facility.id}?emergency=true`)}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -408,15 +440,22 @@ export const EmergencyPage = () => {
       )}
       {currentStep === 'confirmation' && selectedFacility && confirmedLocation && selectedSituation && (
         <div className="flex-1 space-y-5">
-          <button type="button" onClick={() => setCurrentStep('recommendations')} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">
-            <ArrowLeft className="h-3.5 w-3.5" /> Choose another hospital
+          <button
+            type="button"
+            onClick={() => setCurrentStep('recommendations')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Choose another hospital</span>
           </button>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-rose-700">Final confirmation</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Confirm emergency request</h2>
-            <p className="mt-1 text-sm text-slate-600">Review your emergency type, pickup location and destination. ResQ will recheck hospital eligibility before saving the request.</p>
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-bold uppercase tracking-wider">
+              Step 4: Final Confirmation
+            </span>
+            <h2 className="text-xl font-bold text-slate-950 sm:text-2xl tracking-tight">Confirm Emergency Request</h2>
+            <p className="text-xs sm:text-sm text-slate-600">Review your situation, confirmed location and destination hospital. ResQ re-checks eligibility before persisting.</p>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
             <MapView
               center={typeof selectedFacility.latitude === 'number' && typeof selectedFacility.longitude === 'number' ? { latitude: selectedFacility.latitude, longitude: selectedFacility.longitude } : { latitude: confirmedLocation.latitude, longitude: confirmedLocation.longitude }}
               userLocation={confirmedLocation}
@@ -425,37 +464,53 @@ export const EmergencyPage = () => {
               className="h-[240px] sm:h-[320px]"
             />
           </div>
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <div className="resq-card rounded-2xl p-4 sm:p-5 space-y-3.5">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-rose-50 p-2 text-rose-700"><ShieldCheck className="h-5 w-5" /></div>
+              <div className="rounded-xl bg-rose-50 border border-rose-200/80 p-2 text-rose-700"><ShieldCheck className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Emergency type</p>
-                <p className="mt-1 font-semibold text-slate-900">{selectedSituation.label}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Emergency Type</p>
+                <p className="mt-0.5 font-bold text-slate-900">{selectedSituation.label}</p>
               </div>
             </div>
             <div className="flex items-start gap-3 border-t border-slate-100 pt-3">
-              <MapPin className="mt-1 h-5 w-5 shrink-0 text-slate-500" />
-              <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pickup location</p><p className="mt-1 font-semibold text-slate-900">{confirmedLocation.label}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{confirmedLocation.latitude.toFixed(5)}, {confirmedLocation.longitude.toFixed(5)}</p></div>
+              <div className="rounded-xl bg-teal-50 border border-teal-200/80 p-2 text-teal-700"><MapPin className="h-5 w-5" /></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pickup Location</p>
+                <p className="mt-0.5 font-bold text-slate-900">{confirmedLocation.label}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-slate-500">{confirmedLocation.latitude.toFixed(5)}, {confirmedLocation.longitude.toFixed(5)}</p>
+              </div>
             </div>
             <div className="flex items-start gap-3 border-t border-slate-100 pt-3">
-              <Building2 className="mt-1 h-5 w-5 shrink-0 text-slate-500" />
+              <div className="rounded-xl bg-slate-100 border border-slate-200 p-2 text-slate-700"><Building2 className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{selectedFacility.name}</p><span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800"><CheckCircle2 className="h-3 w-3" /> Verified</span></div>
-                <p className="mt-1 text-xs text-slate-600">{selectedFacility.address || 'Address unavailable'}</p>
-                <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700"><span><strong>{selectedFacility.distance}</strong> {selectedFacility.distanceMeters ? (selectedFacility.distanceType === 'DRIVING' ? 'driving distance' : 'straight-line distance') : ''}</span><span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{selectedFacility.estimatedTime || 'Driving ETA unavailable'}</span></p>
-                {selectedFacility.phone && <p className="mt-2 text-xs text-slate-600">Contact: {selectedFacility.phone}</p>}
-                {selectedFacility.capabilities.length > 0 && <p className="mt-2 text-xs text-slate-600">Declared capabilities: {selectedFacility.capabilities.slice(0, 5).join(', ')}</p>}
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-bold text-slate-900">{selectedFacility.name}</p>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                    <CheckCircle2 className="h-3 w-3" /> Verified
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-600">{selectedFacility.address || 'Address unavailable'}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200/70">
+                  <span><strong>{selectedFacility.distance}</strong> {selectedFacility.distanceMeters ? (selectedFacility.distanceType === 'DRIVING' ? 'driving distance' : 'straight-line distance') : ''}</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-teal-800"><Clock className="h-3.5 w-3.5 text-teal-600" />{selectedFacility.estimatedTime || 'Driving ETA unavailable'}</span>
+                </div>
+                {selectedFacility.phone && <p className="mt-2 text-xs text-slate-600 font-medium">Contact: {selectedFacility.phone}</p>}
+                {selectedFacility.capabilities.length > 0 && <p className="mt-1 text-xs text-slate-500">Capabilities: {selectedFacility.capabilities.slice(0, 5).join(', ')}</p>}
               </div>
             </div>
           </div>
-          {selectedFacility.estimatedTime === 'Driving ETA unavailable' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Google Routes could not provide a driving ETA. ResQ will not invent one; the request can still be saved, and direct emergency calling remains available.</div>}
-          {coordinationError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{coordinationError}</div>}
-          <div className="sticky bottom-0 space-y-2 border-t border-slate-200 bg-slate-50/95 py-3 backdrop-blur-sm">
-            <Button variant="emergency" size="lg" fullWidth disabled={isCreatingRequest || activeRequestQuery.isError} onClick={() => void handleConfirmEmergency()}>
-              {isCreatingRequest ? 'Validating hospital and saving request…' : 'Confirm SOS request'}
+          {selectedFacility.estimatedTime === 'Driving ETA unavailable' && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+              Google Routes could not provide a driving ETA. ResQ will not invent one; the request can still be saved, and direct emergency calling remains available.
+            </div>
+          )}
+          {coordinationError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800">{coordinationError}</div>}
+          <div className="sticky bottom-0 space-y-2 border-t border-slate-200 bg-slate-50/95 py-3 backdrop-blur-md z-20">
+            <Button variant="emergency" size="lg" fullWidth disabled={isCreatingRequest || activeRequestQuery.isError} onClick={() => void handleConfirmEmergency()} className="shadow-md font-bold py-3">
+              {isCreatingRequest ? 'Validating hospital and saving request…' : 'Confirm SOS Request'}
             </Button>
             <p className="text-center text-[11px] text-slate-500">This creates a hospital-coordination request. It does not dispatch an ambulance automatically.</p>
-            <button type="button" className="flex w-full items-center justify-center gap-1.5 py-1 text-xs font-semibold text-rose-700" onClick={() => { window.location.href = 'tel:112'; }}><Phone className="h-3.5 w-3.5" /> Call 112 instead</button>
+            <button type="button" className="flex w-full items-center justify-center gap-1.5 py-1 text-xs font-semibold text-rose-700 hover:text-rose-800 cursor-pointer" onClick={() => { window.location.href = 'tel:112'; }}><Phone className="h-3.5 w-3.5" /> Call 112 instead</button>
           </div>
         </div>
       )}

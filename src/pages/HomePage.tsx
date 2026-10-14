@@ -1,10 +1,11 @@
 import { useCallback, useState, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
   List,
   Map as MapIcon,
   ShieldAlert,
   ChevronUp,
+  Calendar,
 } from 'lucide-react';
 import { SearchBar } from '../components/search/SearchBar';
 import { FacilityFilterChips } from '../components/facility/FacilityFilterChips';
@@ -22,6 +23,7 @@ interface LayoutContext {
 }
 
 export const HomePage = () => {
+  const navigate = useNavigate();
   const { currentLocation, refreshLocation } = useOutletContext<LayoutContext>();
   const hasLocation = Number.isFinite(currentLocation.latitude) && Number.isFinite(currentLocation.longitude) && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
   const nearby = useNearbyFacilities(hasLocation ? currentLocation.latitude : null, hasLocation ? currentLocation.longitude : null);
@@ -107,7 +109,7 @@ export const HomePage = () => {
   }, [nearbyLocated, locatedFacilities, facilities, handleSelectFacility]);
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-slate-100">
+    <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-slate-100">
       {/* ========================================================
           DESKTOP & TABLET LAYOUT (Split View: Master-Detail + Map)
           ======================================================== */}
@@ -115,14 +117,45 @@ export const HomePage = () => {
         {/* Left Side: Search, Filters, Facilities List & Preview */}
         <aside
           aria-label="Healthcare facilities finder"
-          className="w-[420px] lg:w-[460px] shrink-0 bg-white border-r border-slate-200/90 flex flex-col h-full shadow-xs z-10"
+          className="w-[430px] lg:w-[480px] shrink-0 bg-white border-r border-slate-200/90 flex flex-col h-full shadow-xs z-10"
         >
-          {/* Top Panel: Search Bar & Filters */}
+          {/* Top Panel: Quick Navigation & Search */}
           <div className="p-4 border-b border-slate-100 space-y-3 bg-white shrink-0">
+            {/* Quick Emergency & Care Action Cards */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/sos')}
+                className="resq-emergency-pulse p-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 text-white flex items-center gap-2.5 text-left cursor-pointer shadow-sm hover:from-red-700 hover:to-rose-800 transition-all active:scale-[0.98]"
+              >
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-4 h-4 text-white animate-pulse" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-black block leading-tight">Emergency SOS</span>
+                  <span className="text-[10px] text-white/80 block truncate font-medium">1-Click Dispatch</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/appointments')}
+                className="p-2.5 rounded-xl bg-teal-50/80 hover:bg-teal-100/70 border border-teal-200/80 text-teal-950 flex items-center gap-2.5 text-left cursor-pointer transition-all shadow-xs active:scale-[0.98]"
+              >
+                <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold block leading-tight">Care & Visits</span>
+                  <span className="text-[10px] text-teal-700 block truncate font-medium">Book or Track</span>
+                </div>
+              </button>
+            </div>
+
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search hospitals, trauma, urgent care..."
+              placeholder="Search hospitals, trauma, specialty care..."
               onClear={() => setSearchQuery('')}
             />
 

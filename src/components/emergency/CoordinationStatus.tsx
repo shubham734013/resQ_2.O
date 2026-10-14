@@ -117,45 +117,51 @@ export const CoordinationStatus = ({
         <div>
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${ready && !request.isError ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-800 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/80 shadow-xs">
               {statusLabel}
             </span>
           </div>
-          <h2 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-slate-950">Emergency coordination</h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Selected facility: <strong className="text-slate-800">{facility.name}</strong>.
+          <h2 className="mt-2.5 text-xl sm:text-2xl font-bold tracking-tight text-slate-950">Emergency Coordination</h2>
+          <p className="text-xs sm:text-sm text-slate-600">
+            Selected facility: <strong className="text-slate-900 font-semibold">{facility.name}</strong>.
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs flex items-start justify-between gap-3">
+        {/* Destination Card */}
+        <div className="resq-card rounded-2xl p-4 sm:p-5 flex items-start justify-between gap-3.5">
           <div className="min-w-0">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">Destination</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700 block mb-1">Destination Facility</span>
             <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate">{facility.name}</h3>
-            <p className="text-xs text-slate-500 truncate">{facility.address || 'Address unavailable'}</p>
+            <p className="text-xs text-slate-500 truncate mt-0.5">{facility.address || 'Address unavailable'}</p>
           </div>
-          <div className="text-right shrink-0 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
+          <div className="text-right shrink-0 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 shadow-xs">
             <span className="font-bold text-slate-900 text-xs sm:text-sm block">{facility.distance}</span>
-            <span className="text-[11px] text-slate-500 flex items-center gap-1 justify-end">
-              <Clock className="w-3 h-3" />
+            <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 justify-end mt-0.5">
+              <Clock className="w-3 h-3 text-slate-400" />
               {facility.estimatedTime || 'Live ETA unavailable'}
             </span>
           </div>
         </div>
 
         {ready && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800">ResQ request</p>
-            <p className="mt-1 font-bold text-emerald-950">{data?.requestCode ?? emergencyRequestId}</p>
-            <p className="mt-1 text-xs text-emerald-800">
-              Persisted in the selected hospital&apos;s emergency queue. Hospital response controls the next coordination step.
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5 space-y-1">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Hospital Request Reference</p>
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
+                ACTIVE QUEUE
+              </span>
+            </div>
+            <p className="font-mono text-base font-bold text-emerald-950 pt-0.5">{data?.requestCode ?? emergencyRequestId}</p>
+            <p className="text-xs text-emerald-800/90 leading-relaxed pt-1">
+              Persisted in the hospital&apos;s active coordination queue. Hospital response guides the next triage step.
             </p>
-            <p className="mt-1 text-[11px] text-emerald-800">Request ID: {data?.id ?? emergencyRequestId}</p>
           </div>
         )}
+
         {data?.dispatch && (
-          <div role="status" className={`rounded-xl border p-4 ${data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED' ? 'border-amber-300 bg-amber-50' : 'border-sky-200 bg-sky-50'}`}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">Ambulance dispatch</p>
-            <p className="mt-1 text-sm font-bold text-slate-950">
+          <div role="status" className={`rounded-2xl border p-4 sm:p-5 space-y-1.5 ${data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED' ? 'border-amber-300 bg-amber-50/80' : 'border-sky-200 bg-sky-50/70'}`}>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-700">Ambulance Dispatch State</p>
+            <p className="text-sm font-bold text-slate-950">
               {data.dispatch.status === 'OFFERED' ? 'A driver is being offered this request' :
                 data.dispatch.status === 'ACCEPTED' ? 'A driver accepted the request' :
                   data.dispatch.status === 'EXHAUSTED' ? 'No eligible driver is currently available' :
@@ -163,11 +169,11 @@ export const CoordinationStatus = ({
                       data.dispatch.status === 'CANCELLED' ? 'Dispatch cancelled' :
                         data.dispatch.status === 'SEARCHING' ? 'Searching eligible drivers and ambulances' : 'Dispatch queued'}
             </p>
-            <p className="mt-1 text-xs text-slate-700">{data.dispatch.message ?? `Dispatch attempts: ${data.dispatch.attemptCount}`}</p>
+            <p className="text-xs text-slate-700">{data.dispatch.message ?? `Dispatch attempts: ${data.dispatch.attemptCount}`}</p>
             {(data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED') && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2 pt-1">
                 <Button variant="emergency" size="sm" onClick={() => { window.location.href = 'tel:112'; }} icon={<Phone className="h-3.5 w-3.5" />}>Call 112</Button>
-                <span className="text-[11px] text-amber-900">Keep your phone available. Hospital selection remains unchanged.</span>
+                <span className="text-[11px] text-amber-900 font-medium">Keep your phone available. Hospital selection remains unchanged.</span>
               </div>
             )}
           </div>
@@ -176,7 +182,7 @@ export const CoordinationStatus = ({
         {emergencyRequestId && <LiveAmbulanceTracking emergencyRequestId={emergencyRequestId} />}
 
         {error && (
-          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-2 text-xs text-amber-900">
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-2.5 text-xs text-amber-900">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
             <span>{error}</span>
           </div>
@@ -188,28 +194,29 @@ export const CoordinationStatus = ({
           </div>
         )}
 
-        <div className="bg-white border border-slate-200/90 rounded-xl p-4 sm:p-5 shadow-xs space-y-3.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block border-b border-slate-100 pb-2">
-            Coordination status
+        {/* Timeline Progression */}
+        <div className="resq-card rounded-2xl p-4 sm:p-5 space-y-3.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block border-b border-slate-100 pb-2">
+            Coordination Milestones
           </span>
-          <ol className="space-y-3 text-xs">
+          <ol className="space-y-3.5 text-xs">
             {[
-              { label: 'Finding care', detail: 'Verified facilities ranked from the confirmed location.', done: true },
-              { label: 'Facility selected', detail: 'Destination selected from the verified facility directory.', done: true },
+              { label: 'Finding care', detail: 'Verified facilities ranked from confirmed location.', done: true },
+              { label: 'Facility selected', detail: 'Destination selected from verified directory.', done: true },
               {
                 label: 'Emergency request',
                 detail: ready ? 'Request persisted to hospital operations.' : 'Waiting for request persistence.',
                 done: ready,
                 current: isCreatingRequest,
               },
-              { label: 'Ready for navigation', detail: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? 'Hospital coordinates are available for navigation.' : 'Hospital coordinates are not currently available.', done: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' },
+              { label: 'Ready for navigation', detail: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? 'Hospital coordinates available for turn-by-turn navigation.' : 'Hospital coordinates unavailable.', done: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' },
             ].map((step, index) => (
               <li key={step.label} className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
                   {step.done ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <CheckCircle2 className="w-4 h-4 text-teal-600" />
                   ) : step.current ? (
-                    <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+                    <Loader2 className="w-4 h-4 text-teal-600 animate-spin" />
                   ) : (
                     <div className="w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center text-[10px] text-slate-400 font-mono">
                       {index + 1}
@@ -225,7 +232,7 @@ export const CoordinationStatus = ({
           </ol>
         </div>
 
-        <div className="p-3 bg-slate-100 border border-slate-200/80 rounded-xl text-xs text-slate-600 flex items-start gap-2">
+        <div className="p-3.5 bg-slate-100/90 border border-slate-200/80 rounded-xl text-xs text-slate-600 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
             <strong>Important:</strong> ResQ coordinates navigation and request delivery. Hospital triage and ambulance availability remain subject to live provider decisions.
@@ -233,19 +240,19 @@ export const CoordinationStatus = ({
         </div>
       </div>
 
-      <div className="pt-4 sticky bottom-0 bg-slate-50/95 backdrop-blur-xs py-3 border-t border-slate-200/80 -mx-4 px-4 sm:mx-0 sm:px-0 space-y-2.5">
+      <div className="pt-4 sticky bottom-0 bg-slate-50/95 backdrop-blur-md py-3 border-t border-slate-200/90 -mx-4 px-4 sm:mx-0 sm:px-0 space-y-2.5 z-20">
         <div className="flex flex-col sm:flex-row gap-2.5">
           <Button
             variant="primary"
             size="lg"
             icon={<Navigation className="w-4 h-4" />}
             onClick={() => navigate(`/route/${facility.id}?emergency=true`)}
-            className="flex-1 font-bold"
+            className="flex-1 font-bold shadow-sm"
             disabled={!ready || typeof facility.latitude !== 'number' || typeof facility.longitude !== 'number'}
           >
             Start Navigation
           </Button>
-          <Button variant="secondary" size="lg" icon={<Phone className="w-4 h-4" />} onClick={callHospital} className="flex-1" disabled={!facility.phone}>
+          <Button variant="secondary" size="lg" icon={<Phone className="w-4 h-4" />} onClick={callHospital} className="flex-1 font-semibold" disabled={!facility.phone}>
             Call Hospital
           </Button>
         </div>
@@ -255,15 +262,15 @@ export const CoordinationStatus = ({
             onClick={() => {
               window.location.href = 'tel:112';
             }}
-            className="text-rose-700 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
+            className="text-rose-700 hover:text-rose-800 font-semibold flex items-center gap-1.5 cursor-pointer"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            Direct emergency dial
+            Direct emergency dial (112)
           </button>
           <button
             type="button"
             onClick={handleExitClick}
-            className="text-slate-500 hover:text-slate-800 font-medium flex items-center gap-1 cursor-pointer"
+            className="text-slate-500 hover:text-slate-800 font-medium flex items-center gap-1 cursor-pointer transition-colors"
           >
             <span>Exit Emergency Flow</span>
             <ArrowRight className="w-3 h-3" />

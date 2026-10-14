@@ -38,22 +38,18 @@ export const BottomNavigation = () => {
                 key={item.name}
                 to={item.path}
                 aria-label="Emergency SOS coordination"
-                className="flex flex-col items-center justify-center min-w-[56px] min-h-[48px] px-2 py-1 group select-none cursor-pointer focus-visible:outline-none"
+                className="flex flex-col items-center justify-center min-w-[56px] min-h-[48px] px-2 py-0.5 group select-none cursor-pointer focus-visible:outline-none -mt-3"
               >
                 <div
-                  className={`flex items-center justify-center w-9 h-9 rounded-full transition-all border ${
+                  className={`flex items-center justify-center w-11 h-11 rounded-full transition-all shadow-md ${
                     isActive
-                      ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
-                      : 'bg-rose-50 text-rose-700 border-rose-200 group-hover:bg-rose-100 group-active:bg-rose-200'
+                      ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-rose-300'
+                      : 'resq-emergency-pulse bg-gradient-to-r from-red-600 to-rose-700 text-white group-hover:scale-105 active:scale-95'
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
                 </div>
-                <span
-                  className={`text-[10px] font-semibold tracking-tight mt-0.5 ${
-                    isActive ? 'text-rose-800' : 'text-rose-700'
-                  }`}
-                >
+                <span className="text-[10px] font-bold tracking-tight mt-1 text-rose-700">
                   {item.name}
                 </span>
               </NavLink>
@@ -65,8 +61,8 @@ export const BottomNavigation = () => {
               key={item.name}
               to={item.path}
               aria-current={isActive ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center min-w-[56px] min-h-[48px] px-2 py-1 rounded-md select-none cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
-                isActive ? 'text-slate-950 font-semibold' : 'text-slate-500 hover:text-slate-900'
+              className={`relative flex flex-col items-center justify-center min-w-[56px] min-h-[48px] px-2 py-1 rounded-lg select-none cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 ${
+                isActive ? 'text-teal-900 font-bold' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               <div className="relative">
@@ -74,7 +70,7 @@ export const BottomNavigation = () => {
                 {isActive && !shouldReduceMotion && (
                   <motion.div
                     layoutId="bottom-nav-active"
-                    className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-slate-900"
+                    className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-teal-600"
                     transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                   />
                 )}
