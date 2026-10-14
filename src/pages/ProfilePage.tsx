@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Shield, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Shield, User, Calendar } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { useCancelEmergency, useUpdateUserProfile, useUserEmergencies, useUserProfile } from '../hooks/useUser';
 import type { UserProfile } from '../services/userApi';
@@ -70,6 +71,7 @@ const ProfileForm = ({ profile, update }: { profile: UserProfile; update: Return
 };
 
 export const ProfilePage = () => {
+  const navigate = useNavigate();
   const q = useUserProfile();
   const emergencies = useUserEmergencies({ page: 1, limit: 10 });
   const cancelEmergency = useCancelEmergency();
@@ -87,6 +89,24 @@ export const ProfilePage = () => {
         <p className="text-sm text-slate-500">Manage the profile information ResQ uses for your account and emergency coordination.</p>
       </header>
       <ProfileForm profile={profile} update={update} />
+
+      <section className="bg-white rounded-xl border border-slate-200/90 p-5 space-y-3 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Hospital Requests & Appointments</h2>
+            <p className="text-xs text-slate-500">Track your non-emergency consultations, scheduled clinic visits, and responses.</p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate('/appointments')}
+            icon={<Calendar className="w-3.5 h-3.5 text-indigo-600" />}
+          >
+            View Appointments
+          </Button>
+        </div>
+      </section>
+
     <section className="bg-white rounded-xl border border-slate-200/90 p-5 space-y-4 shadow-xs"><div><h2 className="text-sm font-semibold text-slate-900">Emergency history</h2><p className="text-xs text-slate-500">Your emergency requests and their current backend status.</p></div>{emergencies.isLoading?<div className="p-5 text-center text-sm text-slate-500">Loading emergency history…</div>:emergencies.isError?<div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><div className="flex items-center justify-between"><span>Unable to load emergency history.</span><Button size="sm" variant="secondary" onClick={()=>void emergencies.refetch()}>Retry</Button></div></div>:!emergencies.data?.items.length?<div className="p-5 text-center text-sm text-slate-500">No emergency requests yet.</div>:<div className="space-y-2">{emergencies.data.items.map((item)=><div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-slate-900">{item.requestCode}</p><p className="text-xs text-slate-500">{item.situationType} · {new Date(item.reportedAt).toLocaleString()}</p><p className="mt-1 text-xs font-medium text-slate-700">{item.status}</p></div>{['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION'].includes(item.status)&&<Button size="sm" variant="secondary" disabled={cancelEmergency.isPending} onClick={()=>{if(window.confirm('Cancel this emergency request?'))cancelEmergency.mutate(item.id);}}>Cancel</Button>}</div>)}</div>}</section>
     <section className="bg-white rounded-xl border border-slate-200/90 p-5 space-y-3 text-xs text-slate-600 shadow-xs"><div className="flex items-center gap-2 font-semibold text-slate-900"><Shield className="w-4 h-4"/><span>Emergency coordination notice</span></div><p className="leading-relaxed">ResQ is a healthcare navigation and emergency coordination platform. It does not diagnose medical conditions or replace local emergency responders.</p></section>
       </div>

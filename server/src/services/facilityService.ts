@@ -80,6 +80,8 @@ export const hospitalToFacility = (hospital: HospitalFacility, distanceMeters?: 
     isOpen: hospital.accountStatus === 'ACTIVE',
     isAvailable: hospital.emergencyAvailability !== 'UNAVAILABLE',
     capabilities: hospital.capabilities.filter((value): value is string => typeof value === 'string'),
+    departments: Array.isArray(hospital.services) ? hospital.services.filter((value): value is string => typeof value === 'string') : [],
+    services: Array.isArray(hospital.services) ? hospital.services.filter((value): value is string => typeof value === 'string') : [],
   };
 };
 

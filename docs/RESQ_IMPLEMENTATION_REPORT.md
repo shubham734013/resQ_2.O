@@ -130,19 +130,84 @@ File: [`server/src/schemas/facility.ts`](file:///Users/shubham/Desktop/projectRe
 
 ---
 
-## 6. Summary of Changed and Added Files
+## 6. Workflow B: Direct Hospital Requests & Concurrency-Safe Appointments
+
+### Problem Statement
+Citizens needed the capability to send non-emergency requests directly to a specific hospital and book scheduled appointments without routing through or altering the core emergency SOS dispatch engine. Crucially, the Emergency SOS workflow (with ambulance dispatch, priority triage, and pre-arrival coordination) had to remain completely prominent, functional, and unaffected.
+
+### Implementation Architecture & Separation of Concerns
+
+1. **Independent Data Models**:
+   - `HospitalCareRequest`: Stores non-emergency consultation requests with human-readable tracking codes (`REQ-...`), preferred timing, contact preferences, and full status history (`PENDING`, `ACCEPTED`, `REJECTED`, `CANCELLED`).
+   - `HospitalAppointmentAvailability`: Manages hospital weekly schedules, slot duration, max capacity per slot, and blackout dates per department.
+   - `HospitalAppointmentSlot`: Individual capacity buckets with a unique compound index `(hospitalId, department, date, startTime)` and atomic `bookedCount` tracker.
+   - `HospitalAppointment`: Citizen appointment records with appointment code (`APT-...`), department, date, time slot, alternative slot proposals, and status history.
+   - `HospitalCareNotification`: In-app notification store with delivery tracking and status (`READ` / `UNREAD`).
+
+2. **Atomic Concurrency Control (Zero Double-Booking Guarantee)**:
+   - Slot reservations execute via atomic conditional updates:
+     ```typescript
+     const reservedSlot = await HospitalAppointmentSlotModel.findOneAndUpdate(
+       {
+         _id: slotDoc._id,
+         bookedCount: { $lt: slotDoc.maxCapacity },
+         isCancelled: false,
+       },
+       { $inc: { bookedCount: 1 } },
+       { returnDocument: 'after' }
+     );
+     if (!reservedSlot) {
+       throw new AppError('SLOT_UNAVAILABLE', 'The requested time slot has reached full capacity.', 409);
+     }
+     ```
+   - On appointment cancellation or hospital rejection, capacity is atomically released with `{ $inc: { bookedCount: -1 } }` guarded by `{ bookedCount: { $gt: 0 } }`.
+   - Verified by automated concurrency integration tests where 3 concurrent callers race for a single slot, resulting in exactly 1 booking and 2 clean 409 rejections.
+
+3. **Prominent Safety Disclaimers**:
+   - Both `CareRequestModal.tsx` and `AppointmentBookingModal.tsx` render high-contrast safety warning banners reminding citizens that the flow is for non-emergency care only, with an instant one-click link to the Emergency SOS interface.
+
+4. **Dedicated Frontend Dashboards**:
+   - Citizen Portal (`/appointments`): Filterable tabs for scheduled Appointments, submitted Care Requests, and In-App Notifications.
+   - Hospital Staff Portal (`/hospital/appointments`): Subtabs for Incoming Care Requests (with Accept/Reject modals), Appointments Schedule (with Alternative Slot Proposal modal), and Availability Configuration.
+   - Facility Actions: Clean coexistence on Facility Details pages displaying `Request Care` and `Book Appointment` alongside `Call`, `Directions`, and `Emergency SOS`.
+
+---
+
+## 7. Summary of Changed and Added Files
 
 | File Path | Nature of Change | Purpose |
 | :--- | :--- | :--- |
+| `server/src/models/HospitalCareRequest.ts` | **Added** | Mongoose schema and model for non-emergency care requests with `REQ-` references and audit history. |
+| `server/src/models/HospitalAppointmentAvailability.ts` | **Added** | Hospital schedule configuration (weekly operating hours, slot duration, capacity, blackout dates). |
+| `server/src/models/HospitalAppointmentSlot.ts` | **Added** | Individual time-slot capacity counters with atomic reservation support. |
+| `server/src/models/HospitalAppointment.ts` | **Added** | Appointment booking schema with `APT-` codes, alternative slot proposals, and lifecycle status. |
+| `server/src/models/HospitalCareNotification.ts` | **Added** | In-app notification persistence for users and hospital staff. |
+| `server/src/services/hospitalCareRequestService.ts` | **Added** | Business logic for creating, cancelling, listing, and hospital acceptance/rejection of requests. |
+| `server/src/services/hospitalAppointmentService.ts` | **Added** | Atomic slot generation, concurrency-safe reservations, capacity release, and alternative slot proposals. |
+| `server/src/services/hospitalCareNotificationService.ts` | **Added** | In-app notification creation, retrieval, mark-as-read, and channel broadcasting. |
+| `server/src/routes/hospitalCareRequestRoutes.ts` | **Added** | Express router for `/api/v1/hospital-requests`. |
+| `server/src/routes/hospitalAppointmentRoutes.ts` | **Added** | Express routers for citizen (`/api/v1/appointments`) and hospital (`/api/v1/hospital-appointments`). |
+| `server/src/tests/hospitalCareRequestAndAppointments.test.ts` | **Added** | 18 automated integration tests covering requests, concurrency, capacity release, and SOS regression. |
+| `src/services/hospitalCareRequestApi.ts` | **Added** | Frontend REST API client for hospital care requests. |
+| `src/services/hospitalAppointmentApi.ts` | **Added** | Frontend REST API client for appointments and schedule management. |
+| `src/services/hospitalCareNotificationApi.ts` | **Added** | Frontend REST API client for in-app notifications. |
+| `src/hooks/useHospitalCareRequests.ts` | **Added** | TanStack Query hooks for care request mutations and queries. |
+| `src/hooks/useHospitalAppointments.ts` | **Added** | TanStack Query hooks for appointment booking, availability, and alternative proposals. |
+| `src/components/facility/CareRequestModal.tsx` | **Added** | Non-emergency care request dialog with safety disclaimer and department selector. |
+| `src/components/facility/AppointmentBookingModal.tsx` | **Added** | Interactive calendar & slot booking dialog with atomic reservation handling. |
+| `src/components/facility/FacilityActions.tsx` | **Updated** | Added Request Care and Book Appointment buttons alongside Call, Directions, and SOS. |
+| `src/pages/CitizenAppointmentsPage.tsx` | **Added** | Citizen dashboard for appointments, care requests, and notifications. |
+| `src/pages/HospitalAppointmentsPage.tsx` | **Added** | Hospital staff portal for request triage, appointment management, and availability configuration. |
+| `src/components/hospital/HospitalLayout.tsx` | **Updated** | Added Care & Appointments sidebar navigation item for hospital staff. |
+| `tests/selenium/test_hospital_requests_and_appointments.py` | **Added** | 4 Selenium browser tests verifying UI flows, tabs, and emergency SOS coexistence. |
 | `server/src/config/testDatabase.ts` | **Added** | Strict test database isolation guards, prohibited target blacklisting, fail-closed target validation. |
 | `server/src/tests/testDatabaseIsolation.test.ts` | **Added** | 12 automated unit tests verifying database safety rules and resolution precedence. |
 | `server/src/scripts/verifyE2EWorkflow.ts` | **Updated** | Switched to `connectTestDatabase()`, added unique `testRunId`, self-seeding fixtures, demo state preservation, and explicit ownership cleanup. |
 | `server/src/middlewares/rateLimit.ts` | **Updated** | Supported test bypass and relaxed dev thresholds to eliminate false 429 errors. |
 | `server/src/schemas/facility.ts` | **Updated** | Added `query` and `search` query parameter aliases for robust full-text search. |
-| `server/src/config/env.ts` | **Updated** | Set default port fallback to `5001` matching frontend configuration. |
 | `src/pages/LoginPage.tsx` | **Updated** | Added session flag initialization before refreshUser to resolve admin login race condition. |
 | `tests/selenium/test_authenticated_workflow.py` | **Added** | 11 authenticated browser tests covering all 5 user roles and protected dashboard workflows. |
-| `docs/RESQ_FEATURE_AUDIT.md` | **Added** | Comprehensive feature-by-feature audit matrix across all 9 modules. |
-| `docs/RESQ_IMPLEMENTATION_REPORT.md` | **Added** | Detailed architectural and code changes documentation. |
-| `docs/RESQ_TEST_EVIDENCE.md` | **Added** | Comprehensive verification log and execution evidence for all test suites. |
-| `docs/RESQ_DEPLOYMENT_CHECKLIST.md` | **Added** | Production configuration, security checklist, and deployment prerequisites. |
+| `docs/RESQ_FEATURE_AUDIT.md` | **Updated** | Comprehensive feature-by-feature audit matrix across all modules including Workflow B. |
+| `docs/RESQ_IMPLEMENTATION_REPORT.md` | **Updated** | Detailed architectural and code changes documentation. |
+| `docs/RESQ_TEST_EVIDENCE.md` | **Updated** | Comprehensive verification log and execution evidence for all test suites. |
+| `docs/RESQ_DEPLOYMENT_CHECKLIST.md` | **Updated** | Production configuration, security checklist, and deployment prerequisites. |

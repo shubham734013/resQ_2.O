@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, UserRound, Ambulance, BedDouble, ChevronRight } from 'lucide-react';
+import { Building2, ClipboardList, UserRound, Ambulance, BedDouble, ChevronRight, Calendar } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { StatusBadge } from '../common/StatusBadge';
 import { useHospitalProfile } from '../../hooks/useHospitalManagement';
@@ -6,6 +6,7 @@ import { useHospitalProfile } from '../../hooks/useHospitalManagement';
 const links = [
   { label: 'Overview', path: '/hospital', icon: Building2 },
   { label: 'Emergency Requests', path: '/hospital/emergencies', icon: ClipboardList },
+  { label: 'Care & Appointments', path: '/hospital/appointments', icon: Calendar },
   { label: 'Patients', path: '/hospital/patients', icon: UserRound },
   { label: 'Ambulances', path: '/hospital/ambulances', icon: Ambulance },
   { label: 'Resources', path: '/hospital/resources', icon: BedDouble },
