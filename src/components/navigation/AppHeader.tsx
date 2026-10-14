@@ -22,7 +22,11 @@ export const AppHeader = ({ userLocation, isUpdatingLocation = false, onRefreshL
   };
 
   const navigation = [
-    { path: '/', label: 'Home' }, { path: '/search', label: 'Search' }, { path: '/saved', label: 'Saved' }, { path: '/profile', label: 'Profile' },
+    { path: '/', label: 'Home' },
+    { path: '/search', label: 'Search' },
+    ...(user ? [{ path: '/appointments', label: 'Appointments' }] : []),
+    { path: '/saved', label: 'Saved' },
+    { path: '/profile', label: 'Profile' },
   ];
 
   return (

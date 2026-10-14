@@ -13,9 +13,8 @@ This document records the exact commands executed, environments used, raw execut
 | **Frontend Production Build** | Vite 8.3 | Production bundle | Built `dist/` | 0 | 0 | **PASS** | 195ms |
 | **Backend Static Analysis** | TypeScript `tsc -p tsconfig.json --noEmit` | Server codebase | Clean | 0 | 0 | **PASS** | 2.4s |
 | **Backend Linter** | ESLint 9 | Server codebase | Clean | 0 | 0 | **PASS** | 1.9s |
-| **Backend Production Build** | TypeScript Compiler `tsc -p tsconfig.json` | Server build | Built `dist/` | 0 | 0 | **PASS** | 2.5s |
-| **Backend Automated Tests** | Node.js Test Runner + Atlas Replica Set | 136 tests | 136 | 0 | 0 | **PASS** | 32.9s |
-| **Selenium Browser Suite** | Python 3 + Chrome Headless | 29 tests | 29 | 0 | 0 | **PASS** | 17.9s |
+| **Backend Automated Tests** | Node.js Test Runner + Atlas Replica Set | 154 tests | 151 | 0 | 3 | **PASS** | 19.8s |
+| **Selenium Browser Suite** | Python 3 + Chrome Headless | 33 tests | 33 | 0 | 0 | **PASS** | 20.2s |
 | **Live E2E Acceptance Script** | TSX + Atlas Test Replica Set | 9 stages | 9 | 0 | 0 | **PASS** | 9.8s |
 
 ---
@@ -192,37 +191,65 @@ Key Suites & Test Results:
   ✔ resolves TEST_MONGODB_URI when set (0.038ms)
 ✔ Test Database Isolation: URI resolution fail-closed behavior (0.497ms)
 
-✔ Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers via REST and cleans terminal trip rooms (13799.913ms)
-✔ tracking snapshot authorization scopes user, hospital, driver and provider to their own emergency (1.008ms)
-✔ previously assigned provider loses tracking access once a trip belongs to another provider (0.179ms)
-✔ before acceptance user and destination hospital may see dispatch status, but no driver can read trip tracking (0.111ms)
-✔ route target follows persisted trip lifecycle rather than browser navigation state (0.097ms)
-✔ tracking freshness rejects missing, stale and future timestamps (0.983ms)
-✔ cancelEmergencySchema accepts optional reason and empty payload (0.506ms)
-✔ createEmergencyRequestSchema validates coordinates, situation, and hospitalId (0.367ms)
-✔ userEmergencyListQuerySchema enforces bounded pagination and valid filters (0.279ms)
-✔ facilitySearchQuerySchema handles text, category, coordinates, and emergency flags (0.359ms)
-✔ routeRequestSchema validates coordinates and driving preference (0.240ms)
-✔ nearbyQuerySchema validates radius and center coordinates (0.214ms)
-✔ hospitalToFacility correctly transforms GeoJSON coordinates and statuses (0.800ms)
-✔ public facility router does not enforce top-level authenticate middleware (0.049ms)
-✔ public maps and geocoding routers do not enforce authenticate middleware (0.057ms)
-✔ geospatial router separates public facilities from authenticated ambulances (0.097ms)
-✔ emergency router middleware contract enforces authentication and USER role (0.116ms)
+▶ Workflow B: Direct Hospital Requests and Concurrency-Safe Appointments
+  ▶ Direct Hospital Care Requests
+    ✔ creates a normal-care request with valid department and records statusHistory (400.494ms)
+    ✔ rejects a care request for an unoffered department (68.993ms)
+    ✔ citizen can retrieve their care requests (133.917ms)
+    ✔ prevents cross-user access to care request (34.469ms)
+    ✔ prevents cross-hospital access to care request (109.179ms)
+    ✔ hospital responds to care request with ACCEPT (507.904ms)
+    ✔ rejects invalid status transitions once ACCEPTED (153.415ms)
+    ✔ citizen can cancel a PENDING request (564.633ms)
+  ✔ Direct Hospital Care Requests (1974.278ms)
+  ▶ Hospital Appointment Scheduling & Concurrency
+    ✔ queries available slots and respects break windows (156.808ms)
+    ✔ returns empty slots and flags unconfigured for hospital without appointment config (36.640ms)
+    ✔ concurrency test: exactly 1 booking succeeds when multiple citizens attempt to book the last slot simultaneously (939.200ms)
+    ✔ cancelling appointment releases slot capacity atomically (685.201ms)
+    ✔ hospital appointment lifecycle: PENDING -> CONFIRMED -> COMPLETED (516.135ms)
+    ✔ hospital proposes alternative slot when original cannot be accommodated (423.887ms)
+    ✔ rejection by hospital releases slot capacity atomically (510.374ms)
+  ✔ Hospital Appointment Scheduling & Concurrency (3477.126ms)
+  ▶ Notifications Persistence and Retrieval
+    ✔ user can list notifications and mark as read (73.792ms)
+    ✔ prevents user from reading hospital notifications (66.015ms)
+  ✔ Notifications Persistence and Retrieval (140.059ms)
+  ▶ Emergency SOS Non-Interference Regression Verification
+    ✔ proves that emergency dispatch, trips, and ambulance records are completely untouched by normal care (136.484ms)
+  ✔ Emergency SOS Non-Interference Regression Verification (136.918ms)
+✔ Workflow B: Direct Hospital Requests and Concurrency-Safe Appointments (7121.889ms)
 
-ℹ tests 136
-ℹ suites 17
-ℹ pass 136
+✔ tracking snapshot authorization scopes user, hospital, driver and provider to their own emergency (0.702ms)
+✔ previously assigned provider loses tracking access once a trip belongs to another provider (0.067ms)
+✔ before acceptance user and destination hospital may see dispatch status, but no driver can read trip tracking (0.045ms)
+✔ route target follows persisted trip lifecycle rather than browser navigation state (0.057ms)
+✔ tracking freshness rejects missing, stale and future timestamps (0.570ms)
+✔ cancelEmergencySchema accepts optional reason and empty payload (0.508ms)
+✔ createEmergencyRequestSchema validates coordinates, situation, and hospitalId (0.359ms)
+✔ userEmergencyListQuerySchema enforces bounded pagination and valid filters (0.282ms)
+✔ facilitySearchQuerySchema handles text, category, coordinates, and emergency flags (0.362ms)
+✔ routeRequestSchema validates coordinates and driving preference (0.241ms)
+✔ nearbyQuerySchema validates radius and center coordinates (0.584ms)
+✔ hospitalToFacility correctly transforms GeoJSON coordinates and statuses (0.919ms)
+✔ public facility router does not enforce top-level authenticate middleware (0.063ms)
+✔ public maps and geocoding routers do not enforce authenticate middleware (0.065ms)
+✔ geospatial router separates public facilities from authenticated ambulances (0.107ms)
+✔ emergency router middleware contract enforces authentication and USER role (0.125ms)
+
+ℹ tests 154
+ℹ suites 22
+ℹ pass 151
 ℹ fail 0
 ℹ cancelled 0
-ℹ skipped 0
+ℹ skipped 3
 ℹ todo 0
-ℹ duration_ms 32992.561
+ℹ duration_ms 19876.560
 ```
 
 ---
 
-### 4. Full Selenium Browser Integration Suite (29/29 Passed)
+### 4. Full Selenium Browser Integration Suite (33/33 Passed)
 ```bash
 RESQ_BASE_URL="http://localhost:5173" tests/selenium/.venv/bin/python3 -m unittest discover -s tests/selenium -p "test_*.py" -v
 ```
@@ -239,6 +266,10 @@ test_role_guard_blocks_user_from_accessing_admin_portal (test_authenticated_work
 test_user_login_and_authenticated_profile (test_authenticated_workflow.ResQAuthenticatedWorkflowTests) ... ok
 test_user_saved_facilities_view (test_authenticated_workflow.ResQAuthenticatedWorkflowTests) ... ok
 test_user_session_persists_across_page_refresh (test_authenticated_workflow.ResQAuthenticatedWorkflowTests) ... ok
+test_01_emergency_sos_prominence_preserved (test_hospital_requests_and_appointments.ResQHospitalRequestsAndAppointmentsTests) ... ok
+test_02_citizen_appointments_page_structure (test_hospital_requests_and_appointments.ResQHospitalRequestsAndAppointmentsTests) ... ok
+test_03_facility_detail_actions (test_hospital_requests_and_appointments.ResQHospitalRequestsAndAppointmentsTests) ... ok
+test_04_hospital_dashboard_navigation (test_hospital_requests_and_appointments.ResQHospitalRequestsAndAppointmentsTests) ... ok
 test_admin_login_page_renders_admin_sign_in (test_website_e2e.ResQWebsiteE2ETests) ... ok
 test_admin_route_redirects_unauthenticated_visitors_to_login (test_website_e2e.ResQWebsiteE2ETests) ... ok
 test_ambulance_driver_registration_form_renders (test_website_e2e.ResQWebsiteE2ETests) ... ok
@@ -259,7 +290,7 @@ test_user_protected_routes_redirect_unauthenticated_visitors_to_login (test_webs
 test_user_registration_rejects_mismatched_passwords_without_api_mutation (test_website_e2e.ResQWebsiteE2ETests) ... ok
 
 ----------------------------------------------------------------------
-Ran 29 tests in 17.912s
+Ran 33 tests in 20.228s
 
 OK
 ```

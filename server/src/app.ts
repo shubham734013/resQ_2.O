@@ -14,6 +14,8 @@ import { emergencyRouter } from './routes/emergencyRoutes.js';
 import { realtimeRouter } from './routes/realtimeRoutes.js';
 import { trackingRouter } from './routes/trackingRoutes.js';
 import { userRouter } from './routes/userRoutes.js';
+import { hospitalCareRequestRouter } from './routes/hospitalCareRequestRoutes.js';
+import { appointmentRouter, hospitalAppointmentManagementRouter } from './routes/hospitalAppointmentRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { getAllowedOrigins, mutationOriginGuard, originGuard, securityHeaders } from './middlewares/security.js';
 
@@ -41,6 +43,9 @@ app.use('/api/v1/auth',authRouter);
 app.use('/api/v1/admin',adminRouter);
 app.use('/api/v1/hospital',hospitalRouter);
 app.use('/api/v1/users',userRouter);
+app.use('/api/v1/hospital-requests',hospitalCareRequestRouter);
+app.use('/api/v1/appointments',appointmentRouter);
+app.use('/api/v1/hospital-appointments',hospitalAppointmentManagementRouter);
 app.use('/api/v1',geospatialRouter);
 app.use('/api/v1/facilities',facilityRouter);
 app.use('/api/v1/maps',mapsRouter);

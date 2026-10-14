@@ -13,6 +13,8 @@ const validateFacilityParam=(req:import('express').Request,_res:import('express'
   next();
 };
 
+import { listUserNotificationsController, markUserNotificationReadController } from '../controllers/hospitalCareNotificationController.js';
+
 export const userRouter=Router();
 userRouter.use(authenticate,authorizeRole('USER'));
 userRouter.get('/profile',getProfile);
@@ -21,3 +23,6 @@ userRouter.get('/saved-facilities',listSavedFacilities);
 userRouter.post('/saved-facilities',validateBody(z.object({facilityId:z.string().regex(/^[0-9a-fA-F]{24}$/,'Invalid facility id')}).strict()),addSavedFacility);
 userRouter.post('/saved-facilities/:facilityId',validateFacilityParam,addSavedFacility);
 userRouter.delete('/saved-facilities/:facilityId',validateFacilityParam,removeSavedFacility);
+userRouter.get('/notifications', listUserNotificationsController);
+userRouter.post('/notifications/:id/read', markUserNotificationReadController);
+
