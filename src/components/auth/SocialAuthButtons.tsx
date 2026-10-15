@@ -30,6 +30,9 @@ const messageFor=(error:unknown)=>{
   return error instanceof Error?error.message:'Social sign-in failed. Please try again.';
 };
 
+// Module-level idempotent guard to prevent duplicate Google Identity Services initialize warnings
+let initializedGoogleClientId: string | null = null;
+
 export const SocialAuthButtons=({roleHint,onSuccess,onError}:Props)=>{
   const {socialLogin}=useAuth(); const googleContainer=useRef<HTMLDivElement>(null);
   const [loading,setLoading]=useState<'google'|'microsoft'|null>(null);
@@ -42,21 +45,42 @@ export const SocialAuthButtons=({roleHint,onSuccess,onError}:Props)=>{
   const latestGoogleConfig = useRef({ roleHint, onSuccess, onError, socialLogin });
   useEffect(() => {
     latestGoogleConfig.current = { roleHint, onSuccess, onError, socialLogin };
-  });
+  }, [roleHint, onSuccess, onError, socialLogin]);
 
   useEffect(()=>{
     if(!googleClientId||!googleContainer.current)return; let active=true;
     void loadScript('https://accounts.google.com/gsi/client').then(()=>{
       if(!active||!googleContainer.current||!window.google)return;
-      window.google.accounts.id.initialize({client_id:googleClientId,ux_mode:'popup',callback:async({credential})=>{
-        const latest=latestGoogleConfig.current;
-        setLoading('google');
-        try{latest.onSuccess(await latest.socialLogin('google',{credential,roleHint:latest.roleHint}));}
-        catch(error){latest.onError(messageFor(error));}
-        finally{setLoading(null);}
-      }});
-      googleContainer.current.innerHTML='';
-      window.google.accounts.id.renderButton(googleContainer.current,{theme:'outline',size:'large',width:360,text:'continue_with',shape:'rectangular'});
+
+      // Idempotently initialize Google Identity Services once per client_id
+      if (initializedGoogleClientId !== googleClientId) {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          ux_mode: 'popup',
+          callback: async ({ credential }) => {
+            const latest = latestGoogleConfig.current;
+            setLoading('google');
+            try {
+              latest.onSuccess(await latest.socialLogin('google', { credential, roleHint: latest.roleHint }));
+            } catch (error) {
+              latest.onError(messageFor(error));
+            } finally {
+              setLoading(null);
+            }
+          },
+        });
+        initializedGoogleClientId = googleClientId;
+      }
+
+      // Re-render button cleanly inside the container element
+      googleContainer.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleContainer.current, {
+        theme: 'outline',
+        size: 'large',
+        width: 360,
+        text: 'continue_with',
+        shape: 'rectangular',
+      });
     }).catch(error=>{if(active)latestGoogleConfig.current.onError(messageFor(error));});
     return()=>{active=false;};
   },[googleClientId]);

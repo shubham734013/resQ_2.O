@@ -3,6 +3,8 @@ name: Operational Frontend Integration Validation
 on:
   push:
     branches:
+      - main
+      - develop
       - feature/operational-frontend-integration
   pull_request:
     branches:

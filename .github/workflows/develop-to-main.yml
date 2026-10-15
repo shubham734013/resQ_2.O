@@ -2,7 +2,7 @@ name: Develop to Main Checks
 
 on:
   push:
-    branches: [develop]
+    branches: [main, develop]
   pull_request:
     branches: [main]
 
