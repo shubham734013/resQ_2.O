@@ -7,7 +7,7 @@ export type DriverProfileCompletionStatus = 'INCOMPLETE'|'COMPLETE';
 export interface AmbulanceDriverDocument {
   fullName: string; email: string; phone: string; passwordHash: string; authProvider: AuthProvider; providerSubject?: string; licenseNumber: string;
   licenseVerificationStatus: VerificationStatus; profileCompletionStatus: DriverProfileCompletionStatus; address?: string; city?: string; state?: string; country?: string;
-  registeredLatitude?: number; registeredLongitude?: number; providerId: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
+  registeredLatitude?: number; registeredLongitude?: number; providerId: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus; isOnDuty?: boolean; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
   accountStatus: AccountStatus; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceDriverDocument>({
@@ -18,9 +18,15 @@ const schema = new Schema<AmbulanceDriverDocument>({
   address: String, city: String, state: String, country: String, registeredLatitude: Number, registeredLongitude: Number,
   providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true }, assignedAmbulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance', index: true },
   availabilityStatus: { type: String, enum: DRIVER_AVAILABILITY_STATUSES, default: 'OFFLINE' },
+  isOnDuty: { type: Boolean, default: false, index: true },
   dispatchReservationId: { type: Schema.Types.ObjectId, ref: 'DispatchJob', index: true },
   dispatchReservationExpiresAt: Date, accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
 }, { timestamps: true });
+schema.pre('save', function () {
+  if (this.availabilityStatus) {
+    this.isOnDuty = this.availabilityStatus !== 'OFFLINE';
+  }
+});
 schema.index({ authProvider: 1, providerSubject: 1 }, { unique: true, partialFilterExpression: { providerSubject: { $type: 'string' } } });
 schema.index({ registeredLatitude: 1, registeredLongitude: 1 });
 export const AmbulanceDriverModel = model<AmbulanceDriverDocument>('AmbulanceDriver', schema);

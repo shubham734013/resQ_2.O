@@ -78,6 +78,30 @@ export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promis
         ack?.({ ok: true, room });
       })().catch(() => ack?.({ ok: false, error: 'SUBSCRIPTION_FAILED' }));
     });
+    socket.on('driver:locationUpdate', (raw: unknown, ack?: (result: { ok: boolean; data?: unknown; error?: string }) => void) => {
+      void (async () => {
+        const identity = socket.data.identity as AuthenticatedIdentity;
+        if (!identity || (identity.role !== 'AMBULANCE_DRIVER' && identity.role !== 'ADMIN')) {
+          ack?.({ ok: false, error: 'FORBIDDEN' });
+          return;
+        }
+        if (!raw || typeof raw !== 'object') {
+          ack?.({ ok: false, error: 'INVALID_PAYLOAD' });
+          return;
+        }
+        const { ambulanceLocationUpdateSchema } = await import('../schemas/ambulance.js');
+        const parseResult = ambulanceLocationUpdateSchema.safeParse(raw);
+        if (!parseResult.success) {
+          ack?.({ ok: false, error: parseResult.error.issues[0]?.message ?? 'INVALID_COORDINATES' });
+          return;
+        }
+        const { updateDriverLocation } = await import('./driverDutyService.js');
+        const telemetry = await updateDriverLocation(identity.id, parseResult.data);
+        ack?.({ ok: true, data: telemetry });
+      })().catch((err: unknown) => {
+        ack?.({ ok: false, error: err instanceof Error ? err.message : 'LOCATION_UPDATE_FAILED' });
+      });
+    });
     socket.on('tracking:unsubscribe', (raw: unknown, ack?: (result: { ok: boolean }) => void) => {
       void (async () => {
         if (!raw || typeof raw !== 'object') { ack?.({ ok: false }); return; }

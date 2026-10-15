@@ -124,6 +124,7 @@ test('concurrent reservations and duplicate acceptances create one active trip',
     await DispatchJobModel.updateOne({ _id: timedOutOffer._id, status: 'PENDING' }, {
       $set: { status: 'SEARCHING', leaseToken, leaseUntil: new Date(Date.now() + 30000) },
     }).exec();
+    await AmbulanceModel.updateOne({ _id: ambulanceId }, { $set: { locationUpdatedAt: new Date() } }).exec();
     const retryJob = await DispatchJobModel.findById(timedOutOffer._id).lean().exec();
     assert.ok(retryJob);
     const retryOffer = await reserveAndOffer(retryJob as unknown as Parameters<typeof reserveAndOffer>[0], candidate);

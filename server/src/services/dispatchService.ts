@@ -390,6 +390,19 @@ const markExhausted = async (job: DispatchJobLean, reason: string) => {
       $push: { events: appendEvent('DISPATCH_EXHAUSTED', reason) },
     },
   ).exec();
+  broadcastEvent(`emergency:${job.emergencyRequestId}`, 'tracking:status', {
+    event: 'DISPATCH_EXHAUSTED',
+    emergencyRequestId: String(job.emergencyRequestId),
+    status: 'EXHAUSTED',
+    reason,
+    timestamp: now.toISOString(),
+  });
+  broadcastEvent(`hospital:${job.hospitalId}`, 'hospital:incoming-patient', {
+    event: 'DISPATCH_EXHAUSTED',
+    emergencyRequestId: String(job.emergencyRequestId),
+    reason,
+    timestamp: now.toISOString(),
+  });
 };
 
 const claimJob = async () => {
@@ -473,6 +486,20 @@ const expireOrReleaseOffer = async (job: DispatchJobLean, reason: string, outcom
     });
   } finally {
     await session.endSession();
+  }
+  if (outcome === 'EXPIRED') {
+    broadcastEvent(`emergency:${job.emergencyRequestId}`, 'tracking:status', {
+      event: 'DISPATCH_OFFER_EXPIRED',
+      emergencyRequestId: String(job.emergencyRequestId),
+      reason,
+      timestamp: now.toISOString(),
+    });
+    broadcastEvent(`driver:${attempt.driverId}`, 'dispatch:offer-expired', {
+      dispatchJobId: String(job._id),
+      attemptId,
+      reason,
+      timestamp: now.toISOString(),
+    });
   }
 };
 
@@ -643,7 +670,7 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
       }, { returnDocument: 'after', session, arrayFilters: [{ 'attempt.attemptId': attempt.attemptId }] }).lean().exec();
       if (!updatedJob) throw new AppError('DISPATCH_STATE_CONFLICT', 'Offer was consumed before acceptance could commit', 409);
       const changedAmbulance = await AmbulanceModel.findOneAndUpdate({ _id: attempt.ambulanceId, dispatchReservationId: jid, currentStatus: 'AVAILABLE' }, { $set: { currentStatus: 'BUSY' }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { returnDocument: 'after', session }).lean().exec();
-      const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, dispatchReservationId: jid, availabilityStatus: 'ONLINE' }, { $set: { availabilityStatus: 'BUSY' }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { returnDocument: 'after', session }).lean().exec();
+      const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, dispatchReservationId: jid, availabilityStatus: 'ONLINE' }, { $set: { availabilityStatus: 'BUSY', isOnDuty: true }, $unset: { dispatchReservationId: 1, dispatchReservationExpiresAt: 1 } }, { returnDocument: 'after', session }).lean().exec();
       if (!changedAmbulance || !changedDriver) throw new AppError('DISPATCH_RESERVATION_CONFLICT', 'Reservation could not be converted into an active trip', 409);
       await HospitalPatientModel.updateOne({ emergencyId: job.emergencyRequestId, hospitalId: job.hospitalId }, { $set: { ambulanceId: attempt.ambulanceId, etaMinutes: request.etaMinutes } }, { session }).exec();
       result = { tripId: String(trip._id), emergencyRequestId: String(job.emergencyRequestId), hospitalId: String(job.hospitalId), requestCode: request.requestCode, etaMinutes: request.etaMinutes, routeSource: attempt.routeSource };

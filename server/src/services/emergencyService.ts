@@ -471,7 +471,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
         if (activeTrip.driverId) {
           const driver = await AmbulanceDriverModel.findOneAndUpdate(
             { _id: activeTrip.driverId, availabilityStatus: 'BUSY' },
-            { $set: { availabilityStatus: 'ONLINE' } },
+            { $set: { availabilityStatus: 'ONLINE', isOnDuty: true } },
             { returnDocument: 'after', session },
           ).lean().exec();
           if (!driver) throw new AppError('DRIVER_STATE_CONFLICT', 'Driver state could not be released safely', 409);
@@ -486,7 +486,7 @@ export const cancelUserEmergencyRequest = async (userId: string, emergencyId: st
         if (current.driverId) {
           const driver = await AmbulanceDriverModel.findOneAndUpdate(
             { _id: current.driverId, availabilityStatus: 'BUSY' },
-            { $set: { availabilityStatus: 'ONLINE' } },
+            { $set: { availabilityStatus: 'ONLINE', isOnDuty: true } },
             { returnDocument: 'after', session },
           ).lean().exec();
           if (!driver) throw new AppError('DRIVER_STATE_CONFLICT', 'Driver state could not be released safely', 409);

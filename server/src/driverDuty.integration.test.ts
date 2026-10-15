@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose, { Types } from 'mongoose';
@@ -18,7 +19,7 @@ process.env.DRIVER_LOCATION_MAX_AGE_MS ??= '30000';
 
 const uri = process.env.DRIVER_DUTY_TEST_MONGODB_URI || process.env.TEST_MONGODB_URI;
 const enabled = Boolean(uri && /test|driver.?duty/i.test(new URL(uri).pathname));
-const { startDriverDuty, endDriverDuty, updateDriverLocation } = await import('./services/driverDutyService.js');
+const { startDriverDuty, endDriverDuty, updateDriverLocation, toggleDriverDuty } = await import('./services/driverDutyService.js');
 
 test('concurrent duty starts serialize; GPS timestamps are monotonic; active trips block ending duty', { skip: !enabled }, async () => {
   if (!uri) return;
@@ -65,6 +66,7 @@ test('concurrent duty starts serialize; GPS timestamps are monotonic; active tri
     ]);
     assert.equal(starts.filter(result => result.status === 'fulfilled').length, 1, 'only one concurrent start may transition OFFLINE to ONLINE');
     assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.availabilityStatus, 'ONLINE');
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.isOnDuty, true);
     assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.currentStatus, 'AVAILABLE');
     const saved = await AmbulanceModel.findById(ambulanceId).lean().exec();
     assert.ok(saved?.locationSourceTimestamp);
@@ -75,9 +77,17 @@ test('concurrent duty starts serialize; GPS timestamps are monotonic; active tri
     const ended = await endDriverDuty(String(driverId));
     assert.equal(ended.dutyState, 'OFF_DUTY');
     assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.availabilityStatus, 'OFFLINE');
-    assert.equal((await AmbulanceModel.findById(ambulanceId).lean().exec())?.currentStatus, 'OFFLINE');
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.isOnDuty, false);
 
-    const restarted = await startDriverDuty(String(driverId), fix(Date.now() + 2));
+    // Verify toggleDriverDuty can start and end duty
+    const toggled = await toggleDriverDuty(String(driverId), { isOnDuty: true, ...fix(Date.now() + 2) });
+    assert.equal(toggled.dutyState, 'AVAILABLE');
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.isOnDuty, true);
+    const toggledOff = await toggleDriverDuty(String(driverId), { isOnDuty: false });
+    assert.equal(toggledOff.dutyState, 'OFF_DUTY');
+    assert.equal((await AmbulanceDriverModel.findById(driverId).lean().exec())?.isOnDuty, false);
+
+    const restarted = await startDriverDuty(String(driverId), fix(Date.now() + 5));
     assert.equal(restarted.dutyState, 'AVAILABLE');
     await TripModel.create({
       emergencyRequestId: emergencyId, providerId, ambulanceId, driverId, destinationHospitalId: hospitalId,

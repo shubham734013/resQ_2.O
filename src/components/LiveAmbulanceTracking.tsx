@@ -86,6 +86,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
     };
     const onState = () => refresh();
     socket.on('tracking:location', onLocation);
+    socket.on('ambulance:locationUpdated', onLocation);
     socket.on('tracking:status', onState);
     socket.on('dispatch:accepted', onState);
     socket.on('dispatch:declined', onState);

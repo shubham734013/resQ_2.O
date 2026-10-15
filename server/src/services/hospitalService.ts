@@ -18,6 +18,9 @@ import type {
 } from '../schemas/hospital.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { DispatchJobModel } from '../models/DispatchJob.js';
+import { broadcastEvent } from './realtimeService.js';
+import { recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
 
 type ProfileInput = z.infer<typeof hospitalProfileUpdateSchema>;
 type ServicesInput = z.infer<typeof hospitalServicesUpdateSchema>;
@@ -221,6 +224,83 @@ export const updateEmergencyStatus = async (
     { returnDocument: 'after', runValidators: true },
   ).lean().exec();
   if (!updated) throw new AppError('STALE_EMERGENCY_UPDATE', 'Emergency request changed before this action could be applied', 409);
+
+  if (status === 'CANCELLED') {
+    const pendingTrip = await TripModel.findOneAndUpdate(
+      { emergencyRequestId: requestObjectId, status: { $in: ['ASSIGNED', 'ACCEPTED'] } },
+      {
+        $set: { status: 'CANCELLED' },
+        $push: {
+          statusHistory: {
+            status: 'CANCELLED',
+            changedAt: now,
+            actorId,
+            actorRole,
+            previousStatus: 'ACCEPTED',
+          },
+        },
+      },
+      { returnDocument: 'after' }
+    ).lean().exec();
+
+    if (pendingTrip) {
+      await AmbulanceModel.updateOne({ _id: pendingTrip.ambulanceId, currentStatus: 'BUSY' }, { $set: { currentStatus: 'AVAILABLE' } }).exec();
+      if (pendingTrip.driverId) {
+        await AmbulanceDriverModel.updateOne({ _id: pendingTrip.driverId, availabilityStatus: 'BUSY' }, { $set: { availabilityStatus: 'ONLINE', isOnDuty: true } }).exec();
+      }
+    } else if (current.ambulanceId) {
+      await AmbulanceModel.updateOne({ _id: current.ambulanceId, currentStatus: 'BUSY' }, { $set: { currentStatus: 'AVAILABLE' } }).exec();
+      if (current.driverId) {
+        await AmbulanceDriverModel.updateOne({ _id: current.driverId, availabilityStatus: 'BUSY' }, { $set: { availabilityStatus: 'ONLINE', isOnDuty: true } }).exec();
+      }
+    }
+
+    await HospitalPatientModel.updateOne(
+      { emergencyId: requestObjectId, hospitalId: hospitalObjectId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
+      { $set: { coordinationStatus: 'CANCELLED' }, $unset: { ambulanceId: 1, etaMinutes: 1 } }
+    ).exec();
+
+    await DispatchJobModel.updateOne(
+      { emergencyRequestId: requestObjectId, status: { $in: ['PENDING', 'SEARCHING', 'OFFERED'] } },
+      { $set: { status: 'CANCELLED' }, $push: { events: { event: 'DISPATCH_CANCELLED', at: now, actorId, actorRole, reason: 'Hospital cancelled emergency request' } } }
+    ).exec();
+
+    try {
+      await recordHospitalCoordinationEvent({ emergencyId: String(requestObjectId), type: 'EMERGENCY_CANCELLED' });
+    } catch {
+      // Best-effort coordination event recording
+    }
+
+    const statusRefresh = { event: 'STATUS_REFRESH', status: 'CANCELLED', timestamp: now.toISOString() };
+    broadcastEvent(`hospital:${hospitalObjectId}`, 'hospital:incoming-patient', statusRefresh);
+    broadcastEvent(`emergency:${requestObjectId}`, 'tracking:status', statusRefresh);
+    broadcastEvent('operations', 'emergency:cancelled', { event: 'QUEUE_REFRESH', timestamp: statusRefresh.timestamp });
+  } else if (status === 'RESOLVED') {
+    await HospitalPatientModel.updateOne(
+      { emergencyId: requestObjectId, hospitalId: hospitalObjectId },
+      { $set: { coordinationStatus: 'RESOLVED' } }
+    ).exec();
+
+    try {
+      await recordHospitalCoordinationEvent({ emergencyId: String(requestObjectId), type: 'TRIP_COMPLETED' });
+    } catch {
+      // Best-effort coordination event recording
+    }
+
+    const statusRefresh = { event: 'STATUS_REFRESH', status: 'RESOLVED', timestamp: now.toISOString() };
+    broadcastEvent(`hospital:${hospitalObjectId}`, 'hospital:incoming-patient', statusRefresh);
+    broadcastEvent(`emergency:${requestObjectId}`, 'tracking:status', statusRefresh);
+  } else if (status === 'REVIEWING' || status === 'PREPARING') {
+    await HospitalPatientModel.updateOne(
+      { emergencyId: requestObjectId, hospitalId: hospitalObjectId, coordinationStatus: { $nin: ['RESOLVED', 'CANCELLED'] } },
+      { $set: { coordinationStatus: status === 'PREPARING' ? 'PREPARING' : 'INCOMING' } }
+    ).exec();
+
+    const statusRefresh = { event: 'STATUS_REFRESH', status, timestamp: now.toISOString() };
+    broadcastEvent(`hospital:${hospitalObjectId}`, 'hospital:incoming-patient', statusRefresh);
+    broadcastEvent(`emergency:${requestObjectId}`, 'tracking:status', statusRefresh);
+  }
+
   return emergencyOut(updated as unknown as Record<string, unknown>);
 };
 

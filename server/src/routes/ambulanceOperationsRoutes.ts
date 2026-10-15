@@ -4,7 +4,7 @@ import { authorizeRole } from '../middlewares/authorizeRole.js';
 import { validateBody } from '../middlewares/validate.js';
 import { z } from 'zod';
 import {
- providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,ambulanceLocationUpdateSchema,
+ providerProfileUpdateSchema,ambulanceCreateSchema,ambulanceUpdateSchema,ambulanceStatusSchema,driverCreateSchema,driverUpdateSchema,assignmentSchema,requestAssignSchema,driverStatusSchema,driverDutyToggleSchema,ambulanceLocationUpdateSchema,
  providerAmbulanceQuerySchema,providerDriverQuerySchema,providerRequestQuerySchema,providerTripQuerySchema,driverRequestQuerySchema,driverTripQuerySchema,
 } from '../schemas/ambulance.js';
 import * as c from '../controllers/ambulanceOperationsController.js';
@@ -42,6 +42,7 @@ driver.patch('/status',validateBody(driverStatusSchema),c.driverStatusUpdate);
 driver.get('/duty',c.driverDutyStatus);
 driver.post('/duty/start',validateBody(ambulanceLocationUpdateSchema),c.driverDutyStart);
 driver.post('/duty/end',c.driverDutyEnd);
+driver.post('/duty/toggle',validateBody(driverDutyToggleSchema),c.driverDutyToggle);
 driver.patch('/location',validateBody(ambulanceLocationUpdateSchema),c.driverLocationUpdate);
 driver.get('/dispatch-offers',dispatch.driverOffers);
 driver.post('/dispatch-offers/:id/accept',dispatch.driverAcceptOffer);

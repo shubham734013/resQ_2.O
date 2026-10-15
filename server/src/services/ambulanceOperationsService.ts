@@ -29,7 +29,7 @@ type IdDoc={_id:Types.ObjectId;createdAt:Date;updatedAt:Date};
 type DriverSummary={_id:Types.ObjectId;fullName:string;phone:string;availabilityStatus:AmbulanceDriverDocument['availabilityStatus']};
 const providerOut=(x:AmbulanceProviderDocument&IdDoc):ProviderProfile=>({id:String(x._id),name:x.name,registrationNumber:x.registrationNumber,email:x.email,phone:x.phone,address:x.address,city:x.city,state:x.state,country:x.country,latitude:x.latitude,longitude:x.longitude,serviceType:x.serviceType,verificationStatus:x.verificationStatus,accountStatus:x.accountStatus,createdAt:x.createdAt,updatedAt:x.updatedAt});
 const ambulanceOut=(x:AmbulanceDocument&IdDoc,d:DriverSummary|null=null):AmbulanceView=>({id:String(x._id),registrationNumber:x.registrationNumber,vehicleNumber:x.vehicleNumber,providerId:String(x.providerId),ambulanceType:x.ambulanceType,capabilities:x.capabilities??[],currentStatus:x.currentStatus,currentLatitude:x.currentLatitude,currentLongitude:x.currentLongitude,serviceArea:x.serviceArea,verificationStatus:x.verificationStatus,accountStatus:x.accountStatus,assignedDriver:d?{id:String(d._id),fullName:d.fullName,phone:d.phone,availabilityStatus:d.availabilityStatus}:null,updatedAt:x.updatedAt});
-const driverOut=(x:AmbulanceDriverDocument&IdDoc):DriverView=>({id:String(x._id),fullName:x.fullName,email:x.email,phone:x.phone,licenseNumber:x.licenseNumber,licenseVerificationStatus:x.licenseVerificationStatus,address:x.address,city:x.city,state:x.state,country:x.country,registeredLatitude:x.registeredLatitude,registeredLongitude:x.registeredLongitude,providerId:String(x.providerId),assignedAmbulanceId:x.assignedAmbulanceId?String(x.assignedAmbulanceId):undefined,availabilityStatus:x.availabilityStatus,accountStatus:x.accountStatus});
+const driverOut=(x:AmbulanceDriverDocument&IdDoc):DriverView=>({id:String(x._id),fullName:x.fullName,email:x.email,phone:x.phone,licenseNumber:x.licenseNumber,licenseVerificationStatus:x.licenseVerificationStatus,address:x.address,city:x.city,state:x.state,country:x.country,registeredLatitude:x.registeredLatitude,registeredLongitude:x.registeredLongitude,providerId:String(x.providerId),assignedAmbulanceId:x.assignedAmbulanceId?String(x.assignedAmbulanceId):undefined,availabilityStatus:x.availabilityStatus,isOnDuty:x.isOnDuty??(x.availabilityStatus!=='OFFLINE'),accountStatus:x.accountStatus});
 type HospitalSummary = { name?: string; latitude?: number; longitude?: number; location?: { coordinates?: [number, number] } };
 const requestOut = (x: EmergencyRequestDocument & IdDoc, hosp?: HospitalSummary | null): RequestView => {
   const coords = hosp?.location?.coordinates;
@@ -203,7 +203,7 @@ async function moveTrip(did:string,id:string,next:TripStatus){
   if(next==='COMPLETED'){
     await Promise.all([
       AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
-      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE',isOnDuty:true}}).exec(),
       EmergencyRequestModel.updateOne(
         {_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION'},
         {$set:{status:'RESOLVED'},$push:{statusHistory:{status:'RESOLVED',changedAt:now,previousStatus:'AMBULANCE_COORDINATION',actorId:x.driverId,actorRole:'AMBULANCE_DRIVER'}}}
@@ -217,7 +217,7 @@ async function moveTrip(did:string,id:string,next:TripStatus){
   if(next==='CANCELLED'){
     await Promise.all([
       AmbulanceModel.updateOne({_id:x.ambulanceId,currentStatus:'BUSY'},{$set:{currentStatus:'AVAILABLE'}}).exec(),
-      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE'}}).exec(),
+      AmbulanceDriverModel.updateOne({_id:x.driverId,availabilityStatus:'BUSY'},{$set:{availabilityStatus:'ONLINE',isOnDuty:true}}).exec(),
       EmergencyRequestModel.updateOne(
         {_id:x.emergencyRequestId,status:'AMBULANCE_COORDINATION',ambulanceId:x.ambulanceId},
         {$unset:{ambulanceId:1,ambulanceProviderId:1,driverId:1,etaMinutes:1}}

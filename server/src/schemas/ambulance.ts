@@ -17,7 +17,19 @@ export const ambulanceStatusSchema = z.object({ status:z.enum(['AVAILABLE','BUSY
 export const driverCreateSchema = z.object({ fullName:z.string().trim().min(2).max(100), email:z.string().trim().email(), phone:z.string().trim().min(7).max(20), password:z.string().min(12).max(128), licenseNumber:z.string().trim().min(3).max(80), address:z.string().trim().max(250).optional(), city:z.string().trim().max(100).optional(), state:z.string().trim().max(100).optional(), country:z.string().trim().max(100).optional(), registeredLatitude:lat.optional(), registeredLongitude:lng.optional() }).strict();
 export const driverUpdateSchema = driverCreateSchema.omit({password:true}).partial().extend({password:z.string().min(12).max(128).optional()}).strict();
 export const assignmentSchema = z.object({ driverId:objectId }).strict();
-export const driverStatusSchema = z.object({ status:z.enum(['ONLINE','OFFLINE','BUSY']) }).strict();
+export const driverStatusSchema = z.object({
+  status: z.enum(['ONLINE','OFFLINE','BUSY']).optional(),
+  isOnDuty: z.boolean().optional(),
+}).strict().refine((data) => data.status !== undefined || data.isOnDuty !== undefined, {
+  message: 'Either status or isOnDuty must be provided',
+});
+export const driverDutyToggleSchema = z.object({
+  isOnDuty: z.boolean(),
+  latitude: lat.optional(),
+  longitude: lng.optional(),
+  accuracy: z.number().nonnegative().max(1000).optional(),
+  timestamp: date.optional(),
+}).strict();
 export const requestAssignSchema = z.object({ ambulanceId:objectId }).strict();
 const commonQuery = z.object({ page, limit, search:z.string().trim().max(100).optional(), status:z.string().trim().max(50).optional(), ambulance:z.string().regex(/^[0-9a-fA-F]{24}$/).optional(), driver:z.string().regex(/^[0-9a-fA-F]{24}$/).optional(), from:date.optional(), to:date.optional(), sortOrder:z.enum(['asc','desc']).default('desc') }).strict();
 export const providerAmbulanceQuerySchema = commonQuery.extend({status:z.enum(AMBULANCE_STATUSES).optional()});

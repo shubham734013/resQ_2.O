@@ -5,6 +5,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{const resp
 const qs=(p:Record<string,unknown>)=>{const s=new URLSearchParams();Object.entries(p).forEach(([k,v])=>{if(v!==undefined&&v!=='')s.set(k,String(v))});const x=s.toString();return x?`?${x}`:''};
 export interface DriverDutyStatus {
   status: 'ONLINE' | 'OFFLINE' | 'BUSY';
+  isOnDuty?: boolean;
   dutyState: 'OFF_DUTY' | 'AVAILABLE' | 'BUSY';
   updatedAt: string;
   accountStatus: string;
@@ -45,6 +46,7 @@ getStatus:()=>request<DriverDutyStatus>('/ambulance-driver/duty'),
 getDutyStatus:()=>request<DriverDutyStatus>('/ambulance-driver/duty'),
 startDuty:(body:DriverDutyLocationInput)=>request<{status:'ONLINE';dutyState:'AVAILABLE';ambulanceId:string;locationUpdatedAt:string;trackingIntervalMs:number;staleAfterMs:number}>('/ambulance-driver/duty/start',{method:'POST',body:JSON.stringify(body)}),
 endDuty:()=>request<{status:'OFFLINE';dutyState:'OFF_DUTY';alreadyOffDuty:boolean;updatedAt:string}>('/ambulance-driver/duty/end',{method:'POST'}),
+toggleDuty:(body:{isOnDuty:boolean;latitude?:number;longitude?:number;accuracy?:number;timestamp?:string})=>request<DriverDutyStatus>('/ambulance-driver/duty/toggle',{method:'POST',body:JSON.stringify(body)}),
 updateLocation:(body:DriverDutyLocationInput)=>request<{ambulanceId:string;driverId:string;latitude:number;longitude:number;locationUpdatedAt:string;sourceTimestamp:string;freshness:'FRESH';coordinatesAreLive:boolean;accuracyMeters:number;dutyState:'AVAILABLE'|'BUSY'}>('/ambulance-driver/location',{method:'PATCH',body:JSON.stringify(body),signal:AbortSignal.timeout(10000)}),
 updateStatus:(status:string)=>request<DriverDutyStatus>('/ambulance-driver/status',{method:'PATCH',body:JSON.stringify({status})}),
 getRequests:(p:Record<string,unknown>={})=>request<{items:AmbulanceRequest[];pagination:Pagination}>(`/ambulance-driver/requests${qs(p)}`),

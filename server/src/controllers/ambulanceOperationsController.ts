@@ -30,11 +30,18 @@ export const providerTrip=async(req:Request,res:Response)=>sendSuccess(res,await
 export const driverProfile=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverProfile(authId(req,'AMBULANCE_DRIVER')));
 export const driverProfileUpdate=async(req:Request,res:Response)=>sendSuccess(res,await service.updateDriverProfile(authId(req,'AMBULANCE_DRIVER'),req.body));
 export const driverStatus=async(req:Request,res:Response)=>sendSuccess(res,await duty.getDriverDutyStatus(authId(req,'AMBULANCE_DRIVER')));
-export const driverStatusUpdate=async(req:Request,res:Response)=>sendSuccess(res,await duty.updateDriverStatus(authId(req,'AMBULANCE_DRIVER'),req.body.status));
+export const driverStatusUpdate=async(req:Request,res:Response)=>{
+  const body = (res.locals.validatedBody ?? req.body) as { status?: 'ONLINE' | 'OFFLINE' | 'BUSY'; isOnDuty?: boolean };
+  if (body.isOnDuty !== undefined && body.status === undefined) {
+    return sendSuccess(res, await duty.toggleDriverDuty(authId(req, 'AMBULANCE_DRIVER'), { isOnDuty: body.isOnDuty }));
+  }
+  return sendSuccess(res, await duty.updateDriverStatus(authId(req, 'AMBULANCE_DRIVER'), body.status!));
+};
 export const driverLocationUpdate=async(req:Request,res:Response)=>sendSuccess(res,await duty.updateDriverLocation(authId(req,'AMBULANCE_DRIVER'),(res.locals.validatedBody ?? req.body)));
 export const driverDutyStatus=async(req:Request,res:Response)=>sendSuccess(res,await duty.getDriverDutyStatus(authId(req,'AMBULANCE_DRIVER')));
 export const driverDutyStart=async(req:Request,res:Response)=>sendSuccess(res,await duty.startDriverDuty(authId(req,'AMBULANCE_DRIVER'),(res.locals.validatedBody ?? req.body)));
 export const driverDutyEnd=async(req:Request,res:Response)=>sendSuccess(res,await duty.endDriverDuty(authId(req,'AMBULANCE_DRIVER')));
+export const driverDutyToggle=async(req:Request,res:Response)=>sendSuccess(res,await duty.toggleDriverDuty(authId(req,'AMBULANCE_DRIVER'),(res.locals.validatedBody ?? req.body)));
 export const driverRequests=async(req:Request,res:Response)=>sendSuccess(res,await service.listDriverRequests(authId(req,'AMBULANCE_DRIVER'),q(res)));
 export const driverRequest=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const driverAccept=async(req:Request,res:Response)=>sendSuccess(res,await service.acceptRequest(authId(req,'AMBULANCE_DRIVER'),id(req)));

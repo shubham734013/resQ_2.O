@@ -148,7 +148,7 @@ export const startDriverDuty = async (driverId: string, input: LocationInput) =>
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
         _id: did, providerId: driver.providerId, assignedAmbulanceId: ambulance._id,
         accountStatus: 'ACTIVE', licenseVerificationStatus: 'VERIFIED', availabilityStatus: 'OFFLINE',
-      }, { $set: { availabilityStatus: 'ONLINE' } }, { returnDocument: 'after', session }).lean().exec();
+      }, { $set: { availabilityStatus: 'ONLINE', isOnDuty: true } }, { returnDocument: 'after', session }).lean().exec();
       if (!changedDriver) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh status and retry.', 409);
       const changedAmbulance = await AmbulanceModel.findOneAndUpdate({
         _id: ambulance._id, providerId: driver.providerId, accountStatus: 'ACTIVE',
@@ -186,7 +186,7 @@ export const endDriverDuty = async (driverId: string) => {
           return;
         }
         if (driver.availabilityStatus === 'ONLINE' || driver.availabilityStatus === 'BUSY') {
-          const changed = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, availabilityStatus: driver.availabilityStatus }, { $set: { availabilityStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
+          const changed = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, availabilityStatus: driver.availabilityStatus }, { $set: { availabilityStatus: 'OFFLINE', isOnDuty: false } }, { returnDocument: 'after', session }).lean().exec();
           if (!changed) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh and retry.', 409);
           result = { status: 'OFFLINE', dutyState: 'OFF_DUTY' };
           return;
@@ -201,7 +201,7 @@ export const endDriverDuty = async (driverId: string) => {
           result = { status: 'OFFLINE', dutyState: 'OFF_DUTY', alreadyOffDuty: true };
           return;
         }
-        const changed = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] } }, { $set: { availabilityStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
+        const changed = await AmbulanceDriverModel.findOneAndUpdate({ _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] } }, { $set: { availabilityStatus: 'OFFLINE', isOnDuty: false } }, { returnDocument: 'after', session }).lean().exec();
         if (!changed) throw new AppError('DUTY_STATE_CONFLICT', 'Assigned ambulance is missing and duty could not be reconciled.', 409);
         result = { status: 'OFFLINE', dutyState: 'OFF_DUTY' };
         return;
@@ -232,7 +232,7 @@ export const endDriverDuty = async (driverId: string) => {
       if (!['AVAILABLE', 'OFFLINE', 'MAINTENANCE', 'BUSY'].includes(ambulance.currentStatus)) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance is not in a safe state for duty termination; contact operations.', 409);
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
         _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] }, assignedAmbulanceId: ambulance._id, providerId: driver.providerId,
-      }, { $set: { availabilityStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
+      }, { $set: { availabilityStatus: 'OFFLINE', isOnDuty: false } }, { returnDocument: 'after', session }).lean().exec();
       if (!changedDriver) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh status and retry.', 409);
       if (ambulance.currentStatus === 'AVAILABLE' || ambulance.currentStatus === 'BUSY') {
         const changedAmbulance = await AmbulanceModel.findOneAndUpdate({
@@ -308,8 +308,10 @@ export const updateDriverLocation = async (driverId: string, input: LocationInpu
       sourceTimestamp: completedTelemetry.sourceTimestamp, freshness: 'FRESH', coordinatesAreLive: true,
     };
     broadcastEvent(`emergency:${activeTrip.emergencyRequestId}`, 'tracking:location', locationEvent);
+    broadcastEvent(`emergency:${activeTrip.emergencyRequestId}`, 'ambulance:locationUpdated', locationEvent);
     broadcastEvent(`trip:${activeTrip._id}`, 'tracking:location', locationEvent);
-    // Hospital viewers subscribe to the authorized emergency room for per-trip GPS; the hospital-operations room carries coordination/status events, avoiding duplicate location delivery.
+    broadcastEvent(`trip:${activeTrip._id}`, 'ambulance:locationUpdated', locationEvent);
+    broadcastEvent(`hospital:${activeTrip.destinationHospitalId}`, 'ambulance:locationUpdated', locationEvent);
   }
   return completedTelemetry;
 };
@@ -329,6 +331,7 @@ export const getDriverDutyStatus = async (driverId: string) => {
   const activeAmbulanceTrip = ambulance ? await TripModel.exists({ ambulanceId: ambulance._id, status: { $in: ACTIVE_TRIP_STATUSES } }) : null;
   return {
     status: driver.availabilityStatus,
+    isOnDuty: driver.availabilityStatus !== 'OFFLINE',
     dutyState: driverDutyStateForAvailability(driver.availabilityStatus),
     updatedAt: driver.updatedAt,
     accountStatus: driver.accountStatus,
@@ -367,4 +370,27 @@ export const updateDriverStatus = async (driverId: string, status: 'ONLINE' | 'O
   if (!activeTrip) throw new AppError('INVALID_DRIVER_STATUS', 'Driver cannot be BUSY without an active trip.', 409);
   if (driver.availabilityStatus !== 'BUSY') throw new AppError('TRIP_STATE_AUTHORITATIVE', 'Trip lifecycle controls BUSY state; it cannot be changed manually.', 409);
   return getDriverDutyStatus(driverId);
+};
+
+export const toggleDriverDuty = async (
+  driverId: string,
+  input: { isOnDuty: boolean; latitude?: number; longitude?: number; accuracy?: number; timestamp?: Date | string }
+) => {
+  if (input.isOnDuty) {
+    if (typeof input.latitude === 'number' && typeof input.longitude === 'number') {
+      const timestamp = input.timestamp ? new Date(input.timestamp) : new Date();
+      return startDriverDuty(driverId, {
+        latitude: input.latitude,
+        longitude: input.longitude,
+        accuracy: input.accuracy ?? 10,
+        timestamp,
+      });
+    }
+    const current = await getDriverDutyStatus(driverId);
+    if (current.status === 'ONLINE' || current.status === 'BUSY') {
+      return current;
+    }
+    throw new AppError('GPS_REQUIRED_TO_START_DUTY', 'Starting duty requires browser GPS fix. Provide latitude and longitude.', 400);
+  }
+  return endDriverDuty(driverId);
 };
