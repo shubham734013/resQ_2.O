@@ -19,6 +19,7 @@ export const authApi={
  registerHospital:(input:HospitalRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/hospital',input),
  registerAmbulanceProvider:(input:AmbulanceProviderRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/ambulance-provider',input),
  registerAmbulanceDriver:(input:AmbulanceDriverRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/ambulance-driver',input),
+ listActiveAmbulanceProviders:():Promise<{success:true;data:Array<{id:string;name:string;registrationNumber:string;serviceType:string;city?:string;state?:string}>}>=>request('/auth/ambulance-providers'),
  socialLogin:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<AuthResponse>=>postJson(`/auth/${provider}`,input),
  linkSocial:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<{success:true;data:AuthUser}>=>postJson(`/auth/link/${provider}`,input),
  me:():Promise<CurrentUserResponse>=>request('/auth/me'),

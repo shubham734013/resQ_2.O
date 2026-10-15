@@ -24,16 +24,47 @@ const hashToken = (token: string) => createHash('sha256').update(token).digest('
 
 export interface AuthResult { user: AuthenticatedIdentity; accessToken: string; refreshToken: string; }
 interface AccountWithPassword {
-  id: string; email: string; name: string; passwordHash?: string; role: Role; accountStatus: AccountStatus;
-  verificationStatus?: VerificationStatus; profileCompletionStatus?: 'INCOMPLETE' | 'COMPLETE'; licenseVerificationStatus?: VerificationStatus;
+  id: string;
+  email: string;
+  name: string;
+  passwordHash?: string;
+  role: Role;
+  accountStatus: AccountStatus;
+  phone?: string;
+  verificationStatus?: VerificationStatus;
+  profileCompletionStatus?: 'INCOMPLETE' | 'COMPLETE';
+  licenseVerificationStatus?: VerificationStatus;
+  providerId?: string;
+  providerName?: string;
+  assignedAmbulanceId?: string;
+  assignedAmbulanceVehicleNumber?: string;
+  licenseNumber?: string;
+  availabilityStatus?: string;
+  registrationNumber?: string;
+  hospitalType?: string;
+  serviceType?: string;
 }
 const accountFrom = (id: string, email: string, name: string, role: Role, accountStatus: AccountStatus, passwordHash?: string, extra?: Partial<AccountWithPassword>): AccountWithPassword =>
   ({ id, email, name, passwordHash, role, accountStatus, ...extra });
 const publicIdentity = (account: AccountWithPassword): AuthenticatedIdentity => ({
-  id: account.id, email: account.email, name: account.name, role: account.role, accountStatus: account.accountStatus,
+  id: account.id,
+  email: account.email,
+  name: account.name,
+  role: account.role,
+  accountStatus: account.accountStatus,
+  ...(account.phone ? { phone: account.phone } : {}),
   ...(account.verificationStatus ? { verificationStatus: account.verificationStatus } : {}),
   ...(account.profileCompletionStatus ? { profileCompletionStatus: account.profileCompletionStatus } : {}),
   ...(account.licenseVerificationStatus ? { licenseVerificationStatus: account.licenseVerificationStatus } : {}),
+  ...(account.providerId ? { providerId: account.providerId } : {}),
+  ...(account.providerName ? { providerName: account.providerName } : {}),
+  ...(account.assignedAmbulanceId ? { assignedAmbulanceId: account.assignedAmbulanceId } : {}),
+  ...(account.assignedAmbulanceVehicleNumber ? { assignedAmbulanceVehicleNumber: account.assignedAmbulanceVehicleNumber } : {}),
+  ...(account.licenseNumber ? { licenseNumber: account.licenseNumber } : {}),
+  ...(account.availabilityStatus ? { availabilityStatus: account.availabilityStatus } : {}),
+  ...(account.registrationNumber ? { registrationNumber: account.registrationNumber } : {}),
+  ...(account.hospitalType ? { hospitalType: account.hospitalType } : {}),
+  ...(account.serviceType ? { serviceType: account.serviceType } : {}),
 });
 
 const ensureUniqueContact = async (email: string, phone: string) => {
@@ -55,19 +86,51 @@ const ensureUniqueLicenseNumber = async (licenseNumber: string) => {
 
 const findUserAccountByEmail = async (email: string): Promise<AccountWithPassword|null> => {
   const a = await UserModel.findOne({email}).select('+passwordHash').exec();
-  return a ? accountFrom(a._id.toString(),a.email,a.name,a.role,a.accountStatus,a.passwordHash) : null;
+  return a ? accountFrom(a._id.toString(), a.email, a.name, a.role, a.accountStatus, a.passwordHash, { phone: a.phone }) : null;
 };
 const findHospitalAccountByEmail = async (email: string): Promise<AccountWithPassword|null> => {
   const a = await HospitalModel.findOne({email}).select('+passwordHash').exec();
-  return a ? accountFrom(a._id.toString(),a.email,a.name,'HOSPITAL',a.accountStatus,a.passwordHash,{verificationStatus:a.verificationStatus}) : null;
+  return a ? accountFrom(a._id.toString(), a.email, a.name, 'HOSPITAL', a.accountStatus, a.passwordHash, {
+    phone: a.phone,
+    verificationStatus: a.verificationStatus,
+    registrationNumber: a.registrationNumber,
+    hospitalType: a.hospitalType,
+  }) : null;
 };
 const findProviderAccountByEmail = async (email: string): Promise<AccountWithPassword|null> => {
   const a = await AmbulanceProviderModel.findOne({email}).select('+passwordHash').exec();
-  return a ? accountFrom(a._id.toString(),a.email,a.name,'AMBULANCE_PROVIDER',a.accountStatus,a.passwordHash,{verificationStatus:a.verificationStatus,profileCompletionStatus:a.profileCompletionStatus}) : null;
+  return a ? accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', a.accountStatus, a.passwordHash, {
+    phone: a.phone,
+    verificationStatus: a.verificationStatus,
+    profileCompletionStatus: a.profileCompletionStatus,
+    registrationNumber: a.registrationNumber,
+    serviceType: a.serviceType,
+  }) : null;
 };
 const findDriverAccountByEmail = async (email: string): Promise<AccountWithPassword|null> => {
   const a = await AmbulanceDriverModel.findOne({email}).select('+passwordHash').exec();
-  return a ? accountFrom(a._id.toString(),a.email,a.fullName,'AMBULANCE_DRIVER',a.accountStatus,a.passwordHash,{profileCompletionStatus:a.profileCompletionStatus,licenseVerificationStatus:a.licenseVerificationStatus}) : null;
+  if (!a) return null;
+  let providerName: string | undefined;
+  if (a.providerId) {
+    const p = await AmbulanceProviderModel.findById(a.providerId).select('name').lean().exec();
+    if (p) providerName = p.name;
+  }
+  let assignedAmbulanceVehicleNumber: string | undefined;
+  if (a.assignedAmbulanceId) {
+    const amb = await AmbulanceModel.findById(a.assignedAmbulanceId).select('vehicleNumber registrationNumber').lean().exec();
+    if (amb) assignedAmbulanceVehicleNumber = amb.vehicleNumber || amb.registrationNumber;
+  }
+  return accountFrom(a._id.toString(), a.email, a.fullName, 'AMBULANCE_DRIVER', a.accountStatus, a.passwordHash, {
+    phone: a.phone,
+    profileCompletionStatus: a.profileCompletionStatus,
+    licenseVerificationStatus: a.licenseVerificationStatus,
+    licenseNumber: a.licenseNumber,
+    availabilityStatus: a.availabilityStatus,
+    providerId: a.providerId?.toString(),
+    providerName,
+    assignedAmbulanceId: a.assignedAmbulanceId?.toString(),
+    assignedAmbulanceVehicleNumber,
+  });
 };
 const findAccountByEmail = async (email: string) => {
   const n = normalizeEmail(email);
@@ -79,10 +142,54 @@ const findAccountByEmail = async (email: string) => {
 const findByIdentity = async (identity: AuthenticatedIdentity): Promise<AccountWithPassword|null> => {
   switch (identity.role) {
     case 'USER':
-    case 'ADMIN': { const a=await UserModel.findById(identity.id).select('+passwordHash').exec(); return a?accountFrom(a._id.toString(),a.email,a.name,a.role,a.accountStatus,a.passwordHash):null; }
-    case 'HOSPITAL': { const a=await HospitalModel.findById(identity.id).select('+passwordHash').exec(); return a?accountFrom(a._id.toString(),a.email,a.name,'HOSPITAL',a.accountStatus,a.passwordHash,{verificationStatus:a.verificationStatus}):null; }
-    case 'AMBULANCE_PROVIDER': { const a=await AmbulanceProviderModel.findById(identity.id).select('+passwordHash').exec(); return a?accountFrom(a._id.toString(),a.email,a.name,'AMBULANCE_PROVIDER',a.accountStatus,a.passwordHash,{verificationStatus:a.verificationStatus,profileCompletionStatus:a.profileCompletionStatus}):null; }
-    case 'AMBULANCE_DRIVER': { const a=await AmbulanceDriverModel.findById(identity.id).select('+passwordHash').exec(); return a?accountFrom(a._id.toString(),a.email,a.fullName,'AMBULANCE_DRIVER',a.accountStatus,a.passwordHash,{profileCompletionStatus:a.profileCompletionStatus,licenseVerificationStatus:a.licenseVerificationStatus}):null; }
+    case 'ADMIN': {
+      const a = await UserModel.findById(identity.id).select('+passwordHash').exec();
+      return a ? accountFrom(a._id.toString(), a.email, a.name, a.role, a.accountStatus, a.passwordHash, { phone: a.phone }) : null;
+    }
+    case 'HOSPITAL': {
+      const a = await HospitalModel.findById(identity.id).select('+passwordHash').exec();
+      return a ? accountFrom(a._id.toString(), a.email, a.name, 'HOSPITAL', a.accountStatus, a.passwordHash, {
+        phone: a.phone,
+        verificationStatus: a.verificationStatus,
+        registrationNumber: a.registrationNumber,
+        hospitalType: a.hospitalType,
+      }) : null;
+    }
+    case 'AMBULANCE_PROVIDER': {
+      const a = await AmbulanceProviderModel.findById(identity.id).select('+passwordHash').exec();
+      return a ? accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', a.accountStatus, a.passwordHash, {
+        phone: a.phone,
+        verificationStatus: a.verificationStatus,
+        profileCompletionStatus: a.profileCompletionStatus,
+        registrationNumber: a.registrationNumber,
+        serviceType: a.serviceType,
+      }) : null;
+    }
+    case 'AMBULANCE_DRIVER': {
+      const a = await AmbulanceDriverModel.findById(identity.id).select('+passwordHash').exec();
+      if (!a) return null;
+      let providerName: string | undefined;
+      if (a.providerId) {
+        const p = await AmbulanceProviderModel.findById(a.providerId).select('name').lean().exec();
+        if (p) providerName = p.name;
+      }
+      let assignedAmbulanceVehicleNumber: string | undefined;
+      if (a.assignedAmbulanceId) {
+        const amb = await AmbulanceModel.findById(a.assignedAmbulanceId).select('vehicleNumber registrationNumber').lean().exec();
+        if (amb) assignedAmbulanceVehicleNumber = amb.vehicleNumber || amb.registrationNumber;
+      }
+      return accountFrom(a._id.toString(), a.email, a.fullName, 'AMBULANCE_DRIVER', a.accountStatus, a.passwordHash, {
+        phone: a.phone,
+        profileCompletionStatus: a.profileCompletionStatus,
+        licenseVerificationStatus: a.licenseVerificationStatus,
+        licenseNumber: a.licenseNumber,
+        availabilityStatus: a.availabilityStatus,
+        providerId: a.providerId?.toString(),
+        providerName,
+        assignedAmbulanceId: a.assignedAmbulanceId?.toString(),
+        assignedAmbulanceVehicleNumber,
+      });
+    }
   }
 };
 
@@ -124,9 +231,6 @@ const createAuthResult = async (account:AccountWithPassword):Promise<AuthResult>
   return {user,accessToken,refreshToken};
 };
 
-const identityFromDocument=(doc:{_id:{toString():string};email:string;name?:string;accountStatus:AccountStatus},role:Role):AuthenticatedIdentity =>
-  publicIdentity(accountFrom(doc._id.toString(),doc.email,doc.name??doc.email,role,doc.accountStatus));
-
 export const registerUser=async(input:UserRegistrationInput):Promise<AuthResult>=>{
   await ensureUniqueContact(input.email,input.phone); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
   const normalized=normalizeEmail(input.email);
@@ -146,23 +250,63 @@ export const registerHospital=async(input:HospitalRegistrationInput)=>{
     accountStatus:'PENDING',
     ...(location ? { location } : {}),
   });
-  return identityFromDocument(a,'HOSPITAL');
+  return publicIdentity(accountFrom(a._id.toString(), a.email, a.name, 'HOSPITAL', 'PENDING', undefined, {
+    phone: a.phone,
+    verificationStatus: 'PENDING',
+    registrationNumber: a.registrationNumber,
+    hospitalType: a.hospitalType,
+  }));
 };
 export const registerAmbulanceProvider=async(input:AmbulanceProviderRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await AmbulanceProviderModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'}); return identityFromDocument(a,'AMBULANCE_PROVIDER');
+  const a=await AmbulanceProviderModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'});
+  return publicIdentity(accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', 'PENDING', undefined, {
+    phone: a.phone,
+    verificationStatus: 'PENDING',
+    profileCompletionStatus: 'COMPLETE',
+    registrationNumber: a.registrationNumber,
+    serviceType: a.serviceType,
+  }));
 };
 export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueLicenseNumber(input.licenseNumber);
   if(!await AmbulanceProviderModel.exists({_id:input.providerId})) throw new AppError('PROVIDER_NOT_FOUND','Ambulance provider was not found',404);
   const provider = await AmbulanceProviderModel.findOne({_id:input.providerId,accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).lean().exec();
   if(!provider) throw new AppError('PROVIDER_NOT_OPERATIONAL','Driver cannot be registered against an inactive or unverified provider',409);
+  let assignedAmbulanceVehicleNumber: string | undefined;
   if (input.assignedAmbulanceId) {
     const ambulance = await AmbulanceModel.findOne({ _id: input.assignedAmbulanceId, providerId: input.providerId }).lean().exec();
     if (!ambulance) throw new AppError('AMBULANCE_NOT_FOUND', 'Assigned ambulance does not exist or does not belong to the selected provider', 404);
+    assignedAmbulanceVehicleNumber = ambulance.vehicleNumber || ambulance.registrationNumber;
   }
   const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await AmbulanceDriverModel.create({...input,email:normalizeEmail(input.email),passwordHash,licenseVerificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'}); return identityFromDocument(a,'AMBULANCE_DRIVER');
+  const a=await AmbulanceDriverModel.create({
+    fullName: input.fullName,
+    email: normalizeEmail(input.email),
+    phone: input.phone,
+    passwordHash,
+    licenseNumber: input.licenseNumber,
+    address: input.address,
+    city: input.city,
+    state: input.state,
+    country: input.country,
+    providerId: input.providerId,
+    assignedAmbulanceId: input.assignedAmbulanceId,
+    licenseVerificationStatus: 'PENDING',
+    accountStatus: 'PENDING',
+    profileCompletionStatus: 'COMPLETE',
+    authProvider: 'LOCAL'
+  });
+  return publicIdentity(accountFrom(a._id.toString(), a.email, a.fullName, 'AMBULANCE_DRIVER', 'PENDING', undefined, {
+    phone: a.phone,
+    profileCompletionStatus: 'COMPLETE',
+    licenseVerificationStatus: 'PENDING',
+    licenseNumber: a.licenseNumber,
+    providerId: a.providerId.toString(),
+    providerName: provider.name,
+    assignedAmbulanceId: a.assignedAmbulanceId?.toString(),
+    assignedAmbulanceVehicleNumber,
+  }));
 };
 
 export const login=async(input:LoginInput)=>{
@@ -341,3 +485,18 @@ export const refreshAuthentication=async(refreshToken:string)=>{
 };
 export const logout=async(refreshToken:string|undefined)=>{if(!refreshToken)return;try{const c=verifyToken(refreshToken,env.JWT_REFRESH_SECRET,'refresh');if(c.jti)await AuthSessionModel.deleteOne({tokenId:c.jti}).exec();}catch(error:unknown){void error;}};
 export const getCurrentUser=async(identity:AuthenticatedIdentity)=>{const a=await findByIdentity(identity);if(!a)throw new AppError('UNAUTHORIZED','Authenticated account was not found',401);return publicIdentity(a);};
+
+export const getActiveProvidersForRegistration = async () => {
+  const providers = await AmbulanceProviderModel.find({ accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' })
+    .select('_id name registrationNumber serviceType city state')
+    .lean()
+    .exec();
+  return providers.map((p) => ({
+    id: p._id.toString(),
+    name: p.name,
+    registrationNumber: p.registrationNumber,
+    serviceType: p.serviceType,
+    city: p.city,
+    state: p.state,
+  }));
+};

@@ -67,12 +67,91 @@ describe('authentication validation', () => {
       providerId: '507f1f77bcf86cd799439011',
     });
     assert.equal(result.providerId, '507f1f77bcf86cd799439011');
+    assert.equal(result.fullName, 'Driver Test');
+    assert.equal(result.licenseNumber, 'LIC-001');
+  });
+
+  it('accepts name, license_number, provider_id aliases and null assignedAmbulanceId for drivers', () => {
+    const result = ambulanceDriverRegistrationSchema.parse({
+      name: '  Driver Alias  ',
+      email: 'DRIVER.ALIAS@EXAMPLE.COM',
+      phone: '  +1-987-654-3210  ',
+      password: 'StrongPassword123!',
+      license_number: '  LIC-ALIAS-999  ',
+      provider_id: '  507f1f77bcf86cd799439011  ',
+      assignedAmbulanceId: null,
+      address: null,
+      role: 'AMBULANCE_DRIVER',
+      roleHint: 'AMBULANCE_DRIVER',
+    });
+    assert.equal(result.fullName, 'Driver Alias');
+    assert.equal(result.email, 'driver.alias@example.com');
+    assert.equal(result.licenseNumber, 'LIC-ALIAS-999');
+    assert.equal(result.providerId, '507f1f77bcf86cd799439011');
+    assert.equal(result.assignedAmbulanceId, undefined);
+    assert.equal(result.address, undefined);
+  });
+
+  it('rejects invalid driver providerId and short licenseNumber with clear validation errors', () => {
+    assert.throws(
+      () => ambulanceDriverRegistrationSchema.parse({
+        fullName: 'Driver',
+        email: 'driver@example.com',
+        phone: '12345678',
+        password: 'Password123!',
+        licenseNumber: 'ab',
+        providerId: 'invalid-id',
+      }),
+      (err: unknown) => {
+        const str = String(err);
+        return str.includes('licenseNumber') || str.includes('providerId');
+      }
+    );
+  });
+
+  it('parses comma-separated services and capabilities in hospital registration', () => {
+    const result = hospitalRegistrationSchema.parse({
+      ...validBase,
+      registrationNumber: 'HOSP-002',
+      hospitalType: 'Speciality',
+      services: 'ICU, Emergency, Cardiology',
+      capabilities: 'Trauma 1, NICU',
+    });
+    assert.deepEqual(result.services, ['ICU', 'Emergency', 'Cardiology']);
+    assert.deepEqual(result.capabilities, ['Trauma 1', 'NICU']);
   });
 
   it('validates login credentials', () => {
     const result = loginSchema.parse({ email: 'USER@EXAMPLE.COM', password: 'password' });
     assert.equal(result.email, 'user@example.com');
   });
+});
+
+describe('role-based access control across all 5 roles', () => {
+  const roles = ['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER', 'ADMIN'] as const;
+
+  for (const role of roles) {
+    it(`allows access for dedicated role ${role}`, () => {
+      let nextCalled = false;
+      const middleware = authorizeRole(role);
+      middleware({ auth: { id: '1', email: `${role.toLowerCase()}@example.com`, role, accountStatus: 'ACTIVE' } } as never, {} as never, () => {
+        nextCalled = true;
+      });
+      assert.equal(nextCalled, true, `Role ${role} should be authorized`);
+    });
+
+    it(`blocks unauthorized other roles from accessing ${role}-only endpoint`, () => {
+      const otherRoles = roles.filter((r) => r !== role);
+      const middleware = authorizeRole(role);
+      for (const other of otherRoles) {
+        let errorCode = '';
+        middleware({ auth: { id: '2', email: 'other@example.com', role: other, accountStatus: 'ACTIVE' } } as never, {} as never, (err?: unknown) => {
+          if (err && typeof err === 'object' && 'code' in err && typeof err.code === 'string') errorCode = err.code;
+        });
+        assert.equal(errorCode, 'FORBIDDEN', `Role ${other} must be forbidden from accessing ${role} route`);
+      }
+    });
+  }
 });
 
 describe('role authorization', () => {

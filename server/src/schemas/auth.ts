@@ -1,49 +1,98 @@
 import { z } from 'zod';
 
 const optionalText = (max: number) =>
-  z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), z.string().trim().max(max).optional());
+  z.preprocess((val) => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      return trimmed === '' ? undefined : trimmed;
+    }
+    return val;
+  }, z.string().trim().max(max).optional());
 
 const baseRegistration = {
-  name: z.string().trim().min(2).max(100),
-  email: z.string().trim().email().transform((value) => value.toLowerCase()),
-  phone: z.string().trim().min(7).max(20),
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().trim().email('Invalid email address').transform((value) => value.toLowerCase()),
+  phone: z.string().trim().min(7, 'Phone number must be at least 7 characters').max(30),
   password: z.string().min(8, 'Password must be at least 8 characters long.').max(128),
   address: optionalText(250),
   city: optionalText(100),
   state: optionalText(100),
   country: optionalText(100),
-  latitude: z.number().finite().min(-90).max(90).optional(),
-  longitude: z.number().finite().min(-180).max(180).optional(),
+  latitude: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.number().finite().min(-90).max(90).optional()),
+  longitude: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.number().finite().min(-180).max(180).optional()),
+  role: z.string().optional(),
+  roleHint: z.string().optional(),
 };
 
 export const userRegistrationSchema = z.object(baseRegistration);
 export const hospitalRegistrationSchema = z.object({
   ...baseRegistration,
-  registrationNumber: z.string().trim().min(2).max(80),
-  hospitalType: z.string().trim().min(2).max(80),
-  services: z.array(z.string().trim().min(1).max(100)).default([]),
-  capabilities: z.array(z.string().trim().min(1).max(100)).default([]),
+  registrationNumber: z.string().trim().min(2, 'Registration number is required').max(80),
+  hospitalType: z.string().trim().min(2, 'Hospital type is required').max(80),
+  services: z.preprocess((val) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') return val.split(',').map((s) => s.trim()).filter(Boolean);
+    return val;
+  }, z.array(z.string().trim().min(1).max(100)).default([])),
+  capabilities: z.preprocess((val) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') return val.split(',').map((s) => s.trim()).filter(Boolean);
+    return val;
+  }, z.array(z.string().trim().min(1).max(100)).default([])),
 });
 export const ambulanceProviderRegistrationSchema = z.object({
   ...baseRegistration,
-  registrationNumber: z.string().trim().min(2).max(80),
-  serviceType: z.string().trim().min(2).max(80),
+  registrationNumber: z.string().trim().min(2, 'Registration number is required').max(80),
+  serviceType: z.string().trim().min(2, 'Service type is required').max(80),
 });
 export const ambulanceDriverRegistrationSchema = z.object({
-  fullName: z.string().trim().min(2).max(100),
-  email: z.string().trim().email().transform((value) => value.toLowerCase()),
-  phone: z.string().trim().min(7).max(20),
+  fullName: z.preprocess((val) => (typeof val === 'string' ? val.trim() : val), z.string().min(2).max(100)).optional(),
+  name: z.preprocess((val) => (typeof val === 'string' ? val.trim() : val), z.string().min(2).max(100)).optional(),
+  email: z.string().trim().email('Invalid email address').transform((value) => value.toLowerCase()),
+  phone: z.string().trim().min(7, 'Phone number must be at least 7 characters').max(30),
   password: z.string().min(8, 'Password must be at least 8 characters long.').max(128),
-  licenseNumber: z.string().trim().min(3).max(80),
+  licenseNumber: z.preprocess((val) => (typeof val === 'string' ? val.trim() : val), z.string().min(3).max(80)).optional(),
+  license_number: z.string().optional(),
   address: optionalText(250),
   city: optionalText(100),
   state: optionalText(100),
   country: optionalText(100),
-  providerId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid providerId'),
-  assignedAmbulanceId: z.preprocess(
-    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
-    z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid assignedAmbulanceId').optional(),
-  ),
+  providerId: z.preprocess((val) => (typeof val === 'string' ? val.trim() : val), z.string().regex(/^[0-9a-fA-F]{24}$/, 'Provider ID must be a 24-character hexadecimal MongoDB ID')).optional(),
+  provider_id: z.string().optional(),
+  assignedAmbulanceId: z.preprocess((val) => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      return trimmed === '' ? undefined : trimmed;
+    }
+    return val;
+  }, z.string().regex(/^[0-9a-fA-F]{24}$/, 'Assigned ambulance ID must be a 24-character hexadecimal MongoDB ID').optional()),
+  assigned_ambulance_id: z.string().optional(),
+  role: z.string().optional(),
+  roleHint: z.string().optional(),
+}).transform((data) => {
+  const resolvedFullName = (data.fullName || data.name || '').trim();
+  const resolvedLicense = (data.licenseNumber || data.license_number || '').trim();
+  const resolvedProviderId = (data.providerId || data.provider_id || '').trim();
+  const resolvedAmbulanceId = data.assignedAmbulanceId || (data.assigned_ambulance_id?.trim() || undefined);
+  return {
+    ...data,
+    fullName: resolvedFullName,
+    licenseNumber: resolvedLicense,
+    providerId: resolvedProviderId,
+    assignedAmbulanceId: resolvedAmbulanceId,
+  };
+}).superRefine((data, ctx) => {
+  if (!data.fullName || data.fullName.length < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Full name is required and must be at least 2 characters', path: ['fullName'] });
+  }
+  if (!data.licenseNumber || data.licenseNumber.length < 3) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'License number is required and must be at least 3 characters', path: ['licenseNumber'] });
+  }
+  if (!data.providerId || !/^[0-9a-fA-F]{24}$/.test(data.providerId)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provider ID is required and must be a 24-character hex ID', path: ['providerId'] });
+  }
 });
 export const loginSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),

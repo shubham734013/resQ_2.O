@@ -15,6 +15,8 @@ const AuthContext=createContext<AuthContextValue|null>(null);
 const getUserFromResponse=(response:{data:{user:AuthUser}}):AuthUser=>response.data.user;
 const HAS_SESSION_KEY = 'resq_has_session';
 
+let sharedRefreshPromise: Promise<AuthUser | null> | null = null;
+
 export const AuthProvider=({children}:{children:ReactNode})=>{
   const queryClient = useQueryClient();
   const [state,setState]=useState<AuthState>({user:null,isAuthenticated:false,isLoading:true});
@@ -29,33 +31,33 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
     setState({user,isAuthenticated:user!==null,isLoading:false});
   },[]);
   const refreshUser=useCallback(async():Promise<AuthUser|null>=>{
-    const operationVersion=++authOperationVersion.current;
-    const hasPriorSession = (() => {
-      try { return localStorage.getItem(HAS_SESSION_KEY) === 'true'; } catch { return false; }
-    })();
-    if (!hasPriorSession) {
-      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
-      return null;
+    if (sharedRefreshPromise) {
+      return sharedRefreshPromise;
     }
-    try{
-      const user=(await authApi.me()).data;
-      if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
-      return user;
-    }catch(error){
-      if(!(error instanceof AuthApiError)||error.status!==401){
-        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
-        throw error;
-      }
+    const operationVersion=++authOperationVersion.current;
+    sharedRefreshPromise = (async () => {
       try{
-        const user=getUserFromResponse(await authApi.refresh());
+        const user=(await authApi.me()).data;
         if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
         return user;
-      }catch(refreshError){
-        if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
-        if(refreshError instanceof AuthApiError&&refreshError.status===401)return null;
-        throw refreshError;
+      }catch(error){
+        if(!(error instanceof AuthApiError)||error.status!==401){
+          if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+          return null;
+        }
+        try{
+          const user=getUserFromResponse(await authApi.refresh());
+          if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
+          return user;
+        }catch(_refreshError){
+          if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
+          return null;
+        }
+      }finally{
+        sharedRefreshPromise = null;
       }
-    }
+    })();
+    return sharedRefreshPromise;
   },[setAuthenticatedUser]);
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(()=>{void refreshUser().catch(()=>undefined);},[refreshUser]);

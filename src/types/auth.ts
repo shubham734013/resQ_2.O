@@ -2,7 +2,26 @@ export type UserRole='USER'|'HOSPITAL'|'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER'|'
 export type AccountStatus='PENDING'|'ACTIVE'|'SUSPENDED'|'REJECTED';
 export type VerificationStatus='PENDING'|'VERIFIED'|'REJECTED';
 export type SocialProvider='GOOGLE'|'MICROSOFT';
-export interface AuthUser { id:string; email:string; name?:string; role:UserRole; accountStatus:AccountStatus; verificationStatus?:VerificationStatus; profileCompletionStatus?:'INCOMPLETE'|'COMPLETE'; licenseVerificationStatus?:VerificationStatus; }
+export interface AuthUser {
+  id: string;
+  email: string;
+  name?: string;
+  role: UserRole;
+  accountStatus: AccountStatus;
+  phone?: string;
+  verificationStatus?: VerificationStatus;
+  profileCompletionStatus?: 'INCOMPLETE' | 'COMPLETE';
+  licenseVerificationStatus?: VerificationStatus;
+  providerId?: string;
+  providerName?: string;
+  assignedAmbulanceId?: string;
+  assignedAmbulanceVehicleNumber?: string;
+  licenseNumber?: string;
+  availabilityStatus?: string;
+  registrationNumber?: string;
+  hospitalType?: string;
+  serviceType?: string;
+}
 export interface AuthResponse { success:true; data:{user:AuthUser}; }
 export interface CurrentUserResponse { success:true; data:AuthUser; }
 export type LoginRoleHint='USER'|'HOSPITAL'|'AMBULANCE_PROVIDER'|'AMBULANCE_DRIVER';

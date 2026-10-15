@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { AuthApiError } from '../services/authApi';
+import { authApi, AuthApiError } from '../services/authApi';
 import type { AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationRequest, AuthUser, HospitalRegistrationRequest, UserRegistrationRequest } from '../types/auth';
 
 type RegistrationKind = 'user' | 'hospital' | 'ambulance-provider' | 'ambulance-driver';
@@ -29,12 +29,12 @@ const getErrorMessage = (error: unknown): string => {
     if (error.code === 'PROVIDER_NOT_FOUND') return 'No ambulance provider was found for this Provider ID. Copy the provider MongoDB _id exactly.';
     if (error.code === 'PROVIDER_NOT_OPERATIONAL') return 'This provider is not yet approved. Driver registration requires the provider account to be ACTIVE and VERIFIED by an administrator.';
     if (error.code === 'AMBULANCE_NOT_FOUND') return 'The assigned ambulance was not found under this provider. Check the ambulance ID or leave that optional field blank.';
-    if (error.code === 'VALIDATION_ERROR') return 'Some registration details are missing or invalid. Check your full name, email, phone, password (at least 8 characters), license number, and 24-character Provider ID.';
+    if (error.code === 'VALIDATION_ERROR') return error.message || 'Some registration details are missing or invalid.';
     if (error.status === 404) return 'The registration endpoint was not found on the running API. Restart the ResQ backend on port 5001 and retry. If it continues, check that the frontend and backend use the same branch/version.';
     if (error.status === 400 || error.status === 409 || error.status === 422) return error.message;
     if (error.status >= 500) return 'ResQ is temporarily unavailable. Please try again.';
   }
-  return 'Registration could not be completed. Please review your details and try again.';
+  return error instanceof Error && error.message ? error.message : 'Registration could not be completed. Please review your details and try again.';
 };
 const buildUserPayload = (form: FormState): UserRegistrationRequest => ({ name: form.name.trim(), email: form.email.trim(), password: form.password, phone: form.phone.trim(), address: form.address.trim() || undefined, city: form.city.trim() || undefined, state: form.state.trim() || undefined, country: form.country.trim() || undefined });
 const buildHospitalPayload = (form: FormState): HospitalRegistrationRequest => ({ ...buildUserPayload(form), registrationNumber: form.registrationNumber.trim(), hospitalType: form.hospitalType.trim(), services: splitList(form.services), capabilities: splitList(form.capabilities) });
@@ -48,8 +48,25 @@ export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
   const [error, setError] = useState('');
   const [createdUser, setCreatedUser] = useState<AuthUser | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [providers, setProviders] = useState<Array<{ id: string; name: string; registrationNumber: string; city?: string; state?: string }>>([]);
   const copy = titles[kind];
   const update = (field: keyof FormState, value: string) => setForm((current) => ({ ...current, [field]: value }));
+
+  useEffect(() => {
+    if (kind === 'ambulance-driver') {
+      authApi.listActiveAmbulanceProviders()
+        .then((res) => {
+          if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+            setProviders(res.data);
+            setForm((current) => ({
+              ...current,
+              providerId: current.providerId || res.data[0].id,
+            }));
+          }
+        })
+        .catch(() => { /* ignore */ });
+    }
+  }, [kind]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(''); setCreatedUser(null);
@@ -94,7 +111,7 @@ export const RegistrationPage = ({ kind }: RegistrationPageProps) => {
         <label><span className="label">Confirm password</span><input required minLength={8} type="password" value={form.confirmPassword} onChange={(event) => update('confirmPassword', event.target.value)} className="input" autoComplete="new-password" /></label>
         {kind === 'hospital' && <><label><span className="label">Registration number</span><input required value={form.registrationNumber} onChange={(event) => update('registrationNumber', event.target.value)} className="input" /></label><label><span className="label">Hospital type</span><input required value={form.hospitalType} onChange={(event) => update('hospitalType', event.target.value)} className="input" /></label><label><span className="label">Services</span><input value={form.services} onChange={(event) => update('services', event.target.value)} className="input" placeholder="Emergency, ICU" /></label><label><span className="label">Capabilities</span><input value={form.capabilities} onChange={(event) => update('capabilities', event.target.value)} className="input" placeholder="Trauma, Cardiac" /></label></>}
         {kind === 'ambulance-provider' && <><label><span className="label">Registration number</span><input required value={form.registrationNumber} onChange={(event) => update('registrationNumber', event.target.value)} className="input" /></label><label><span className="label">Service type</span><input required value={form.serviceType} onChange={(event) => update('serviceType', event.target.value)} className="input" placeholder="Private / NGO / Fleet" /></label></>}
-        {kind === 'ambulance-driver' && <><label><span className="label">License number</span><input required value={form.licenseNumber} onChange={(event) => update('licenseNumber', event.target.value)} className="input" /></label><label><span className="label">Provider ID</span><input required value={form.providerId} onChange={(event) => update('providerId', event.target.value)} className="input" placeholder="MongoDB provider ID" /></label><label className="sm:col-span-2"><span className="label">Assigned ambulance ID (optional)</span><input value={form.assignedAmbulanceId} onChange={(event) => update('assignedAmbulanceId', event.target.value)} className="input" /></label></>}
+        {kind === 'ambulance-driver' && <><label><span className="label">License number</span><input required value={form.licenseNumber} onChange={(event) => update('licenseNumber', event.target.value)} className="input" placeholder="e.g. DL-1420110012345" /></label><label><span className="label">Provider</span>{providers.length > 0 ? (<select value={form.providerId} onChange={(event) => update('providerId', event.target.value)} className="input bg-white" required><option value="" disabled>Select approved provider</option>{providers.map((p) => (<option key={p.id} value={p.id}>{p.name} ({p.city || p.registrationNumber})</option>))}</select>) : (<input required value={form.providerId} onChange={(event) => update('providerId', event.target.value)} className="input" placeholder="MongoDB provider ID" />)}</label><label className="sm:col-span-2"><span className="label">Assigned ambulance ID (optional)</span><input value={form.assignedAmbulanceId} onChange={(event) => update('assignedAmbulanceId', event.target.value)} className="input" placeholder="Leave blank if not assigned yet" /></label></>}
         {kind !== 'user' && <label className="sm:col-span-2"><span className="label">Address</span><input value={form.address} onChange={(event) => update('address', event.target.value)} className="input" /></label>}
         <label><span className="label">City</span><input value={form.city} onChange={(event) => update('city', event.target.value)} className="input" /></label><label><span className="label">State</span><input value={form.state} onChange={(event) => update('state', event.target.value)} className="input" /></label><label><span className="label">Country</span><input value={form.country} onChange={(event) => update('country', event.target.value)} className="input" /></label>
         {error && <p className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700" role="alert">{error}</p>}

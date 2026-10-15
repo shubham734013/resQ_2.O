@@ -57,8 +57,14 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req: Request, 
   const err = error instanceof Error ? error : new Error('Unknown error');
   const statusCode = 'statusCode' in err && typeof err.statusCode === 'number' ? err.statusCode : 500;
   const code = 'code' in err && typeof err.code === 'string' ? err.code : 'INTERNAL_SERVER_ERROR';
-  const message = statusCode >= 500 ? 'Internal server error' : err.message;
   const details = 'details' in err ? err.details : undefined;
+
+  let message = statusCode >= 500 ? 'Internal server error' : err.message;
+  if (code === 'VALIDATION_ERROR' && Array.isArray(details) && details.length > 0) {
+    const issues = details as z.ZodIssue[];
+    const formattedFields = issues.map((i) => `${i.path.join('.') || 'payload'}: ${i.message}`).join('; ');
+    message = `Validation failed: ${formattedFields}`;
+  }
 
   writeLog({ level: statusCode >= 500 ? 'error' : 'warn', code, statusCode, method: req.method, path: req.path });
 
