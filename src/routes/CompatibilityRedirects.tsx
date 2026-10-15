@@ -8,7 +8,7 @@ const FacilityRedirect = () => {
 
 const RouteRedirect = () => {
   const { facilityId } = useParams<{ facilityId: string }>();
-  return <Navigate to={facilityId ? `/user/hospitals/${facilityId}` : '/user/hospitals'} replace />;
+  return <Navigate to={facilityId ? `/user/route/${facilityId}` : '/user/route'} replace />;
 };
 
 export const compatibilityRedirectRoutes = (
@@ -19,9 +19,9 @@ export const compatibilityRedirectRoutes = (
     <Route path="/my-requests" element={<Navigate to="/user/appointments" replace />} />
     <Route path="/search" element={<Navigate to="/user/hospitals" replace />} />
     <Route path="/facility/:id" element={<FacilityRedirect />} />
-    <Route path="/route" element={<Navigate to="/user/hospitals" replace />} />
+    <Route path="/route" element={<Navigate to="/user/route" replace />} />
     <Route path="/route/:facilityId" element={<RouteRedirect />} />
-    <Route path="/saved" element={<Navigate to="/user/hospitals" replace />} />
+    <Route path="/saved" element={<Navigate to="/user/saved" replace />} />
     <Route path="/profile" element={<Navigate to="/user/profile" replace />} />
 
     {/* Legacy Ambulance Provider Routes */}

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, Panel } from '../components/admin/AdminPrimitives';
 import { Button } from '../components/common/Button';
 import {
@@ -32,7 +31,7 @@ const useFilters = () => { const [searchInput, setSearchInput] = useState(''); c
 const DetailLink = ({ to }: { to: string }) => <Link className="font-medium text-slate-700 underline-offset-2 hover:underline" to={to}>View</Link>;
 const ConfirmAction = ({ label, onConfirm, disabled }: { label: string; onConfirm: () => void; disabled?: boolean }) => <Button size="sm" variant="secondary" disabled={disabled} onClick={() => { if (window.confirm(`Confirm: ${label}?`)) onConfirm(); }}>{label}</Button>;
 
-const ManagementShell = ({ title, description, children }: { title: string; description: string; children: ReactNode }) => <AdminLayout><AdminPage title={title} description={description}>{children}</AdminPage></AdminLayout>;
+const ManagementShell = ({ title, description, children }: { title: string; description: string; children: ReactNode }) => <div className="w-full"><AdminPage title={title} description={description}>{children}</AdminPage></div>;
 
 export const AdminUsersManagementPage = () => {
   const f = useFilters(); const [role, setRole] = useState(''); const [status, setStatus] = useState('');

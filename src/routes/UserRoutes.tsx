@@ -11,6 +11,8 @@ import { UserTrackingPage } from '../pages/user/UserTrackingPage';
 import { UserNotificationsPage } from '../pages/user/UserNotificationsPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { UserSettingsPage } from '../pages/user/UserSettingsPage';
+import { RouteNavigationPage } from '../pages/RouteNavigationPage';
+import { SavedPage } from '../pages/SavedPage';
 
 export const userRoutes = (
   <Route path="/user" element={<RequireAuth />}>
@@ -21,6 +23,9 @@ export const userRoutes = (
           <Route path="dashboard" element={<UserDashboardPage />} />
           <Route path="hospitals" element={<SearchPage />} />
           <Route path="hospitals/:id" element={<FacilityDetailPage />} />
+          <Route path="saved" element={<SavedPage />} />
+          <Route path="route" element={<RouteNavigationPage />} />
+          <Route path="route/:facilityId" element={<RouteNavigationPage />} />
           <Route path="appointments" element={<CitizenAppointmentsPage />} />
           <Route path="appointments/:appointmentId" element={<CitizenAppointmentsPage />} />
           <Route path="emergency" element={<EmergencyPage />} />

@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, Panel } from '../components/admin/AdminPrimitives';
 import { Button } from '../components/common/Button';
 import {
@@ -49,12 +48,12 @@ const Header = ({ title, back }: { title: string; back: string }) => (
 );
 
 const Shell = ({ children, title, back }: { children: ReactNode; title: string; back: string }) => (
-  <AdminLayout>
+  <div className="w-full">
     <AdminPage title={title} description="Safe operational information from the Admin API.">
       <Header title={title} back={back} />
       {children}
     </AdminPage>
-  </AdminLayout>
+  </div>
 );
 
 export const AdminUserDetailPage = () => {

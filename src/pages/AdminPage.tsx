@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react';
-import { AdminLayout } from '../components/admin/AdminLayout';
 import { AdminPage, MetricGrid, Panel } from '../components/admin/AdminPrimitives';
 import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
 import { EmergencyTable } from '../components/admin/AdminTables';
@@ -31,7 +30,7 @@ import {
 import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmbulanceProvider, AdminHospital, AdminUser, AdminVerificationStatus } from '../types/adminManagement';
 import { adminApi } from '../services/adminApi';
 
-const Section = ({ children }: { children: ReactNode }) => <AdminLayout>{children}</AdminLayout>;
+const Section = ({ children }: { children: ReactNode }) => <div className="w-full">{children}</div>;
 const ErrorBox = ({ message, retry }: { message: string; retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{message}</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Retry</Button></div>;
 const Loading = () => <div className="flex items-center justify-center p-12 text-sm text-slate-500">Loading live admin data…</div>;
 const Empty = ({ label }: { label: string }) => <div className="p-10 text-center text-sm text-slate-500">{label}</div>;
