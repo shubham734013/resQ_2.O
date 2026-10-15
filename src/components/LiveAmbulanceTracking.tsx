@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Navigation, Radio, RefreshCw, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { Button } from './common/Button';
 import { MapView } from './map/MapView';
 import { createTrackingSocket, subscribeTrackingRoom, type TrackingEnvelope } from '../services/trackingSocket';
@@ -30,6 +31,7 @@ const formatAge = (ageMs: number | null | undefined) => {
 };
 
 export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOperations = false }: LiveAmbulanceTrackingProps) => {
+  const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => ['tracking', 'emergency', emergencyRequestId] as const, [emergencyRequestId]);
   const [connected, setConnected] = useState(false);
@@ -37,7 +39,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
   const snapshotQuery = useQuery({
     queryKey,
     queryFn: () => trackingApi.getEmergency(emergencyRequestId),
-    enabled: Boolean(emergencyRequestId),
+    enabled: Boolean(emergencyRequestId && isAuthenticated),
     staleTime: 0,
     refetchInterval: (query) => query.state.data?.trackingActive ? 15000 : 8000,
     refetchOnWindowFocus: true,
@@ -46,7 +48,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
   const snapshot = snapshotQuery.data;
 
   useEffect(() => {
-    if (!emergencyRequestId) return;
+    if (!emergencyRequestId || !isAuthenticated || snapshotQuery.isError) return;
     const socket = createTrackingSocket();
     let disposed = false;
     const refresh = () => { void queryClient.invalidateQueries({ queryKey }); };
@@ -63,7 +65,15 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       refresh();
     });
     socket.on('disconnect', () => setConnected(false));
-    socket.on('connect_error', () => { setConnected(false); setSocketError('Realtime connection interrupted. Recovering through REST snapshots and automatic reconnect.'); });
+    socket.on('connect_error', (error) => {
+      setConnected(false);
+      if (error?.message === 'UNAUTHORIZED' || error?.message?.includes('UNAUTHORIZED')) {
+        setSocketError('Authentication expired. Log in to reconnect real-time tracking.');
+        socket.disconnect();
+      } else {
+        setSocketError('Realtime connection interrupted. Recovering through REST snapshots and automatic reconnect.');
+      }
+    });
     const onLocation = (envelope: TrackingEnvelope<LocationEvent>) => {
       const event = envelope?.data;
       if (!event || event.emergencyRequestId !== emergencyRequestId) return;
@@ -98,7 +108,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       socket.disconnect();
       socket.removeAllListeners();
     };
-  }, [emergencyRequestId, queryClient, queryKey, subscribeHospitalOperations, snapshot?.hospital.id]);
+  }, [emergencyRequestId, isAuthenticated, snapshotQuery.isError, queryClient, queryKey, subscribeHospitalOperations, snapshot?.hospital.id]);
   const routePhase = snapshot?.routeTarget ?? 'PICKUP';
   const location = snapshot?.location;
   const roundedLat = typeof location?.latitude === 'number' ? location.latitude.toFixed(3) : 'none';

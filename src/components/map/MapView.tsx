@@ -231,7 +231,7 @@ export const MapView = ({
           mapTypeControl: false,
           fullscreenControl: false,
           clickableIcons: false,
-          tilt: isNavigating || is3D ? 45 : 0,
+          tilt: hasValidMapId && (isNavigating || is3D) ? 45 : 0,
         });
         setZoomLevel(zoom);
         setStatus('ready');
@@ -274,15 +274,15 @@ export const MapView = ({
     void applyTraffic();
   }, [showTraffic, status]);
 
-  // 3D Perspective Tilt Toggle
+  // 3D Perspective Tilt Toggle (Vector Maps Only)
   const toggle3D = useCallback(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !hasValidMapId) return;
     const next = !is3D;
     setIs3D(next);
     if (mapRef.current.setTilt) {
       mapRef.current.setTilt(next ? 45 : 0);
     }
-  }, [is3D]);
+  }, [is3D, hasValidMapId]);
 
   // Desktop/Mobile Resize Observer
   useEffect(() => {
@@ -637,20 +637,22 @@ export const MapView = ({
             <LocateFixed className="h-4 w-4 text-blue-600" />
           </button>
 
-          {/* 3D / 2D Perspective Toggle */}
-          <button
-            type="button"
-            aria-label="Toggle 3D View"
-            onClick={toggle3D}
-            className={`rounded-2xl p-2.5 shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
-              is3D
-                ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/30'
-                : 'bg-white/95 hover:bg-white text-slate-800 border-slate-200/80'
-            }`}
-            title={is3D ? 'Switch to 2D' : 'Switch to 3D Perspective'}
-          >
-            <Compass className="h-4 w-4" />
-          </button>
+          {/* 3D / 2D Perspective Toggle (Vector Maps Only) */}
+          {hasValidMapId && (
+            <button
+              type="button"
+              aria-label="Toggle 3D View"
+              onClick={toggle3D}
+              className={`rounded-2xl p-2.5 shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+                is3D
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/30'
+                  : 'bg-white/95 hover:bg-white text-slate-800 border-slate-200/80'
+              }`}
+              title={is3D ? 'Switch to 2D' : 'Switch to 3D Perspective'}
+            >
+              <Compass className="h-4 w-4" />
+            </button>
+          )}
 
           {/* Live Traffic Layer Toggle */}
           <button

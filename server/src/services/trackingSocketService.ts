@@ -53,7 +53,7 @@ const authorized = async (identity: AuthenticatedIdentity, request: RoomRequest)
 
 export const initializeTrackingSockets = (httpServer: HttpServer): (() => Promise<void>) => {
   if (io) throw new Error('Tracking Socket.IO has already been initialized.');
-  io = new Server(httpServer, { cors: { origin: getAllowedOrigins(), credentials: true, methods: ['GET', 'POST'] }, transports: ['websocket', 'polling'], connectTimeout: 10000, maxHttpBufferSize: 16000 });
+  io = new Server(httpServer, { cors: { origin: getAllowedOrigins(), credentials: true, methods: ['GET', 'POST'] }, transports: ['polling', 'websocket'], connectTimeout: 10000, maxHttpBufferSize: 16000 });
   io.use(async (socket, next) => {
     try {
       const token = tokenFromSocket(socket);

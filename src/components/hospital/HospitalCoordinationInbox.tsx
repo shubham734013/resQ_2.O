@@ -47,7 +47,12 @@ export const HospitalCoordinationInbox = () => {
       };
       currentSocket.on('connect', subscribe);
       currentSocket.on('disconnect', () => { if (!disposed) setRealtime('RECONNECTING'); });
-      currentSocket.on('connect_error', () => { if (!disposed) setRealtime('RECONNECTING'); });
+      currentSocket.on('connect_error', (error) => {
+        if (!disposed) setRealtime('RECONNECTING');
+        if (error?.message === 'UNAUTHORIZED' || error?.message?.includes('UNAUTHORIZED')) {
+          currentSocket.disconnect();
+        }
+      });
       currentSocket.on('hospital:coordination-notification', onNotification);
       currentSocket.on('hospital:coordination-notification-acknowledged', refreshHospitalState);
       currentSocket.on('hospital:incoming-patient', refreshHospitalState);
