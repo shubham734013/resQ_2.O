@@ -301,17 +301,16 @@ export const bookAppointment = async (
   const endMinutes = startMinutes + availability.slotDurationMinutes;
   const endTime = minutesToTimeStr(endMinutes);
 
-  // Ensure slot document exists before atomic increment
-  let slotDoc = await HospitalAppointmentSlotModel.findOne({
-    hospitalId: hospitalObjectId,
-    department: input.department.trim(),
-    date: input.date,
-    startTime: input.startTime,
-  }).exec();
-
-  if (!slotDoc) {
-    try {
-      slotDoc = await HospitalAppointmentSlotModel.create({
+  // Ensure slot document exists before atomic increment via atomic upsert
+  const slotDoc = await HospitalAppointmentSlotModel.findOneAndUpdate(
+    {
+      hospitalId: hospitalObjectId,
+      department: input.department.trim(),
+      date: input.date,
+      startTime: input.startTime,
+    },
+    {
+      $setOnInsert: {
         hospitalId: hospitalObjectId,
         department: input.department.trim(),
         date: input.date,
@@ -320,17 +319,10 @@ export const bookAppointment = async (
         maxCapacity: availability.maxCapacityPerSlot,
         bookedCount: 0,
         isCancelled: false,
-      });
-    } catch {
-      // If concurrent insert created it, fetch the created slot
-      slotDoc = await HospitalAppointmentSlotModel.findOne({
-        hospitalId: hospitalObjectId,
-        department: input.department.trim(),
-        date: input.date,
-        startTime: input.startTime,
-      }).exec();
-    }
-  }
+      },
+    },
+    { upsert: true, returnDocument: 'after' }
+  ).exec();
 
   if (!slotDoc) {
     throw new AppError('SLOT_NOT_FOUND', 'Could not initialize appointment slot', 500);
@@ -340,7 +332,7 @@ export const bookAppointment = async (
   const reservedSlot = await HospitalAppointmentSlotModel.findOneAndUpdate(
     {
       _id: slotDoc._id,
-      bookedCount: { $lt: slotDoc.maxCapacity },
+      $expr: { $lt: ['$bookedCount', '$maxCapacity'] },
       isCancelled: false,
     },
     {
@@ -397,12 +389,20 @@ export const bookAppointment = async (
     });
 
     return appointment;
-  } catch (error) {
+  } catch (error: unknown) {
     // If appointment document creation fails, roll back the slot reservation count
     await HospitalAppointmentSlotModel.findOneAndUpdate(
       { _id: reservedSlot._id, bookedCount: { $gt: 0 } },
       { $inc: { bookedCount: -1 } }
     ).exec();
+
+    if (error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === 11000) {
+      throw new AppError(
+        'DUPLICATE_BOOKING',
+        'You already have an active appointment or pending booking for this time slot.',
+        409
+      );
+    }
     throw error;
   }
 };

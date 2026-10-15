@@ -98,6 +98,13 @@ const hospitalAppointmentSchema = new Schema<HospitalAppointmentDocument>(
 
 hospitalAppointmentSchema.index({ hospitalId: 1, slotDate: 1, status: 1 });
 hospitalAppointmentSchema.index({ userId: 1, slotDate: 1, status: 1 });
+hospitalAppointmentSchema.index(
+  { userId: 1, hospitalId: 1, serviceDepartment: 1, slotDate: 1, startTime: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ['PENDING', 'CONFIRMED'] } },
+  }
+);
 
 export const HospitalAppointmentModel = model<HospitalAppointmentDocument>(
   'HospitalAppointment',
