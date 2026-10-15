@@ -40,7 +40,7 @@ export const AppHeader = ({ userLocation, isUpdatingLocation = false, onRefreshL
               <span>ResQ Network Active</span>
             </span>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-400">99.99% Platform SLA Uptime</span>
+            <span className="text-slate-400">99.99% Target SLA Uptime</span>
             <span className="text-slate-600">•</span>
             <span className="text-slate-400">HL7 FHIR v4 Ready</span>
           </div>

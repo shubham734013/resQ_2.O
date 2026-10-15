@@ -9,6 +9,8 @@ export interface ReportOverview {
   ambulanceProviders: { total:number; verified:number };
   ambulances: { total:number; available:number; busy:number; offline:number; maintenance:number; unassigned:number };
   drivers: { total:number; online:number; busy:number; offline:number };
+  appointments?: { total:number; pending:number; confirmed:number; completed:number; cancelled:number };
+  careRequests?: { total:number; pending:number; accepted:number; cancelled:number };
 }
 export interface ReportTrendPoint { _id:string; value:number; }
 export interface ReportValuePoint { _id:string; value:number; }

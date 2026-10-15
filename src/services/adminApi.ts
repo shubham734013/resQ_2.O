@@ -84,8 +84,8 @@ export const adminApi = {
   reportsOverview: (params: { from?: string; to?: string }) => request<ReportOverview>(`/admin/reports/overview${query(params)}`),
   reportsEmergencies: (params: { from?: string; to?: string }) => request<EmergencyReports>(`/admin/reports/emergencies${query(params)}`),
   reportsAnalytics: (params: { from?: string; to?: string }) => request<OperationalAnalytics>(`/admin/reports/analytics${query(params)}`),
-  exportReports: async (params: { from?: string; to?: string }) => {
-    const response = await fetch(`${API_BASE_URL}/admin/reports/export${query(params)}`, { credentials: 'include' });
+  exportReports: async (params: { from?: string; to?: string; format?: 'csv' | 'json' }) => {
+    const response = await fetch(`${API_BASE_URL}/admin/reports/export${query(params as AdminListParams)}`, { credentials: 'include' });
     if (!response.ok) throw new AdminApiError(response.status, 'EXPORT_FAILED', 'The report export could not be generated.');
     return response.blob();
   },

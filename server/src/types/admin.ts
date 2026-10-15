@@ -6,7 +6,9 @@ export interface AdminOverview {
   verifiedHospitals:number; verifiedProviders:number; verifiedDrivers:number;
   availableAmbulances:number; busyAmbulances:number; offlineAmbulances:number; maintenanceAmbulances:number;
   onlineDrivers:number; busyDrivers:number; offlineDrivers:number;
-  activeEmergencies:number; resolvedEmergencies:number; cancelledEmergencies:number;
+  totalEmergencies:number; activeEmergencies:number; resolvedEmergencies:number; cancelledEmergencies:number;
+  totalAppointments:number; pendingAppointments:number; confirmedAppointments:number; completedAppointments:number; cancelledAppointments:number;
+  totalCareRequests:number; pendingCareRequests:number; acceptedCareRequests:number; cancelledCareRequests:number;
 }
 export interface AdminUser { id:string; name:string; email:string; phone:string; role:Role; accountStatus:AccountStatus; emailVerified:boolean; phoneVerified:boolean; address?:string; city?:string; state?:string; country?:string; latitude?:number; longitude?:number; createdAt:Date|string; updatedAt:Date|string; }
 export interface AdminHospital { id:string; name:string; registrationNumber:string; email:string; phone:string; address?:string; city?:string; state?:string; country?:string; latitude?:number; longitude?:number; hospitalType:string; services:string[]; capabilities:string[]; resourceSummary:Record<string,number>; emergencyAvailability:string; verificationStatus:VerificationStatus; accountStatus:AccountStatus; createdAt:Date|string; updatedAt:Date|string; }

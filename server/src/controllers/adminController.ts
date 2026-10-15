@@ -38,7 +38,12 @@ export const reportOverviewController=async(_req:Request,res:Response):Promise<v
 export const emergencyReportsController=async(_req:Request,res:Response):Promise<void>=>sendSuccess(res,await getEmergencyReports(getReportRange(res)));
 export const analyticsReportsController=async(_req:Request,res:Response):Promise<void>=>sendSuccess(res,await getOperationalAnalytics(getReportRange(res)));
 export const exportReportsController=async(_req:Request,res:Response):Promise<void>=>{
-  const rows=await getExportRows(getReportRange(res));
+  const query=getValidatedQuery<{from?:Date;to?:Date;format?:'csv'|'json'}>(res);
+  const rows=await getExportRows({from:query.from,to:query.to});
+  if (query.format === 'json') {
+    res.status(200).type('application/json').set('Content-Disposition','attachment; filename="resq-emergency-report.json"').send(JSON.stringify({ success: true, data: rows }, null, 2));
+    return;
+  }
   const escape=(value:string|number)=>'"'+String(value).replace(/"/g,'""')+'"';
   const header=['date','total_requests','received','reviewing','preparing','ambulance_coordination','resolved','cancelled'];
   const csv=[header.join(','),...rows.map(row=>[escape(row._id),row.total,row.RECEIVED,row.REVIEWING,row.PREPARING,row.AMBULANCE_COORDINATION,row.RESOLVED,row.CANCELLED].join(','))].join('\n')+'\n';

@@ -17,7 +17,13 @@ export const providerListQuerySchema=z.object({search:z.string().trim().max(100)
 export const ambulanceListQuerySchema=z.object({search:z.string().trim().max(100).optional(),currentStatus:z.enum(AMBULANCE_STATUSES).optional(),verification:z.enum(VERIFICATION_STATUSES).optional(),status:z.enum(ACCOUNT_STATUSES).optional(),provider:objectId.optional(),sortBy:z.enum(['createdAt','updatedAt','registrationNumber','vehicleNumber','currentStatus','verificationStatus','accountStatus']).default('createdAt'),...pagination}).strict();
 export const driverListQuerySchema=z.object({search:z.string().trim().max(100).optional(),verification:z.enum(VERIFICATION_STATUSES).optional(),status:z.enum(ACCOUNT_STATUSES).optional(),availability:z.enum(DRIVER_AVAILABILITY_STATUSES).optional(),provider:objectId.optional(),sortBy:z.enum(['createdAt','updatedAt','fullName','email','licenseVerificationStatus','availabilityStatus','accountStatus']).default('createdAt'),...pagination}).strict();
 export const reportsQuerySchema=reportDateRangeSchema;
-export const reportsExportQuerySchema=reportDateRangeSchema;
+export const reportsExportQuerySchema=z.object({
+  ...dateRange,
+  format: z.enum(['csv', 'json']).default('csv'),
+}).strict().superRefine((value,ctx)=>{
+  if(value.from&&value.to&&value.from>value.to)ctx.addIssue({code:z.ZodIssueCode.custom,path:['from'],message:'from must be before to'});
+  if(value.from&&value.to&&value.to.getTime()-value.from.getTime()>366*24*60*60*1000)ctx.addIssue({code:z.ZodIssueCode.custom,path:['to'],message:'date range cannot exceed 366 days'});
+});
 export const adminEmergencyListQuerySchema=z.object({
   search:z.string().trim().max(100).optional(), status:z.enum(HOSPITAL_EMERGENCY_STATUSES).optional(),
   hospital:objectId.optional(), provider:objectId.optional(), ambulance:objectId.optional(), driver:objectId.optional(),

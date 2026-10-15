@@ -128,9 +128,9 @@ export const HomePage = () => {
                 <span>ResQ Network Active</span>
               </div>
               <div className="flex items-center gap-2 text-slate-300 text-[10px] font-medium">
-                <span>4.2m Avg Dispatch</span>
+                <span>Target: 4.2m Dispatch SLA</span>
                 <span className="text-slate-600">•</span>
-                <span>99.99% SLA Uptime</span>
+                <span>99.99% Platform Uptime (Benchmark)</span>
               </div>
             </div>
 

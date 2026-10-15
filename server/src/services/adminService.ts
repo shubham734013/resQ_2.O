@@ -5,6 +5,8 @@ import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
+import { HospitalAppointmentModel } from '../models/HospitalAppointment.js';
+import { HospitalCareRequestModel } from '../models/HospitalCareRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { AppError } from '../utils/AppError.js';
 import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js';
@@ -26,16 +28,41 @@ const listResult=async <T>(itemsPromise:Promise<T[]>,totalPromise:Promise<number
 
 export const getOverview=async():Promise<AdminOverview>=>{
   const activeStatuses=['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION'] as const;
-  const [totalUsers,totalHospitals,totalAmbulanceProviders,totalAmbulances,totalAmbulanceDrivers,pendingHospitals,pendingProviders,pendingDrivers,activeUsers,suspendedUsers,verifiedHospitals,verifiedProviders,verifiedDrivers,availableAmbulances,busyAmbulances,offlineAmbulances,maintenanceAmbulances,onlineDrivers,busyDrivers,offlineDrivers,activeEmergencies,resolvedEmergencies,cancelledEmergencies]=await Promise.all([
+  const [
+    totalUsers,totalHospitals,totalAmbulanceProviders,totalAmbulances,totalAmbulanceDrivers,
+    pendingHospitals,pendingProviders,pendingDrivers,
+    activeUsers,suspendedUsers,
+    verifiedHospitals,verifiedProviders,verifiedDrivers,
+    availableAmbulances,busyAmbulances,offlineAmbulances,maintenanceAmbulances,
+    onlineDrivers,busyDrivers,offlineDrivers,
+    totalEmergencies,activeEmergencies,resolvedEmergencies,cancelledEmergencies,
+    totalAppointments,pendingAppointments,confirmedAppointments,completedAppointments,cancelledAppointments,
+    totalCareRequests,pendingCareRequests,acceptedCareRequests,cancelledCareRequests
+  ]=await Promise.all([
     UserModel.countDocuments(),HospitalModel.countDocuments(),AmbulanceProviderModel.countDocuments(),AmbulanceModel.countDocuments(),AmbulanceDriverModel.countDocuments(),
     HospitalModel.countDocuments({verificationStatus:'PENDING'}),AmbulanceProviderModel.countDocuments({verificationStatus:'PENDING'}),AmbulanceDriverModel.countDocuments({licenseVerificationStatus:'PENDING'}),
     UserModel.countDocuments({accountStatus:'ACTIVE'}),UserModel.countDocuments({accountStatus:'SUSPENDED'}),
     HospitalModel.countDocuments({verificationStatus:'VERIFIED'}),AmbulanceProviderModel.countDocuments({verificationStatus:'VERIFIED'}),AmbulanceDriverModel.countDocuments({licenseVerificationStatus:'VERIFIED'}),
     AmbulanceModel.countDocuments({currentStatus:'AVAILABLE'}),AmbulanceModel.countDocuments({currentStatus:'BUSY'}),AmbulanceModel.countDocuments({currentStatus:'OFFLINE'}),AmbulanceModel.countDocuments({currentStatus:'MAINTENANCE'}),
     AmbulanceDriverModel.countDocuments({availabilityStatus:'ONLINE'}),AmbulanceDriverModel.countDocuments({availabilityStatus:'BUSY'}),AmbulanceDriverModel.countDocuments({availabilityStatus:'OFFLINE'}),
+    EmergencyRequestModel.countDocuments(),
     EmergencyRequestModel.countDocuments({status:{$in:activeStatuses}}),EmergencyRequestModel.countDocuments({status:'RESOLVED'}),EmergencyRequestModel.countDocuments({status:'CANCELLED'}),
+    HospitalAppointmentModel.countDocuments(),
+    HospitalAppointmentModel.countDocuments({status:'PENDING'}),HospitalAppointmentModel.countDocuments({status:'CONFIRMED'}),HospitalAppointmentModel.countDocuments({status:'COMPLETED'}),HospitalAppointmentModel.countDocuments({status:'CANCELLED'}),
+    HospitalCareRequestModel.countDocuments(),
+    HospitalCareRequestModel.countDocuments({status:'PENDING'}),HospitalCareRequestModel.countDocuments({status:'ACCEPTED'}),HospitalCareRequestModel.countDocuments({status:'CANCELLED'}),
   ]);
-  return {totalUsers,totalHospitals,totalAmbulanceProviders,totalAmbulances,totalAmbulanceDrivers,pendingHospitals,pendingProviders,pendingDrivers,activeUsers,suspendedUsers,verifiedHospitals,verifiedProviders,verifiedDrivers,availableAmbulances,busyAmbulances,offlineAmbulances,maintenanceAmbulances,onlineDrivers,busyDrivers,offlineDrivers,activeEmergencies,resolvedEmergencies,cancelledEmergencies};
+  return {
+    totalUsers,totalHospitals,totalAmbulanceProviders,totalAmbulances,totalAmbulanceDrivers,
+    pendingHospitals,pendingProviders,pendingDrivers,
+    activeUsers,suspendedUsers,
+    verifiedHospitals,verifiedProviders,verifiedDrivers,
+    availableAmbulances,busyAmbulances,offlineAmbulances,maintenanceAmbulances,
+    onlineDrivers,busyDrivers,offlineDrivers,
+    totalEmergencies,activeEmergencies,resolvedEmergencies,cancelledEmergencies,
+    totalAppointments,pendingAppointments,confirmedAppointments,completedAppointments,cancelledAppointments,
+    totalCareRequests,pendingCareRequests,acceptedCareRequests,cancelledCareRequests
+  };
 };
 
 export const listUsers=async(o:UserFilters)=>{const filter:Record<string,unknown>={};if(o.search){const rx=new RegExp(escapeRegex(o.search),'i');filter.$or=[{name:rx},{email:rx},{phone:rx}]}if(o.status)filter.accountStatus=o.status;if(o.role)filter.role=o.role;if(o.city)filter.city=new RegExp('^'+escapeRegex(o.city)+'$','i');if(o.from||o.to)filter.createdAt={...(o.from?{$gte:o.from}:{}),...(o.to?{$lte:o.to}:{})};const select='name email phone role accountStatus emailVerified phoneVerified address city state country latitude longitude createdAt updatedAt';const result=await listResult(UserModel.find(filter).select(select).sort({[o.sortBy]:o.sortOrder==='asc'?1:-1}).skip((o.page-1)*o.limit).limit(o.limit).lean().exec(),UserModel.countDocuments(filter).exec(),o);return {...result,items:result.items.map(x=>({...x,id:String(x._id)})) as unknown as AdminUser[]};};
@@ -92,6 +119,8 @@ export const updateHospitalVerification=async(id:string,verificationStatus:Verif
   const updateDoc: Record<string, unknown> = { verificationStatus };
   if (verificationStatus === 'VERIFIED' && prev.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';
+  } else if (verificationStatus === 'REJECTED' && prev.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'REJECTED';
   }
   const x=await HospitalModel.findByIdAndUpdate(id,{$set:updateDoc},{returnDocument: 'after',runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Hospital not found',404);
@@ -141,6 +170,8 @@ export const updateProviderVerification=async(id:string,verificationStatus:Verif
   const updateDoc: Record<string, unknown> = { verificationStatus };
   if (verificationStatus === 'VERIFIED' && prev.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';
+  } else if (verificationStatus === 'REJECTED' && prev.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'REJECTED';
   }
   const x=await AmbulanceProviderModel.findByIdAndUpdate(id,{$set:updateDoc},{returnDocument: 'after',runValidators:true}).select('-passwordHash').lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Ambulance provider not found',404);
@@ -179,6 +210,9 @@ export const updateAmbulanceVerification=async(id:string,verificationStatus:Veri
   if (verificationStatus === 'VERIFIED' && x.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';
     updateDoc.currentStatus = 'AVAILABLE';
+  } else if (verificationStatus === 'REJECTED' && x.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'REJECTED';
+    updateDoc.currentStatus = 'OFFLINE';
   }
   await AmbulanceModel.updateOne({_id:x._id},{$set:updateDoc}).exec();
   await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_AMBULANCE_VERIFICATION',entityType:'AMBULANCE',entityId:id,previousState:{verificationStatus:x.verificationStatus,accountStatus:x.accountStatus},newState:{verificationStatus,accountStatus:(updateDoc.accountStatus ?? x.accountStatus) as AccountStatus}});
@@ -205,6 +239,8 @@ export const updateDriverVerification=async(id:string,verificationStatus:Verific
   const updateDoc: Record<string, unknown> = { licenseVerificationStatus: verificationStatus };
   if (verificationStatus === 'VERIFIED' && d.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';
+  } else if (verificationStatus === 'REJECTED' && d.accountStatus === 'PENDING') {
+    updateDoc.accountStatus = 'REJECTED';
   }
   await AmbulanceDriverModel.updateOne({_id:id},{$set:updateDoc}).exec();
   await recordAuditLog({actorId,actorRole:'ADMIN',action:'UPDATE_DRIVER_VERIFICATION',entityType:'AMBULANCE_DRIVER',entityId:id,previousState:{licenseVerificationStatus:d.licenseVerificationStatus,accountStatus:d.accountStatus},newState:{licenseVerificationStatus:verificationStatus,accountStatus:(updateDoc.accountStatus ?? d.accountStatus) as AccountStatus}});

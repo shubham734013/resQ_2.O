@@ -62,7 +62,7 @@ export const HospitalLayout = () => {
         </nav>
         <div className="border-t border-slate-200 p-4 space-y-1 bg-slate-50/60">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="font-semibold text-slate-700">Clinical Desk SLA</span>
+            <span className="font-semibold text-slate-700">Clinical Desk SLA (Target)</span>
             <span className="text-emerald-700 font-bold">99.99%</span>
           </div>
           <p className="text-[10px] text-slate-500 font-medium">Emergency Intake: {availability}</p>

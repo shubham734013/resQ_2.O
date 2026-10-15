@@ -15,7 +15,9 @@
     "build:server": "npm --prefix server run build",
     "lint:server": "npm --prefix server run lint",
     "typecheck:all": "npm run typecheck && npm run typecheck:server",
-    "build:all": "npm run build && npm run build:server"
+    "build:all": "npm run build && npm run build:server",
+    "test": "npm --prefix server run test",
+    "seed:demo": "npm --prefix server run seed:demo"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

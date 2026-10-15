@@ -23,7 +23,7 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Enterprise Dispatch Engine: 99.99% Uptime SLA</span>
+                <span>Enterprise Dispatch Engine: 99.99% Target Uptime SLA</span>
               </span>
               <span className="text-slate-600 hidden md:inline">|</span>
               <span className="text-slate-400 hidden md:inline">

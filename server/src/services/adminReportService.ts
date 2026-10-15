@@ -3,6 +3,8 @@ import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { EmergencyRequestModel, type HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
 import { HospitalModel } from '../models/Hospital.js';
+import { HospitalAppointmentModel } from '../models/HospitalAppointment.js';
+import { HospitalCareRequestModel } from '../models/HospitalCareRequest.js';
 
 export interface ReportRange { from?: Date; to?: Date; }
 export const REPORT_STATUSES: HospitalEmergencyStatus[] = ['RECEIVED','REVIEWING','PREPARING','AMBULANCE_COORDINATION','RESOLVED','CANCELLED'];
@@ -11,12 +13,16 @@ const emergencyMatch = (range: ReportRange) => ({
   ...(range.from || range.to ? { reportedAt: { ...(range.from ? { $gte: range.from } : {}), ...(range.to ? { $lte: range.to } : {}) } } : {}),
 });
 
+const createdMatch = (range: ReportRange) => ({
+  ...(range.from || range.to ? { createdAt: { ...(range.from ? { $gte: range.from } : {}), ...(range.to ? { $lte: range.to } : {}) } } : {}),
+});
+
 const dateBucket = { $dateToString: { format: '%Y-%m-%d', date: '$reportedAt', timezone: 'UTC' } };
 
 const zeroStatus = () => Object.fromEntries(REPORT_STATUSES.map((status) => [status, 0])) as Record<HospitalEmergencyStatus, number>;
 
 export const getReportOverview = async (range: ReportRange) => {
-  const [emergency, hospitals, providers, ambulances, drivers] = await Promise.all([
+  const [emergency, hospitals, providers, ambulances, drivers, appointmentRows, careRequestRows] = await Promise.all([
     EmergencyRequestModel.aggregate<{ _id: HospitalEmergencyStatus; count: number }>([
       { $match: emergencyMatch(range) },
       { $group: { _id: '$status', count: { $sum: 1 } } },
@@ -37,12 +43,28 @@ export const getReportOverview = async (range: ReportRange) => {
       AmbulanceDriverModel.countDocuments({ availabilityStatus: 'BUSY' }),
       AmbulanceDriverModel.countDocuments({ availabilityStatus: 'OFFLINE' }),
     ]),
+    HospitalAppointmentModel.aggregate<{ _id: string; count: number }>([
+      { $match: createdMatch(range) },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]).exec(),
+    HospitalCareRequestModel.aggregate<{ _id: string; count: number }>([
+      { $match: createdMatch(range) },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]).exec(),
   ]);
 
   const status = zeroStatus();
   emergency.forEach((row) => { status[row._id] = row.count; });
   const totalRequests = emergency.reduce((sum, row) => sum + row.count, 0);
   const activeRequests = status.RECEIVED + status.REVIEWING + status.PREPARING + status.AMBULANCE_COORDINATION;
+
+  const apptMap: Record<string, number> = {};
+  appointmentRows.forEach((r) => { apptMap[r._id] = r.count; });
+  const totalAppointments = appointmentRows.reduce((sum, r) => sum + r.count, 0);
+
+  const careMap: Record<string, number> = {};
+  careRequestRows.forEach((r) => { careMap[r._id] = r.count; });
+  const totalCareRequests = careRequestRows.reduce((sum, r) => sum + r.count, 0);
 
   return {
     range: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null },
@@ -52,6 +74,8 @@ export const getReportOverview = async (range: ReportRange) => {
     ambulanceProviders: { total: providers[0], verified: providers[1] },
     ambulances: { total: ambulances[0], available: ambulances[1], busy: ambulances[2], offline: ambulances[3], maintenance: ambulances[4], unassigned: ambulances[0] - ambulances[5] },
     drivers: { total: drivers[0], online: drivers[1], busy: drivers[2], offline: drivers[3] },
+    appointments: { total: totalAppointments, pending: apptMap.PENDING ?? 0, confirmed: apptMap.CONFIRMED ?? 0, completed: apptMap.COMPLETED ?? 0, cancelled: apptMap.CANCELLED ?? 0 },
+    careRequests: { total: totalCareRequests, pending: careMap.PENDING ?? 0, accepted: careMap.ACCEPTED ?? 0, cancelled: careMap.CANCELLED ?? 0 },
   };
 };
 

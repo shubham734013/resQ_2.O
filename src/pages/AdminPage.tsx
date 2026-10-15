@@ -51,11 +51,82 @@ export const AdminOverviewPage = () => {
     { label: 'Users', value: String(d.totalUsers), detail: `${d.activeUsers} active` },
     { label: 'Hospitals', value: String(d.totalHospitals), detail: `${d.verifiedHospitals} verified` },
     { label: 'Providers', value: String(d.totalAmbulanceProviders), detail: `${d.verifiedProviders} verified` },
-    { label: 'Ambulances', value: String(d.totalAmbulances), detail: 'Registered fleet' },
-    { label: 'Drivers', value: String(d.totalAmbulanceDrivers), detail: `${d.verifiedDrivers} verified` },
-    { label: 'Pending', value: String(d.pendingHospitals + d.pendingProviders + d.pendingDrivers), detail: 'Registrations awaiting review' },
+    { label: 'Ambulances', value: String(d.totalAmbulances), detail: `${d.availableAmbulances ?? 0} available` },
+    { label: 'Drivers', value: String(d.totalAmbulanceDrivers), detail: `${d.onlineDrivers ?? 0} online` },
+    { label: 'Emergency SOS', value: String(d.totalEmergencies ?? 0), detail: `${d.activeEmergencies ?? 0} active · ${d.resolvedEmergencies ?? 0} resolved` },
+    { label: 'Appointments', value: String(d.totalAppointments ?? 0), detail: `${d.pendingAppointments ?? 0} pending · ${d.confirmedAppointments ?? 0} confirmed` },
+    { label: 'Pending Review', value: String(d.pendingHospitals + d.pendingProviders + d.pendingDrivers), detail: 'Registrations awaiting review' },
   ];
-  return <Section><AdminPage title="Operations overview" description="Live MongoDB-backed platform metrics."><MetricGrid metrics={metrics} /><div className="mt-6 grid gap-6 lg:grid-cols-3"><Panel title="Pending registrations"><div className="space-y-3 p-5 text-sm"><div className="flex justify-between"><span>Hospitals</span><b>{d.pendingHospitals}</b></div><div className="flex justify-between"><span>Providers</span><b>{d.pendingProviders}</b></div><div className="flex justify-between"><span>Drivers</span><b>{d.pendingDrivers}</b></div></div></Panel><Panel title="Account health"><div className="space-y-3 p-5 text-sm"><div className="flex justify-between"><span>Active users</span><b>{d.activeUsers}</b></div><div className="flex justify-between"><span>Suspended users</span><b>{d.suspendedUsers}</b></div></div></Panel><Panel title="Verification"><div className="space-y-3 p-5 text-sm"><div className="flex justify-between"><span>Hospitals</span><b>{d.verifiedHospitals}</b></div><div className="flex justify-between"><span>Providers</span><b>{d.verifiedProviders}</b></div><div className="flex justify-between"><span>Drivers</span><b>{d.verifiedDrivers}</b></div></div></Panel></div><div className="mt-6"><Panel title="Operational data"><div className="p-5 text-sm text-slate-600">Emergency, ambulance and driver lifecycle records are available through the live management APIs.</div></Panel></div></AdminPage></Section>;
+  return (
+    <Section>
+      <AdminPage title="Operations overview" description="Live MongoDB-backed platform metrics & enterprise governance.">
+        <MetricGrid metrics={metrics} />
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <Panel title="Pending registrations">
+            <div className="space-y-3 p-5 text-sm">
+              <div className="flex justify-between"><span>Hospitals</span><b>{d.pendingHospitals}</b></div>
+              <div className="flex justify-between"><span>Providers</span><b>{d.pendingProviders}</b></div>
+              <div className="flex justify-between"><span>Drivers</span><b>{d.pendingDrivers}</b></div>
+              <div className="border-t border-slate-100 pt-2 flex justify-between text-xs text-slate-500">
+                <span>Total Awaiting Verification</span>
+                <span className="font-semibold text-amber-700">{d.pendingHospitals + d.pendingProviders + d.pendingDrivers}</span>
+              </div>
+            </div>
+          </Panel>
+          <Panel title="Emergency SOS triage">
+            <div className="space-y-3 p-5 text-sm">
+              <div className="flex justify-between"><span>Active SOS Dispatches</span><b className="text-red-700">{d.activeEmergencies ?? 0}</b></div>
+              <div className="flex justify-between"><span>Resolved Emergencies</span><b className="text-emerald-700">{d.resolvedEmergencies ?? 0}</b></div>
+              <div className="flex justify-between"><span>Cancelled Requests</span><b className="text-slate-600">{d.cancelledEmergencies ?? 0}</b></div>
+              <div className="border-t border-slate-100 pt-2 flex justify-between text-xs text-slate-500">
+                <span>All-time SOS Volume</span>
+                <span className="font-semibold">{d.totalEmergencies ?? 0}</span>
+              </div>
+            </div>
+          </Panel>
+          <Panel title="Routine care & appointments">
+            <div className="space-y-3 p-5 text-sm">
+              <div className="flex justify-between"><span>Pending Appointments</span><b className="text-amber-700">{d.pendingAppointments ?? 0}</b></div>
+              <div className="flex justify-between"><span>Confirmed Appointments</span><b className="text-teal-700">{d.confirmedAppointments ?? 0}</b></div>
+              <div className="flex justify-between"><span>Completed Visits</span><b className="text-emerald-700">{d.completedAppointments ?? 0}</b></div>
+              <div className="border-t border-slate-100 pt-2 flex justify-between text-xs text-slate-500">
+                <span>Direct Hospital Care Requests</span>
+                <span className="font-semibold">{d.totalCareRequests ?? 0}</span>
+              </div>
+            </div>
+          </Panel>
+        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Panel title="Ambulance fleet & telemetry readiness">
+            <div className="grid grid-cols-2 gap-4 p-5 text-sm">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Ambulances</p>
+                <div className="flex justify-between"><span>Available</span><b className="text-emerald-700">{d.availableAmbulances ?? 0}</b></div>
+                <div className="flex justify-between"><span>Busy / On Trip</span><b className="text-amber-700">{d.busyAmbulances ?? 0}</b></div>
+                <div className="flex justify-between"><span>Offline</span><b>{d.offlineAmbulances ?? 0}</b></div>
+                <div className="flex justify-between"><span>Maintenance</span><b>{d.maintenanceAmbulances ?? 0}</b></div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Drivers</p>
+                <div className="flex justify-between"><span>Online / On Duty</span><b className="text-emerald-700">{d.onlineDrivers ?? 0}</b></div>
+                <div className="flex justify-between"><span>Busy With Patient</span><b className="text-amber-700">{d.busyDrivers ?? 0}</b></div>
+                <div className="flex justify-between"><span>Offline</span><b>{d.offlineDrivers ?? 0}</b></div>
+              </div>
+            </div>
+          </Panel>
+          <Panel title="Platform governance & accounts">
+            <div className="space-y-3 p-5 text-sm">
+              <div className="flex justify-between"><span>Active User Accounts</span><b className="text-emerald-700">{d.activeUsers}</b></div>
+              <div className="flex justify-between"><span>Suspended Accounts</span><b className="text-rose-700">{d.suspendedUsers}</b></div>
+              <div className="flex justify-between"><span>Verified Hospitals</span><b>{d.verifiedHospitals} / {d.totalHospitals}</b></div>
+              <div className="flex justify-between"><span>Verified Providers</span><b>{d.verifiedProviders} / {d.totalAmbulanceProviders}</b></div>
+              <div className="flex justify-between"><span>Verified Drivers</span><b>{d.verifiedDrivers} / {d.totalAmbulanceDrivers}</b></div>
+            </div>
+          </Panel>
+        </div>
+      </AdminPage>
+    </Section>
+  );
 };
 
 export const AdminUsersPage = () => {
@@ -380,11 +451,24 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
   };
   const exportCsv = async () => {
     try {
-      const blob = await adminApi.exportReports(params);
+      const blob = await adminApi.exportReports({ ...params, format: 'csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'resq-emergency-report.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      window.alert(message(e));
+    }
+  };
+  const exportJson = async () => {
+    try {
+      const blob = await adminApi.exportReports({ ...params, format: 'json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'resq-emergency-report.json';
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -411,6 +495,7 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
           <div className="flex gap-2 print:hidden">
             <Button size="sm" variant="secondary" onClick={() => window.print()}>Print</Button>
             <Button size="sm" variant="secondary" onClick={refresh} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
+            <Button size="sm" variant="secondary" onClick={exportJson} icon={<Download className="h-4 w-4" />}>Export JSON</Button>
             <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Export CSV</Button>
           </div>
         }
@@ -429,6 +514,7 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
               </>
             )}
             <Button size="sm" variant="secondary" onClick={refresh} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
+            <Button size="sm" variant="secondary" onClick={exportJson} icon={<Download className="h-4 w-4" />}>Export JSON</Button>
             <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Export CSV</Button>
           </div>
           <div className="px-4 pb-4 text-xs text-slate-500">Selected range: {from} to {to} (UTC). Last updated: {new Date(d.generatedAt).toLocaleString()}.</div>
@@ -439,6 +525,8 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
             { label: 'Active emergencies', value: String(d.emergencies.activeRequests), detail: 'Selected period' },
             { label: 'Resolved', value: String(d.emergencies.resolved), detail: 'Selected period' },
             { label: 'Cancelled', value: String(d.emergencies.cancelled), detail: 'Selected period' },
+            { label: 'Appointments', value: String(d.appointments?.total ?? 0), detail: `${d.appointments?.confirmed ?? 0} confirmed · ${d.appointments?.pending ?? 0} pending` },
+            { label: 'Care Requests', value: String(d.careRequests?.total ?? 0), detail: `${d.careRequests?.accepted ?? 0} accepted · ${d.careRequests?.pending ?? 0} pending` },
             { label: 'Hospitals in network', value: String(d.hospitals.total), detail: `${d.hospitals.verified} verified` },
             { label: 'Ambulances in fleet', value: String(d.ambulances.total), detail: `${d.ambulances.available} available now` },
             { label: 'Drivers', value: String(d.drivers.total), detail: `${d.drivers.online} online` },
