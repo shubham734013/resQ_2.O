@@ -12,11 +12,19 @@ interface AppointmentBookingModalProps {
   onSwitchToCareRequest?: () => void;
 }
 
-// Helper to format tomorrow's date YYYY-MM-DD
+// Format a calendar date in the user's local timezone (not UTC).
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper to format tomorrow's date YYYY-MM-DD using local calendar time.
 const getDefaultDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0] ?? '';
+  return formatLocalDate(d);
 };
 
 export const AppointmentBookingModal = ({
@@ -218,7 +226,7 @@ export const AppointmentBookingModal = ({
                   <label className="text-xs font-semibold text-slate-700">Appointment Date</label>
                   <input
                     type="date"
-                    min={new Date().toISOString().split('T')[0]}
+                    min={formatLocalDate(new Date())}
                     value={selectedDate}
                     onChange={(e) => {
                       setSelectedDate(e.target.value);
