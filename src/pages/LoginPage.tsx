@@ -6,8 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { authApi, AuthApiError } from '../services/authApi';
 import { SocialAuthButtons } from '../components/auth/SocialAuthButtons';
 import type { LoginRoleHint, UserRole } from '../types/auth';
+import { ROLE_HOMES, isPathAllowedForRole } from '../routes/routePaths';
 
-const roleHome:Record<UserRole,string>={USER:'/',HOSPITAL:'/hospital',AMBULANCE_PROVIDER:'/ambulance/provider',AMBULANCE_DRIVER:'/ambulance',ADMIN:'/admin'};
 const errorMessage=(error:unknown)=>{
   if(error instanceof AuthApiError){
     if(error.code==='ACCOUNT_PENDING')return 'Your account is pending operational approval. You will receive access once approved.';
@@ -27,18 +27,19 @@ const errorMessage=(error:unknown)=>{
 export const LoginPage=({admin=false}:{admin?:boolean})=>{
   const {login,refreshUser,logout}=useAuth();const navigate=useNavigate();const location=useLocation();
   const requestedPath=(location.state as {from?:string}|null)?.from??'';
-  const initialRoleHint:LoginRoleHint=requestedPath.startsWith('/ambulance-provider')||requestedPath==='/ambulance/provider'?'AMBULANCE_PROVIDER':requestedPath.startsWith('/ambulance')?'AMBULANCE_DRIVER':requestedPath.startsWith('/hospital')?'HOSPITAL':'USER';
+  const initialRoleHint:LoginRoleHint=
+    requestedPath.startsWith('/provider')||requestedPath.startsWith('/ambulance-provider')||requestedPath==='/ambulance/provider'
+      ? 'AMBULANCE_PROVIDER'
+      : requestedPath.startsWith('/driver')||requestedPath.startsWith('/ambulance')
+      ? 'AMBULANCE_DRIVER'
+      : requestedPath.startsWith('/hospital')
+      ? 'HOSPITAL'
+      : 'USER';
   const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [roleHint,setRoleHint]=useState<LoginRoleHint>(initialRoleHint);const [error,setError]=useState('');const [isSubmitting,setIsSubmitting]=useState(false);
   const finishLogin=useCallback((user:{role:UserRole})=>{
     const from=(location.state as {from?:string}|null)?.from;
-    const isTargetMatch=Boolean(from&&(
-      (user.role==='USER'&&!from.startsWith('/hospital')&&!from.startsWith('/ambulance')&&!from.startsWith('/admin'))||
-      (user.role==='HOSPITAL'&&from.startsWith('/hospital'))||
-      (user.role==='AMBULANCE_PROVIDER'&&from.startsWith('/ambulance'))||
-      (user.role==='AMBULANCE_DRIVER'&&from.startsWith('/ambulance'))||
-      (user.role==='ADMIN'&&from.startsWith('/admin'))
-    ));
-    navigate(isTargetMatch&&from?from:roleHome[user.role],{replace:true});
+    const isTargetMatch=Boolean(from && isPathAllowedForRole(user.role, from));
+    navigate(isTargetMatch && from ? from : ROLE_HOMES[user.role], {replace:true});
   },[location.state,navigate]);
   const handleSubmit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();setError('');if(!email.trim()||!password){setError('Enter your email and password.');return;}setIsSubmitting(true);try{
     if(admin){const user=(await authApi.adminLogin({email,password})).data.user;if(user.role!=='ADMIN'){setError('This account is not an administrator account.');return;}try{localStorage.setItem('resq_has_session','true');}catch{/* ignore */}const authenticated=await refreshUser();if(!authenticated){setError('Your session could not be established. Please try again.');return;}finishLogin(authenticated);}

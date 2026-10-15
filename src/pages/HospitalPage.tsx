@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Ambulance, Building2, CalendarDays, Check, CircleAlert, MapPinned, RefreshCw, Save, Search, UserRound } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import type { HospitalProfileUpdate } from '../services/hospitalApi';
@@ -26,14 +27,24 @@ const PageShell = ({ children }: { children: ReactNode }) => <div className={wra
 const availabilityLabel: Record<string, string> = { AVAILABLE: 'Available', LIMITED: 'Limited', UNAVAILABLE: 'Unavailable', UNKNOWN: 'Unknown' };
 const statusVariant = (value: string): 'verified' | 'waitTime' | 'neutral' => value === 'AVAILABLE' || value === 'VERIFIED' || value === 'RESOLVED' ? 'verified' : value === 'UNAVAILABLE' || value === 'CANCELLED' ? 'neutral' : 'waitTime';
 
-export const HospitalPage = () => {
-  const path = window.location.pathname;
+export const HospitalPage = ({ tab }: { tab?: 'overview' | 'requests' | 'patients' | 'ambulances' | 'services' | 'profile' | 'emergency' | 'availability' } = {}) => {
+  const location = useLocation();
+  const path = location.pathname;
 
-  if (path === '/hospital/emergencies') return <HospitalEmergenciesPage />;
-  if (path === '/hospital/patients') return <HospitalPatientsPage />;
-  if (path === '/hospital/ambulances') return <HospitalAmbulancesPage />;
-  if (path === '/hospital/resources') return <HospitalResourcesPage />;
-  if (path === '/hospital/profile') return <HospitalProfilePage />;
+  if (tab === 'emergency' || path === '/hospital/emergency') {
+    return (
+      <PageShell>
+        <div className="space-y-6">
+          <HospitalCoordinationInbox />
+        </div>
+      </PageShell>
+    );
+  }
+  if (tab === 'requests' || path === '/hospital/requests' || path === '/hospital/emergencies') return <HospitalEmergenciesPage />;
+  if (tab === 'patients' || path === '/hospital/patients') return <HospitalPatientsPage />;
+  if (tab === 'ambulances' || path === '/hospital/ambulances') return <HospitalAmbulancesPage />;
+  if (tab === 'services' || tab === 'availability' || path === '/hospital/services' || path === '/hospital/resources' || path === '/hospital/availability') return <HospitalResourcesPage />;
+  if (tab === 'profile' || path === '/hospital/profile') return <HospitalProfilePage />;
   return <HospitalOverviewPage />;
 };
 

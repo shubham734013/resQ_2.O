@@ -1,27 +1,18 @@
 import { Link, Navigate } from 'react-router-dom';
 import { LoginPage } from './LoginPage';
 import { useAuth } from '../context/AuthContext';
+import { ROUTES, getRoleHome } from '../routes/routePaths';
 
 export const AdminLoginPage = () => {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
-  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  if (user?.role === 'ADMIN') return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />;
   return <LoginPage admin />;
 };
 
 export const UnauthorizedPage = () => {
   const { user } = useAuth();
-  const homePath = user?.role
-    ? user.role === 'ADMIN'
-      ? '/admin'
-      : user.role === 'HOSPITAL'
-        ? '/hospital'
-        : user.role === 'AMBULANCE_DRIVER'
-          ? '/ambulance'
-          : user.role === 'AMBULANCE_PROVIDER'
-            ? '/ambulance/provider'
-            : '/'
-    : '/login';
+  const homePath = user?.role ? getRoleHome(user.role) : ROUTES.PUBLIC.LOGIN;
   const roleTitle = user?.role ? user.role.replaceAll('_', ' ').toLowerCase() : 'account';
 
   return (

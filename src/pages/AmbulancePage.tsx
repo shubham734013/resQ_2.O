@@ -106,7 +106,18 @@ export const AmbulancePage=()=>{
  const location = outletContext?.location ?? fallbackLocationState.location;
  const permissionState = outletContext?.permissionState ?? fallbackLocationState.permissionState;
  const refreshLocation = outletContext?.refreshLocation ?? fallbackLocationState.refreshLocation;
- const routeMode=pathname.replace('/ambulance','').replace(/^\//,'');
+ const isDriverNamespace = pathname.startsWith('/driver');
+ const basePrefix = isDriverNamespace ? '/driver' : '/ambulance';
+ const routeMode=pathname
+   .replace('/driver/assignments', 'request')
+   .replace('/driver/navigation', 'navigation')
+   .replace('/driver/trips', 'trips')
+   .replace('/driver/trip', 'trip')
+   .replace('/driver/profile', 'profile')
+   .replace('/driver/dashboard', '')
+   .replace('/driver', '')
+   .replace('/ambulance', '')
+   .replace(/^\//,'');
  const profile=useQuery({queryKey:['ambulance-driver','profile'],queryFn:ambulanceDriverApi.getProfile});
  const status=useQuery({queryKey:['ambulance-driver','status'],queryFn:ambulanceDriverApi.getStatus,refetchInterval:5000,refetchOnWindowFocus:true});
  const requests=useQuery({queryKey:['ambulance-driver','requests'],queryFn:()=>ambulanceDriverApi.getRequests({limit:20})});
@@ -234,12 +245,12 @@ export const AmbulancePage=()=>{
    requestFix();
    return()=>{disposed=true;window.clearInterval(timer);locationRequestInFlightRef.current=false;};
  },[status.data?.status,status.data?.trackingIntervalMs,invalidate,trackingRestartToken]);
- const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance/navigation');}});
- const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate('/ambulance');}});
- const pickup=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedPickup(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
- const onboard=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.patientPickedUp(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/navigation');}});
- const hospital=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedHospital(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
- const complete=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.completeTrip(id),onSuccess:async()=>{await invalidate();navigate('/ambulance/trip');}});
+ const acceptOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.acceptDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate(`${basePrefix}/navigation`);}});
+ const rejectOffer=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.rejectDispatchOffer(id),onSuccess:async()=>{await invalidate();await qc.invalidateQueries({queryKey:['ambulance-driver','dispatch-offers']});navigate(basePrefix);}});
+ const pickup=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedPickup(id),onSuccess:async()=>{await invalidate();navigate(`${basePrefix}/trip`);}});
+ const onboard=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.patientPickedUp(id),onSuccess:async()=>{await invalidate();navigate(`${basePrefix}/navigation`);}});
+ const hospital=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.arrivedHospital(id),onSuccess:async()=>{await invalidate();navigate(`${basePrefix}/trip`);}});
+ const complete=useMutation({mutationFn:(id:string)=>ambulanceDriverApi.completeTrip(id),onSuccess:async()=>{await invalidate();navigate(`${basePrefix}/trip`);}});
 
 
 
@@ -349,7 +360,7 @@ export const AmbulancePage=()=>{
                 {status.data?.status === 'BUSY' && status.data.activeTrip ? (
                   <Button
                     variant="primary"
-                    onClick={() => navigate(activeTrip?.status === 'AT_PICKUP' || activeTrip?.status === 'AT_HOSPITAL' ? '/ambulance/trip' : '/ambulance/navigation')}
+                    onClick={() => navigate(activeTrip?.status === 'AT_PICKUP' || activeTrip?.status === 'AT_HOSPITAL' ? `${basePrefix}/trip` : `${basePrefix}/navigation`)}
                     icon={<Navigation className="h-4 w-4" />}
                   >
                     Resume Navigation
@@ -483,7 +494,7 @@ export const AmbulancePage=()=>{
                 </div>
                 <Button
                   variant="primary"
-                  onClick={() => navigate(activeTrip.status === 'AT_PICKUP' || activeTrip.status === 'AT_HOSPITAL' ? '/ambulance/trip' : '/ambulance/navigation')}
+                  onClick={() => navigate(activeTrip.status === 'AT_PICKUP' || activeTrip.status === 'AT_HOSPITAL' ? `${basePrefix}/trip` : `${basePrefix}/navigation`)}
                   icon={<Navigation className="h-4 w-4" />}
                 >
                   Continue Trip Flow
