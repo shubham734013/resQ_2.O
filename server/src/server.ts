@@ -10,6 +10,20 @@ const startServer = async (): Promise<void> => {
   const stopDispatchWorker = startDispatchWorker();
   const server = createServer(app);
   const stopTrackingSockets = initializeTrackingSockets(server);
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        `\n[ResQ Server Error] Port ${env.PORT} is already in use by another process.\n` +
+        `To identify and terminate the existing process, run:\n` +
+        `  lsof -ti :${env.PORT} | xargs kill -9\n`
+      );
+      process.exit(1);
+    }
+    console.error(`ResQ HTTP server error: ${err.message}`);
+    process.exit(1);
+  });
+
   server.listen(env.PORT, () => console.info(`ResQ API listening on port ${env.PORT}`));
 
   let isShuttingDown = false;
