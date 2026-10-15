@@ -59,7 +59,7 @@ const toFacility = (item: EmergencyDiscoveryHospital): Facility => ({
   phone: item.phone,
   openStatus: item.emergencyAvailability === 'LIMITED' ? 'Emergency intake reported as limited' : 'Emergency intake reported as available',
   isOpen: true,
-  isAvailable: item.emergencyAvailability === 'AVAILABLE',
+  isAvailable: true,
   capabilities: [...item.services, ...item.capabilities],
 });
 const situationIdForLabel = (label: string): EmergencySituationId =>
