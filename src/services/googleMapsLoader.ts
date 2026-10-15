@@ -35,11 +35,16 @@ export function loadGoogleMaps(): Promise<GoogleMapsApi> {
         if (previousAuthFailure) windowWithMapsHooks.gm_authFailure = previousAuthFailure;
         else delete windowWithMapsHooks.gm_authFailure;
       }
-      if (error) reject(error);
-      else {
+      if (error) {
+        loadPromise = null;
+        reject(error);
+      } else {
         const googleMaps = getGoogle();
         if (googleMaps?.maps?.importLibrary) resolve(googleMaps);
-        else reject(new Error('MAPS_API_LOAD_FAILED'));
+        else {
+          loadPromise = null;
+          reject(new Error('MAPS_API_LOAD_FAILED'));
+        }
       }
     };
 

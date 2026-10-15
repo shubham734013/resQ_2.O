@@ -257,6 +257,7 @@ export const HomePage = () => {
             userLocation={hasLocation ? currentLocation : undefined}
             markers={mapMarkers}
             interactive
+            className="w-full h-full min-h-[400px]"
             onRecenter={refreshLocation}
           />
         </section>
@@ -319,6 +320,7 @@ export const HomePage = () => {
                 userLocation={hasLocation ? currentLocation : undefined}
                 markers={mapMarkers}
                 interactive
+                className="w-full h-full min-h-[350px]"
                 onRecenter={refreshLocation}
               />
             </div>

@@ -49,7 +49,7 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
           const user=getUserFromResponse(await authApi.refresh());
           if(operationVersion===authOperationVersion.current)setAuthenticatedUser(user);
           return user;
-        }catch(_refreshError){
+        }catch{
           if(operationVersion===authOperationVersion.current)setAuthenticatedUser(null);
           return null;
         }
@@ -59,9 +59,7 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
     })();
     return sharedRefreshPromise;
   },[setAuthenticatedUser]);
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(()=>{void refreshUser().catch(()=>undefined);},[refreshUser]);
-  /* eslint-enable react-hooks/set-state-in-effect */
   const login=useCallback(async(input:LoginRequest)=>{
     const operationVersion=++authOperationVersion.current;
     try{

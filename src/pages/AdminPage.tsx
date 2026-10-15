@@ -8,6 +8,7 @@ import { CategoryChart, TrendChart } from '../components/admin/AdminCharts';
 import { EmergencyTable } from '../components/admin/AdminTables';
 import { Button } from '../components/common/Button';
 import { MapView } from '../components/map/MapView';
+import { DEFAULT_JAIPUR_COORDINATES } from '../types/maps';
 import {
   useAdminAmbulances,
   useAdminDrivers,
@@ -91,7 +92,7 @@ export const AdminHospitalsPage = () => {
     if (hospitalMarkers.length > 0) {
       return { latitude: hospitalMarkers[0].latitude, longitude: hospitalMarkers[0].longitude };
     }
-    return { latitude: 28.6139, longitude: 77.2090 };
+    return DEFAULT_JAIPUR_COORDINATES;
   }, [hospitalMarkers]);
 
   return (
@@ -101,7 +102,7 @@ export const AdminHospitalsPage = () => {
           <div className="mb-6">
             <Panel title="Hospital network radar" description="Live geographic coverage of registered hospital facilities.">
               <div className="p-4">
-                <div className="h-72 w-full overflow-hidden rounded-xl border border-slate-200">
+                <div className="min-h-[400px] h-[440px] w-full overflow-hidden rounded-xl border border-slate-200">
                   <MapView center={mapCenter} zoom={11} markers={hospitalMarkers} interactive className="h-full w-full" />
                 </div>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
@@ -194,7 +195,7 @@ export const AdminAmbulancesPage = () => {
     if (ambulanceMarkers.length > 0) {
       return { latitude: ambulanceMarkers[0].latitude, longitude: ambulanceMarkers[0].longitude };
     }
-    return { latitude: 28.6139, longitude: 77.2090 };
+    return DEFAULT_JAIPUR_COORDINATES;
   }, [ambulanceMarkers]);
 
   return (
@@ -204,7 +205,7 @@ export const AdminAmbulancesPage = () => {
           <div className="mb-6">
             <Panel title="Fleet command radar" description="Live geographical positioning of ambulances reporting coordinates.">
               <div className="p-4">
-                <div className="h-72 w-full overflow-hidden rounded-xl border border-slate-200">
+                <div className="min-h-[400px] h-[440px] w-full overflow-hidden rounded-xl border border-slate-200">
                   <MapView center={mapCenter} zoom={12} markers={ambulanceMarkers} interactive className="h-full w-full" />
                 </div>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">

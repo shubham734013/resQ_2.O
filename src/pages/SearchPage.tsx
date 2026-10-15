@@ -7,6 +7,7 @@ import { FacilityList } from '../components/facility/FacilityList';
 import { FacilityPreview } from '../components/facility/FacilityPreview';
 import { useFacilities } from '../hooks/useFacilities';
 import { MapView } from '../components/map/MapView';
+import { DEFAULT_JAIPUR_COORDINATES } from '../types/maps';
 import type { Facility, FacilityCategory, UserLocation } from '../types/facility';
 
 interface LayoutContext {
@@ -74,7 +75,7 @@ export const SearchPage = () => {
     ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
     : locatedFacilities[0]
       ? { latitude: locatedFacilities[0].latitude, longitude: locatedFacilities[0].longitude }
-      : undefined;
+      : DEFAULT_JAIPUR_COORDINATES;
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-slate-100">
@@ -171,6 +172,7 @@ export const SearchPage = () => {
             userLocation={hasLocation ? currentLocation : undefined}
             markers={mapMarkers}
             interactive
+            className="w-full h-full min-h-[400px]"
             onRecenter={refreshLocation}
           />
 
@@ -219,6 +221,7 @@ export const SearchPage = () => {
               userLocation={hasLocation ? currentLocation : undefined}
               markers={mapMarkers}
               interactive
+              className="w-full h-full min-h-[350px]"
               onRecenter={refreshLocation}
             />
 

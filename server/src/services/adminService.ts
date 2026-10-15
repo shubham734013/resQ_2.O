@@ -51,8 +51,39 @@ export const updateUserStatus=async(id:string,status:Extract<AccountStatus,'ACTI
 };
 
 const mapResourceSummary=(x:unknown):Record<string,number>=>{if(!x||typeof x!=='object')return {};return Object.fromEntries(Object.entries(x as Record<string,unknown>).filter(([,v])=>typeof v==='number')) as Record<string,number>;};
-const hospitalOut=(x:Record<string,unknown>):AdminHospital=>({...x,id:String(x._id),resourceSummary:mapResourceSummary(x.resourceSummary)} as AdminHospital);
-export const listHospitals=async(o:HospitalFilters)=>{const filter:Record<string,unknown>={};if(o.search){const rx=new RegExp(escapeRegex(o.search),'i');filter.$or=[{name:rx},{registrationNumber:rx},{email:rx},{phone:rx}]}if(o.verification)filter.verificationStatus=o.verification;if(o.status)filter.accountStatus=o.status;if(o.city)filter.city=new RegExp('^'+escapeRegex(o.city)+'$','i');if(o.hospitalType)filter.hospitalType=o.hospitalType;const result=await listResult(HospitalModel.find(filter).select('-passwordHash').sort({[o.sortBy]:o.sortOrder==='asc'?1:-1}).skip((o.page-1)*o.limit).limit(o.limit).lean().exec(),HospitalModel.countDocuments(filter).exec(),o);return {...result,items:result.items.map(x=>hospitalOut(x as unknown as Record<string,unknown>))};};
+const hospitalOut=(x:Record<string,unknown>):AdminHospital=>{
+  const coords = (x.location as { coordinates?: [number, number] } | undefined)?.coordinates;
+  const latitude = typeof x.latitude === 'number' && Number.isFinite(x.latitude)
+    ? x.latitude
+    : Array.isArray(coords) && typeof coords[1] === 'number'
+      ? coords[1]
+      : undefined;
+  const longitude = typeof x.longitude === 'number' && Number.isFinite(x.longitude)
+    ? x.longitude
+    : Array.isArray(coords) && typeof coords[0] === 'number'
+      ? coords[0]
+      : undefined;
+  return {
+    ...x,
+    id: String(x._id),
+    latitude,
+    longitude,
+    resourceSummary: mapResourceSummary(x.resourceSummary)
+  } as AdminHospital;
+};
+export const listHospitals=async(o:HospitalFilters)=>{
+  const filter:Record<string,unknown>={};
+  if(o.search){
+    const rx=new RegExp(escapeRegex(o.search),'i');
+    filter.$or=[{name:rx},{registrationNumber:rx},{email:rx},{phone:rx}];
+  }
+  if(o.verification)filter.verificationStatus=o.verification;
+  if(o.status)filter.accountStatus=o.status;
+  if(o.city)filter.city=new RegExp('^'+escapeRegex(o.city)+'$','i');
+  if(o.hospitalType)filter.hospitalType=new RegExp(escapeRegex(o.hospitalType),'i');
+  const result=await listResult(HospitalModel.find(filter).select('-passwordHash').sort({[o.sortBy]:o.sortOrder==='asc'?1:-1}).skip((o.page-1)*o.limit).limit(o.limit).lean().exec(),HospitalModel.countDocuments(filter).exec(),o);
+  return {...result,items:result.items.map(x=>hospitalOut(x as unknown as Record<string,unknown>))};
+};
 export const getHospital=async(id:string)=>{safeId(id);const x=await HospitalModel.findById(id).select('-passwordHash').lean().exec();if(!x)throw new AppError('NOT_FOUND','Hospital not found',404);return hospitalOut(x as unknown as Record<string,unknown>)};
 export const updateHospitalVerification=async(id:string,verificationStatus:VerificationStatus,actorId?:string)=>{
   safeId(id);
@@ -78,10 +109,28 @@ export const updateHospitalStatus=async(id:string,status:Extract<AccountStatus,'
 };
 
 const refOut=(x:Record<string,unknown>|null):AdminRelationshipRef|null=>x?({id:String(x._id),...(typeof x.name==='string'?{name:x.name}:{}),...(typeof x.registrationNumber==='string'?{registrationNumber:x.registrationNumber}:{}),...(typeof x.vehicleNumber==='string'?{vehicleNumber:x.vehicleNumber}:{})}):null;
-const ambulanceOut=(x:Record<string,unknown>,p:Record<string,unknown>|null,d:Record<string,unknown>|null):AdminAmbulance=>({
-  ...(x as unknown as AdminAmbulance),id:String(x._id),provider:refOut(p),assignedDriver:refOut(d),
-  locationFreshness:getLocationFreshness(typeof x.locationUpdatedAt==='string'||x.locationUpdatedAt instanceof Date||typeof x.locationUpdatedAt==='number'?x.locationUpdatedAt:undefined),
-});
+const ambulanceOut=(x:Record<string,unknown>,p:Record<string,unknown>|null,d:Record<string,unknown>|null):AdminAmbulance=>{
+  const coords = (x.location as { coordinates?: [number, number] } | undefined)?.coordinates;
+  const currentLatitude = typeof x.currentLatitude === 'number' && Number.isFinite(x.currentLatitude)
+    ? x.currentLatitude
+    : Array.isArray(coords) && typeof coords[1] === 'number'
+      ? coords[1]
+      : undefined;
+  const currentLongitude = typeof x.currentLongitude === 'number' && Number.isFinite(x.currentLongitude)
+    ? x.currentLongitude
+    : Array.isArray(coords) && typeof coords[0] === 'number'
+      ? coords[0]
+      : undefined;
+  return {
+    ...(x as unknown as AdminAmbulance),
+    id: String(x._id),
+    currentLatitude,
+    currentLongitude,
+    provider: refOut(p),
+    assignedDriver: refOut(d),
+    locationFreshness: getLocationFreshness(typeof x.locationUpdatedAt==='string'||x.locationUpdatedAt instanceof Date||typeof x.locationUpdatedAt==='number'?x.locationUpdatedAt:undefined),
+  };
+};
 
 export const listProviders=async(o:ProviderFilters)=>{const filter:Record<string,unknown>={};if(o.search){const rx=new RegExp(escapeRegex(o.search),'i');filter.$or=[{name:rx},{registrationNumber:rx},{email:rx},{phone:rx}]}if(o.verification)filter.verificationStatus=o.verification;if(o.status)filter.accountStatus=o.status;if(o.city)filter.city=new RegExp('^'+escapeRegex(o.city)+'$','i');const [items,total]=await Promise.all([AmbulanceProviderModel.find(filter).select('-passwordHash').sort({[o.sortBy]:o.sortOrder==='asc'?1:-1}).skip((o.page-1)*o.limit).limit(o.limit).lean().exec(),AmbulanceProviderModel.countDocuments(filter).exec()]);const ids=items.map(x=>x._id);const counts=ids.length?await AmbulanceModel.aggregate([{$match:{providerId:{$in:ids}}},{$group:{_id:'$providerId',count:{$sum:1}}} ]):[];const countMap=new Map(counts.map((x:{_id:Types.ObjectId;count:number})=>[String(x._id),x.count]));return {items:items.map(x=>({...x,id:String(x._id),ambulanceCount:countMap.get(String(x._id))??0})) as unknown as AdminAmbulanceProvider[],pagination:{page:o.page,limit:o.limit,total,totalPages:total===0?0:Math.ceil(total/o.limit)}};};
 export const getProvider=async(id:string)=>{safeId(id);const x=await AmbulanceProviderModel.findById(id).select('-passwordHash').lean().exec();if(!x)throw new AppError('NOT_FOUND','Ambulance provider not found',404);const ambulanceCount=await AmbulanceModel.countDocuments({providerId:x._id});return {...x,id:String(x._id),ambulanceCount} as unknown as AdminAmbulanceProvider};

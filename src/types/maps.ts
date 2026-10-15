@@ -1,4 +1,8 @@
 export interface MapCoordinate { latitude:number; longitude:number; }
+export const DEFAULT_JAIPUR_COORDINATES: MapCoordinate = {
+  latitude: 26.9124,
+  longitude: 75.7873,
+};
 export interface GeoPoint extends MapCoordinate { accuracyMeters?:number; timestamp:number; }
 export interface FacilityMapItem { id:string; name:string; type:string; services:string[]; capabilities:string[]; address?:string; city?:string; state?:string; country?:string; phone?:string; latitude:number; longitude:number; distanceMeters:number; verificationStatus:string; accountStatus:string; emergencyAvailability:string; updatedAt:string; }
 export interface AmbulanceMapItem { id:string; status:string; latitude:number; longitude:number; updatedAt:string; }
