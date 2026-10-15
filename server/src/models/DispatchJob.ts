@@ -86,7 +86,7 @@ const eventSchema = new Schema<DispatchJobEvent>({
 }, { _id: false });
 
 const schema = new Schema<DispatchJobDocument>({
-  emergencyRequestId: { type: Schema.Types.ObjectId, ref: 'EmergencyRequest', required: true, unique: true, index: true },
+  emergencyRequestId: { type: Schema.Types.ObjectId, ref: 'EmergencyRequest', required: true, unique: true },
   hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   category: { type: String, required: true },

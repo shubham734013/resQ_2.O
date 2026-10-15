@@ -70,7 +70,7 @@ const statusHistorySchema = new Schema<StatusHistoryEntry>(
 
 const hospitalCareRequestSchema = new Schema<HospitalCareRequestDocument>(
   {
-    referenceId: { type: String, required: true, unique: true, index: true },
+    referenceId: { type: String, required: true, unique: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
     serviceDepartment: { type: String, required: true, trim: true },

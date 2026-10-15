@@ -46,7 +46,7 @@ const statusHistorySchema = new Schema<EmergencyStatusHistoryEntry>({
 }, { _id: false });
 
 const schema = new Schema<EmergencyRequestDocument>({
-  requestCode: { type: String, required: true, unique: true, index: true },
+  requestCode: { type: String, required: true, unique: true },
   idempotencyKey: { type: String, required: false, trim: true },
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },

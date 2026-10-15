@@ -76,7 +76,7 @@ const appointmentStatusHistorySchema = new Schema<AppointmentStatusHistoryEntry>
 
 const hospitalAppointmentSchema = new Schema<HospitalAppointmentDocument>(
   {
-    appointmentCode: { type: String, required: true, unique: true, index: true },
+    appointmentCode: { type: String, required: true, unique: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
     slotId: { type: Schema.Types.ObjectId, ref: 'HospitalAppointmentSlot', required: true, index: true },

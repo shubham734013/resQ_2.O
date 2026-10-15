@@ -28,8 +28,8 @@ export interface AmbulanceDocument {
 }
 
 const schema = new Schema<AmbulanceDocument>({
-  registrationNumber: { type: String, required: true, unique: true, index: true },
-  vehicleNumber: { type: String, required: true, unique: true, index: true },
+  registrationNumber: { type: String, required: true, unique: true },
+  vehicleNumber: { type: String, required: true, unique: true },
   providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true },
   ambulanceType: { type: String, required: true },
   capabilities: { type: [String], default: [] },

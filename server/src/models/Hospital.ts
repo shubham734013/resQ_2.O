@@ -34,7 +34,7 @@ export interface HospitalDocument {
 
 const hospitalSchema = new Schema<HospitalDocument>({
   name: { type: String, required: true, trim: true },
-  registrationNumber: { type: String, required: true, unique: true, index: true, trim: true },
+  registrationNumber: { type: String, required: true, unique: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, required: true, trim: true },
   passwordHash: { type: String, required: true, select: false },

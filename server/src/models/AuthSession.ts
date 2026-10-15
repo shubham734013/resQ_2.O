@@ -14,7 +14,7 @@ export interface AuthSessionDocument {
 const authSessionSchema = new Schema<AuthSessionDocument>({
   accountId: { type: String, required: true, index: true },
   role: { type: String, required: true, index: true },
-  tokenId: { type: String, required: true, unique: true, index: true },
+  tokenId: { type: String, required: true, unique: true },
   tokenHash: { type: String, required: true, select: false },
   expiresAt: { type: Date, required: true },
 }, { timestamps: true });

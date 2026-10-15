@@ -11,9 +11,9 @@ export interface AmbulanceDriverDocument {
   accountStatus: AccountStatus; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceDriverDocument>({
-  fullName: { type: String, required: true, trim: true }, email: { type: String, required: true, unique: true, lowercase: true, index: true }, phone: { type: String, required: true },
+  fullName: { type: String, required: true, trim: true }, email: { type: String, required: true, unique: true, lowercase: true }, phone: { type: String, required: true },
   passwordHash: { type: String, required: true, select: false }, authProvider: { type: String, enum: ['LOCAL','GOOGLE','MICROSOFT'], default: 'LOCAL', index: true }, providerSubject: { type: String },
-  licenseNumber: { type: String, required: true, unique: true, index: true }, licenseVerificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' },
+  licenseNumber: { type: String, required: true, unique: true }, licenseVerificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' },
   profileCompletionStatus: { type: String, enum: ['INCOMPLETE','COMPLETE'], default: 'INCOMPLETE', index: true },
   address: String, city: String, state: String, country: String, registeredLatitude: Number, registeredLongitude: Number,
   providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true }, assignedAmbulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance', index: true },

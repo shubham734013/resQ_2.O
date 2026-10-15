@@ -7,8 +7,8 @@ export interface AmbulanceProviderDocument {
   serviceType: string; verificationStatus: VerificationStatus; accountStatus: AccountStatus; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceProviderDocument>({
-  name: { type: String, required: true, trim: true }, registrationNumber: { type: String, required: true, unique: true, index: true, trim: true },
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true }, phone: { type: String, required: true, default: '' },
+  name: { type: String, required: true, trim: true }, registrationNumber: { type: String, required: true, unique: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true }, phone: { type: String, required: true, default: '' },
   passwordHash: { type: String, select: false }, authProvider: { type: String, enum: ['LOCAL','GOOGLE','MICROSOFT'], default: 'LOCAL', index: true },
   providerSubject: { type: String }, profileCompletionStatus: { type: String, enum: ['INCOMPLETE','COMPLETE'], default: 'COMPLETE', index: true },
   address: String, city: String, state: String, country: String, latitude: Number, longitude: Number, serviceType: { type: String, required: true, default: '' },

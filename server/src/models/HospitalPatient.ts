@@ -17,9 +17,9 @@ export interface HospitalPatientDocument {
 }
 
 const schema = new Schema<HospitalPatientDocument>({
-  caseId: { type: String, required: true, unique: true, index: true },
+  caseId: { type: String, required: true, unique: true },
   hospitalId: { type: Schema.Types.ObjectId, ref: 'Hospital', required: true, index: true },
-  emergencyId: { type: Schema.Types.ObjectId, ref: 'EmergencyRequest', required: true, unique: true, index: true },
+  emergencyId: { type: Schema.Types.ObjectId, ref: 'EmergencyRequest', required: true, unique: true },
   ambulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance', index: true },
   coordinationStatus: { type: String, enum: HOSPITAL_PATIENT_STATUSES, default: 'INCOMING', index: true },
   emergencyType: { type: String, required: true, trim: true },
