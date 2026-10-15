@@ -20,7 +20,6 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { getAllowedOrigins, mutationOriginGuard, originGuard, securityHeaders } from './middlewares/security.js';
 
 export const app=express();
-const allowedOrigins=getAllowedOrigins();
 
 app.disable('x-powered-by');
 app.use(securityHeaders);
@@ -28,10 +27,11 @@ app.use(securityHeaders);
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) { callback(null, true); return; }
-    if (allowedOrigins.includes(origin)) { callback(null, true); return; }
+    const allowed = getAllowedOrigins();
+    if (allowed.includes(origin)) { callback(null, true); return; }
     callback(new Error('CORS origin is not allowed'));
   },
-  credentials:true,
+  credentials: true,
 }));
 app.use(originGuard);
 app.use(mutationOriginGuard);

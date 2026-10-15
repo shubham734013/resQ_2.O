@@ -2,8 +2,7 @@ import type {
   AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationRequest, ApiErrorBody, AuthResponse,
   AuthUser, CurrentUserResponse, HospitalRegistrationRequest, LoginRequest, SocialAuthRequest, UserRegistrationRequest,
 } from '../types/auth';
-
-const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
+import { API_BASE_URL } from './apiConfig';
 
 export class AuthApiError extends Error {
   readonly status:number; readonly code:string;

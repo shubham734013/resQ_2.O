@@ -9,7 +9,13 @@
     "build": "tsc -b && vite build",
     "lint": "eslint src",
     "preview": "vite preview",
-    "start": "npm run dev"
+    "start": "npm run dev",
+    "dev:server": "npm --prefix server run dev",
+    "typecheck:server": "npm --prefix server run typecheck",
+    "build:server": "npm --prefix server run build",
+    "lint:server": "npm --prefix server run lint",
+    "typecheck:all": "npm run typecheck && npm run typecheck:server",
+    "build:all": "npm run build && npm run build:server"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

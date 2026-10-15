@@ -1,6 +1,5 @@
 import type { AmbulanceMapItem, FacilityMapItem, PlaceSearchResult, RouteRequest, RouteResult } from '../types/maps';
-
-const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
+import { API_BASE_URL } from './apiConfig';
 
 type ApiIssue = { path?: Array<string | number>; message?: string };
 type ApiErrorPayload = { code?: string; message?: string; details?: ApiIssue[] };

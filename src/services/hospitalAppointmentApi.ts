@@ -1,8 +1,4 @@
-const API_BASE = (() => {
-  const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-  if (!value) throw new Error('VITE_API_BASE_URL is required.');
-  return value.replace(/\/$/, '');
-})();
+import { API_BASE_URL as API_BASE } from './apiConfig';
 
 export class AppointmentApiError extends Error {
   readonly status: number;

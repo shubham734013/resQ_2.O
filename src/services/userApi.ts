@@ -1,4 +1,4 @@
-const API_BASE=(()=>{const value=(import.meta.env.VITE_API_BASE_URL as string|undefined)?.trim();if(!value)throw new Error('VITE_API_BASE_URL is required.');return value.replace(/\/$/,'');})();
+import { API_BASE_URL as API_BASE } from './apiConfig';
 
 class UserApiError extends Error { readonly status:number; readonly code:string; constructor(status:number,code:string,message:string){super(message);this.name='UserApiError';this.status=status;this.code=code;} }
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{

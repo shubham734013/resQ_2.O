@@ -2,8 +2,19 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../utils/AppError.js';
 
 export const getAllowedOrigins = (): string[] => {
-  const raw = process.env.CORS_ORIGINS?.trim();
-  return raw ? raw.split(',').map((value) => value.trim()).filter(Boolean) : [];
+  const raw = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN)?.trim();
+  if (raw) {
+    return raw.split(',').map((value) => value.trim()).filter(Boolean);
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    return [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:4173',
+      'http://127.0.0.1:4173',
+    ];
+  }
+  return [];
 };
 
 export const originGuard = (req: Request, _res: Response, next: NextFunction): void => {

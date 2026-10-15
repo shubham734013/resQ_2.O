@@ -15,7 +15,8 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   RESQ_ADMIN_EMAIL: z.string().email(),
   RESQ_ADMIN_PASSWORD: z.string().min(12),
-  CORS_ORIGINS: z.string().default(''),
+  CORS_ORIGIN: z.string().optional(),
+  CORS_ORIGINS: z.string().optional(),
   DRIVER_LOCATION_UPDATE_INTERVAL_MS: z.coerce.number().int().min(3000).max(5000).default(4000),
   DRIVER_LOCATION_STALE_AFTER_MS: z.coerce.number().int().min(10000).max(30000).default(15000),
   DRIVER_LOCATION_MAX_AGE_MS: z.coerce.number().int().min(10000).max(60000).default(30000),
@@ -32,14 +33,22 @@ const envSchema = z.object({
   GOOGLE_ROUTES_API_KEY: z.string().trim().optional(),
   GOOGLE_PLACES_API_KEY: z.string().trim().optional(),
   GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
+}).transform((data) => {
+  const mergedCors = (data.CORS_ORIGINS || data.CORS_ORIGIN || '').trim();
+  const effectiveCors = mergedCors || (data.NODE_ENV !== 'production' ? 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173' : '');
+  return {
+    ...data,
+    CORS_ORIGINS: effectiveCors,
+    CORS_ORIGIN: data.CORS_ORIGIN || effectiveCors.split(',')[0] || '',
+  };
 });
 
 const validatedSchema = envSchema.superRefine((value, ctx) => {
-  if (value.NODE_ENV === 'production' && value.CORS_ORIGINS.trim() === '') {
+  if (value.NODE_ENV === 'production' && !value.CORS_ORIGINS.trim()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['CORS_ORIGINS'],
-      message: 'CORS_ORIGINS is required in production',
+      message: 'CORS_ORIGINS (or CORS_ORIGIN) is required in production',
     });
   }
 });
@@ -47,8 +56,14 @@ const validatedSchema = envSchema.superRefine((value, ctx) => {
 const parsed = validatedSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  const messages = parsed.error.issues.map((issue) => issue.path.join('.') + ': ' + issue.message);
-  throw new Error('Invalid environment configuration: ' + messages.join('; '));
+  const messages = parsed.error.issues.map((issue) => {
+    const field = issue.path.join('.') || 'configuration';
+    return `[${field}]: ${issue.message}`;
+  });
+  console.error('\n❌ RESQ STARTUP CONFIGURATION ERROR:');
+  messages.forEach((msg) => console.error(`  - ${msg}`));
+  console.error('Please check your .env file or environment variables.\n');
+  throw new Error('Invalid environment configuration:\n  ' + messages.join('\n  '));
 }
 
 export const env = parsed.data;

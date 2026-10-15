@@ -16,28 +16,49 @@ const startServer = async (): Promise<void> => {
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    console.info(`${signal} received. Shutting down gracefully...`);
+    console.info(`\n${signal} received. Initiating graceful shutdown...`);
 
     const forceExitTimeout = setTimeout(() => {
-      console.error('Forced shutdown due to timeout');
+      console.error('Forced shutdown due to timeout (10s)');
       process.exit(1);
     }, 10000);
     forceExitTimeout.unref();
 
-    stopDispatchWorker();
     try {
-      // Socket.IO owns and closes this same HTTP server; do not create or close a second server.
+      stopDispatchWorker();
+    } catch (dispatchErr: unknown) {
+      console.error('Error stopping dispatch worker:', dispatchErr instanceof Error ? dispatchErr.message : dispatchErr);
+    }
+
+    try {
       await stopTrackingSockets();
     } catch (socketErr: unknown) {
       console.error('Error closing Socket.IO:', socketErr instanceof Error ? socketErr.message : 'Unknown Socket.IO close error');
     }
+
+    if (server.listening) {
+      await new Promise<void>((resolve) => {
+        server.close((err) => {
+          if (err && (err as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING') {
+            console.error('Error closing HTTP server:', err.message);
+          }
+          resolve();
+        });
+        if ('closeAllConnections' in server && typeof (server as unknown as { closeAllConnections?: () => void }).closeAllConnections === 'function') {
+          (server as unknown as { closeAllConnections: () => void }).closeAllConnections();
+        }
+      });
+    }
+
     try {
       await disconnectDatabase();
     } catch (dbErr: unknown) {
       const msg = dbErr instanceof Error ? sanitizeMongoUri(dbErr.message) : 'Unknown db disconnect error';
       console.error('Error during database disconnect:', msg);
     }
+
     clearTimeout(forceExitTimeout);
+    console.info('Graceful shutdown complete. Exiting cleanly.');
     process.exit(0);
   };
 

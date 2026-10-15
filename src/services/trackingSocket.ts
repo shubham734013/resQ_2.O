@@ -1,11 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-
-const API_BASE = (() => {
-  const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-  if (!value) throw new Error('VITE_API_BASE_URL is required.');
-  return value.replace(/\/$/, '');
-})();
-const SOCKET_URL = API_BASE.replace(/\/api\/v1\/?$/, '');
+import { SOCKET_URL } from './apiConfig';
 
 export interface TrackingEnvelope<T = unknown> {
   channel: string;

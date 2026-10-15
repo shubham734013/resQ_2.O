@@ -1,6 +1,5 @@
 import type { Facility } from '../types/facility';
-
-const API_BASE_URL = (() => { const value = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(); if (!value) throw new Error('VITE_API_BASE_URL is required.'); return value.replace(/\/$/, ''); })();
+import { API_BASE_URL } from './apiConfig';
 
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(API_BASE_URL + path, { credentials: 'include' });

@@ -346,7 +346,7 @@ describe('Workflow B: Direct Hospital Requests and Concurrency-Safe Appointments
       assert.match(errorMsg, /requested time slot has reached full capacity/i);
 
       // Track created appointment
-      const winner = (fulfilled[0] as PromiseFulfilledResult<any>).value;
+      const winner = (fulfilled[0] as PromiseFulfilledResult<{ _id: Types.ObjectId; slotId: Types.ObjectId }>).value;
       createdAppointmentIds.push(winner._id);
       createdSlotIds.push(winner.slotId);
 
