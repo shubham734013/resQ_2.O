@@ -28,6 +28,8 @@ export interface HospitalDocument {
   operationalDescription?: string;
   verificationStatus: VerificationStatus;
   accountStatus: AccountStatus;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +59,8 @@ const hospitalSchema = new Schema<HospitalDocument>({
   operationalDescription: { type: String, trim: true },
   verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING', index: true },
   accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
+  passwordResetTokenHash: { type: String, select: false },
+  passwordResetExpiresAt: { type: Date, select: false },
 }, { timestamps: true });
 
 hospitalSchema.pre('save', function () {

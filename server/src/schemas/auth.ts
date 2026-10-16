@@ -127,6 +127,18 @@ export const driverProfileSchema = z.object({
   registeredLongitude: z.number().finite().min(-180).max(180),
 }).strict();
 
+// Password reset schemas
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email('Invalid email address').transform((v) => v.toLowerCase()),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(64, 'Reset token is required').max(128),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+});
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export const userProfileUpdateSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   phone: z.string().trim().min(7).max(20).optional(),

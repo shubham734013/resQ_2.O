@@ -20,16 +20,16 @@ import { useAuth } from '../context/AuthContext';
 import { ROUTES } from '../routes/routePaths';
 
 const adminNavItems = [
-  { label: 'Governance Overview', path: ROUTES.ADMIN.DASHBOARD, icon: LayoutDashboard },
-  { label: 'Citizen Users', path: ROUTES.ADMIN.USERS, icon: Users },
-  { label: 'Hospitals Directory', path: ROUTES.ADMIN.HOSPITALS, icon: Building2 },
+  { label: 'Dashboard', path: ROUTES.ADMIN.DASHBOARD, icon: LayoutDashboard },
+  { label: 'SOS Requests', path: ROUTES.ADMIN.REQUESTS, icon: Activity },
+  { label: 'Users', path: ROUTES.ADMIN.USERS, icon: Users },
+  { label: 'Hospitals', path: ROUTES.ADMIN.HOSPITALS, icon: Building2 },
   { label: 'Ambulance Providers', path: ROUTES.ADMIN.PROVIDERS, icon: UserRoundCog },
-  { label: 'Paramedic Drivers', path: ROUTES.ADMIN.DRIVERS, icon: UserRoundCog },
-  { label: 'Ambulance Fleets', path: ROUTES.ADMIN.AMBULANCES, icon: Ambulance },
-  { label: 'Emergency Requests', path: ROUTES.ADMIN.REQUESTS, icon: Activity },
-  { label: 'Appointments Registry', path: ROUTES.ADMIN.APPOINTMENTS, icon: Calendar },
-  { label: 'Network Analytics', path: ROUTES.ADMIN.ANALYTICS, icon: BarChart3 },
-  { label: 'Audit Logs & Reports', path: ROUTES.ADMIN.AUDIT_LOGS, icon: FileText },
+  { label: 'Ambulance Drivers', path: ROUTES.ADMIN.DRIVERS, icon: UserRoundCog },
+  { label: 'Ambulances', path: ROUTES.ADMIN.AMBULANCES, icon: Ambulance },
+  { label: 'Appointments', path: ROUTES.ADMIN.APPOINTMENTS, icon: Calendar },
+  { label: 'Analytics & Reports', path: ROUTES.ADMIN.ANALYTICS, icon: BarChart3 },
+  { label: 'Audit Logs', path: ROUTES.ADMIN.AUDIT_LOGS, icon: FileText },
   { label: 'System Settings', path: ROUTES.ADMIN.SETTINGS, icon: Settings },
 ];
 

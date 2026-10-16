@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
 import type { AuthenticatedRequest, SocialProvider } from '../types/auth.js';
-import { adminLogin, getCurrentUser, login, logout, refreshAuthentication, registerAmbulanceDriver, registerAmbulanceProvider, registerHospital, registerUser, socialLogin, linkSocialAccount, updateDriverProfile, updateProviderProfile, getActiveProvidersForRegistration } from '../services/authService.js';
+import { adminLogin, getCurrentUser, login, logout, refreshAuthentication, registerAmbulanceDriver, registerAmbulanceProvider, registerHospital, registerUser, socialLogin, linkSocialAccount, updateDriverProfile, updateProviderProfile, getActiveProvidersForRegistration, initiatePasswordReset, completePasswordReset } from '../services/authService.js';
 import { clearAuthCookies, getCookie, REFRESH_TOKEN_COOKIE, setAuthCookies } from '../utils/cookies.js';
 import { sendSuccess } from '../utils/apiResponse.js';
-import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, SocialAuthInput, DriverProfileInput, ProviderProfileInput } from '../schemas/auth.js';
+import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, SocialAuthInput, DriverProfileInput, ProviderProfileInput, ForgotPasswordInput, ResetPasswordInput } from '../schemas/auth.js';
 
 export const registerUserController = async (req: Request, res: Response) => {
   const result = await registerUser(req.body as UserRegistrationInput);
@@ -34,3 +34,17 @@ export const logoutController=async(req:Request,res:Response)=>{await logout(get
 export const refreshController=async(req:Request,res:Response)=>{const token=getCookie(req,REFRESH_TOKEN_COOKIE);if(!token){res.status(401).json({success:false,error:{code:'UNAUTHORIZED',message:'Refresh session is required'}});return;}const result=await refreshAuthentication(token);setAuthCookies(res,result.accessToken,result.refreshToken);sendSuccess(res,{user:result.user});};
 export const driverProfileController=async(req:AuthenticatedRequest,res:Response)=>sendSuccess(res,await updateDriverProfile(req.auth!,req.body as DriverProfileInput));
 export const providerProfileController=async(req:AuthenticatedRequest,res:Response)=>sendSuccess(res,await updateProviderProfile(req.auth!,req.body as ProviderProfileInput));
+export const forgotPasswordController = async (req: Request, res: Response): Promise<void> => {
+  const { email } = (req.body as ForgotPasswordInput);
+  const result = await initiatePasswordReset(email);
+  sendSuccess(res, {
+    message: 'If an account with this email exists, a reset link has been sent.',
+    ...(result.resetToken ? { resetToken: result.resetToken, expiresAt: result.expiresAt } : {}),
+  });
+};
+
+export const resetPasswordController = async (req: Request, res: Response): Promise<void> => {
+  const { token, password } = (req.body as ResetPasswordInput);
+  await completePasswordReset(token, password);
+  sendSuccess(res, { message: 'Password updated successfully. You may now sign in.' });
+};

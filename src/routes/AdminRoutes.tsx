@@ -23,13 +23,14 @@ import {
   AdminDriverDetailPage,
 } from '../pages/AdminDetailPages';
 import { AdminAppointmentsPage } from '../pages/admin/AdminAppointmentsPage';
+import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 
 export const adminRoutes = (
   <Route path="/admin" element={<RequireAuth />}>
     <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
       <Route element={<AdminLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<AdminOverviewPage />} />
+        <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="users" element={<AdminUsersManagementPage />} />
         <Route path="users/:id" element={<AdminUserDetailPage />} />
         <Route path="hospitals" element={<AdminHospitalsManagementPage />} />

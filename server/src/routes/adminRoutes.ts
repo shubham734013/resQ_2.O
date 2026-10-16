@@ -15,6 +15,7 @@ import {
 } from '../controllers/adminController.js';
 import { adminEmergenciesController, adminEmergencyController, adminEmergencySummaryController } from '../controllers/adminEmergencyController.js';
 import * as dispatch from '../controllers/dispatchController.js';
+import { listAuditLogsController } from '../controllers/adminAuditLogController.js';
 import { dispatchAdminQuerySchema, dispatchManualAssignSchema, dispatchEscalateSchema } from '../schemas/dispatch.js';
 import type { z } from 'zod';
 
@@ -57,3 +58,4 @@ adminRouter.get('/reports/overview',validateQuery(reportsQuerySchema),reportOver
 adminRouter.get('/reports/emergencies',validateQuery(reportsQuerySchema),emergencyReportsController);
 adminRouter.get('/reports/analytics',validateQuery(reportsQuerySchema),analyticsReportsController);
 adminRouter.get('/reports/export',validateQuery(reportsExportQuerySchema),exportReportsController);
+adminRouter.get('/audit-logs',listAuditLogsController);

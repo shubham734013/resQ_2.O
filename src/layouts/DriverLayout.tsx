@@ -13,6 +13,11 @@ import {
   Radio,
   MapPin,
   History,
+  Truck,
+  FileText,
+  MessageSquare,
+  Calendar,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -21,13 +26,16 @@ import { useLocationState } from '../hooks/useLocationState';
 import { ROUTES } from '../routes/routePaths';
 
 const driverNavItems = [
-  { label: 'Driver Console', path: ROUTES.DRIVER.DASHBOARD, icon: LayoutDashboard },
-  { label: 'Dispatch Assignments', path: ROUTES.DRIVER.ASSIGNMENTS, icon: Radio },
-  { label: 'Active Navigation', path: ROUTES.DRIVER.NAVIGATION('active'), icon: Navigation },
-  { label: 'Trips & Mileage', path: ROUTES.DRIVER.TRIPS, icon: History },
-  { label: 'Notifications', path: ROUTES.DRIVER.NOTIFICATIONS, icon: Bell },
-  { label: 'Driver Profile', path: ROUTES.DRIVER.PROFILE, icon: User },
-  { label: 'Console Settings', path: ROUTES.DRIVER.SETTINGS, icon: Settings },
+  { label: 'Dashboard', path: ROUTES.DRIVER.DASHBOARD, icon: LayoutDashboard },
+  { label: 'Active Request', path: ROUTES.DRIVER.NAVIGATION('active'), icon: AlertTriangle },
+  { label: 'Available Requests', path: ROUTES.DRIVER.ASSIGNMENTS, icon: Radio },
+  { label: 'My Trips', path: ROUTES.DRIVER.TRIPS, icon: History },
+  { label: 'Duty Schedule', path: ROUTES.DRIVER.DASHBOARD, icon: Calendar },
+  { label: 'Location Tracking', path: ROUTES.DRIVER.NAVIGATION('active'), icon: MapPin },
+  { label: 'Vehicle Status', path: ROUTES.DRIVER.DASHBOARD, icon: Truck },
+  { label: 'Documents', path: ROUTES.DRIVER.PROFILE, icon: FileText },
+  { label: 'Messages', path: ROUTES.DRIVER.NOTIFICATIONS, icon: MessageSquare },
+  { label: 'Profile & Settings', path: ROUTES.DRIVER.SETTINGS, icon: User },
 ];
 
 export const DriverLayout = () => {
@@ -82,12 +90,12 @@ export const DriverLayout = () => {
         {/* Brand */}
         <div className="border-b border-slate-200 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 text-indigo-400 border border-indigo-500/20 shadow-xs">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 text-white border border-blue-500/20 shadow-xs">
               <Navigation className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-bold text-slate-950 text-sm tracking-tight">ResQ Driver</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Paramedic Navigation</p>
+              <p className="font-bold text-slate-950 text-sm tracking-tight">ResQ</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Faster Help. Safer Tomorrow.</p>
             </div>
           </div>
         </div>
@@ -116,7 +124,7 @@ export const DriverLayout = () => {
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
                   isActive
-                    ? 'bg-slate-900 text-white shadow-xs font-bold'
+                    ? 'bg-blue-600 text-white shadow-xs font-bold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`
               }
@@ -126,6 +134,25 @@ export const DriverLayout = () => {
             </NavLink>
           ))}
         </nav>
+
+        {/* Support Section */}
+        <div className="px-4 py-3 border-t border-slate-100">
+          <div className="rounded-xl bg-blue-50 p-3 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                <Bell className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+            <p className="text-xs font-bold text-blue-900">Need Support?</p>
+            <p className="text-[10px] text-blue-700 mb-2">24×7 Driver Helpline</p>
+            <a
+              href="tel:112"
+              className="inline-block w-full rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-blue-700 transition"
+            >
+              Call Support
+            </a>
+          </div>
+        </div>
 
         {/* Footer info & Logout */}
         <div className="border-t border-slate-200 p-3 bg-slate-50/60">
@@ -189,7 +216,7 @@ export const DriverLayout = () => {
                   end={path === ROUTES.DRIVER.DASHBOARD}
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold ${
-                      isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                      isActive ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-50'
                     }`
                   }
                 >

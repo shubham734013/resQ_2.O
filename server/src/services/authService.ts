@@ -500,3 +500,74 @@ export const getActiveProvidersForRegistration = async () => {
     state: p.state,
   }));
 };
+
+// -----------------------------------------------------------------------
+// Password Reset (token-based, no email delivery — token returned in response)
+// In production, integrate an email provider and send the token via email.
+// For now the token is returned in the API response so it can be relayed
+// through a frontend "email sent" flow during development / demo.
+// -----------------------------------------------------------------------
+
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const RESET_TOKEN_HASH_ROUNDS = 10;
+
+const findModelByEmail = async (email: string) => {
+  const n = normalizeEmail(email);
+  const user = await UserModel.findOne({ email: n }).exec();
+  if (user) return { model: UserModel as typeof UserModel, doc: user as typeof user, role: user.role };
+  const hospital = await HospitalModel.findOne({ email: n }).exec();
+  if (hospital) return { model: HospitalModel as typeof HospitalModel, doc: hospital as typeof hospital, role: 'HOSPITAL' as const };
+  const provider = await AmbulanceProviderModel.findOne({ email: n }).exec();
+  if (provider) return { model: AmbulanceProviderModel as typeof AmbulanceProviderModel, doc: provider as typeof provider, role: 'AMBULANCE_PROVIDER' as const };
+  const driver = await AmbulanceDriverModel.findOne({ email: n }).exec();
+  if (driver) return { model: AmbulanceDriverModel as typeof AmbulanceDriverModel, doc: driver as typeof driver, role: 'AMBULANCE_DRIVER' as const };
+  return null;
+};
+
+export const initiatePasswordReset = async (email: string): Promise<{ resetToken: string; expiresAt: Date }> => {
+  // Always return a generic response to prevent user enumeration.
+  // We still compute and return the token in dev mode.
+  const found = await findModelByEmail(email);
+  if (!found) {
+    // Timing-safe: still do a fake hash operation so response time is consistent.
+    await bcrypt.hash('timing-safe-fake', RESET_TOKEN_HASH_ROUNDS);
+    const fakeExpiry = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    // Return a fake token so the frontend always gets the same shape response.
+    return { resetToken: '', expiresAt: fakeExpiry };
+  }
+  const { randomBytes } = await import('node:crypto');
+  const rawToken = randomBytes(32).toString('hex');
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+  // Store the hashed token and expiry on the document.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const doc = found.doc as any;
+  doc.passwordResetTokenHash = tokenHash;
+  doc.passwordResetExpiresAt = expiresAt;
+  await doc.save();
+  return { resetToken: rawToken, expiresAt };
+};
+
+export const completePasswordReset = async (rawToken: string, newPassword: string): Promise<void> => {
+  if (!rawToken || rawToken.length < 32) throw new AppError('INVALID_RESET_TOKEN', 'Password reset token is invalid or has expired', 400);
+  const tokenHash = hashToken(rawToken);
+  const now = new Date();
+  const findByResetToken = async () => {
+    const u = await UserModel.findOne({ passwordResetTokenHash: tokenHash, passwordResetExpiresAt: { $gt: now } }).exec();
+    if (u) return u as { passwordHash?: string; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; save: () => Promise<unknown> };
+    const h = await HospitalModel.findOne({ passwordResetTokenHash: tokenHash, passwordResetExpiresAt: { $gt: now } }).exec();
+    if (h) return h as { passwordHash?: string; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; save: () => Promise<unknown> };
+    const p = await AmbulanceProviderModel.findOne({ passwordResetTokenHash: tokenHash, passwordResetExpiresAt: { $gt: now } }).exec();
+    if (p) return p as { passwordHash?: string; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; save: () => Promise<unknown> };
+    const d = await AmbulanceDriverModel.findOne({ passwordResetTokenHash: tokenHash, passwordResetExpiresAt: { $gt: now } }).exec();
+    if (d) return d as { passwordHash?: string; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; save: () => Promise<unknown> };
+    return null;
+  };
+  const doc = await findByResetToken();
+  if (!doc) throw new AppError('INVALID_RESET_TOKEN', 'Password reset token is invalid or has expired', 400);
+  doc.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  doc.passwordResetTokenHash = undefined;
+  doc.passwordResetExpiresAt = undefined;
+  await doc.save();
+};
+

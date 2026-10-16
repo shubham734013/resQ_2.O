@@ -2,6 +2,7 @@ import { Navigate, Route } from 'react-router-dom';
 import { RequireAuth, RoleRoute, AccountStatusGuard } from './ProtectedRoute';
 import { DriverLayout } from '../layouts/DriverLayout';
 import { AmbulancePage } from '../pages/AmbulancePage';
+import { DriverDashboardPage } from '../pages/driver/DriverDashboardPage';
 import { DriverNotificationsPage } from '../pages/driver/DriverNotificationsPage';
 import { DriverProfilePage } from '../pages/driver/DriverProfilePage';
 import { DriverSettingsPage } from '../pages/driver/DriverSettingsPage';
@@ -12,7 +13,7 @@ export const driverRoutes = (
       <Route element={<AccountStatusGuard />}>
         <Route element={<DriverLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<AmbulancePage />} />
+          <Route path="dashboard" element={<DriverDashboardPage />} />
           <Route path="assignments" element={<AmbulancePage />} />
           <Route path="assignments/:assignmentId" element={<AmbulancePage />} />
           <Route path="navigation" element={<AmbulancePage />} />

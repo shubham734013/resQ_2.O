@@ -5,6 +5,7 @@ import { HospitalPage } from '../pages/HospitalPage';
 import { HospitalAppointmentsPage } from '../pages/HospitalAppointmentsPage';
 import { HospitalAnalyticsPage } from '../pages/hospital/HospitalAnalyticsPage';
 import { HospitalSettingsPage } from '../pages/hospital/HospitalSettingsPage';
+import { HospitalDashboardPage } from '../pages/hospital/HospitalDashboardPage';
 
 export const hospitalRoutes = (
   <Route path="/hospital" element={<RequireAuth />}>
@@ -12,7 +13,7 @@ export const hospitalRoutes = (
       <Route element={<AccountStatusGuard />}>
         <Route element={<HospitalLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<HospitalPage tab="overview" />} />
+          <Route path="dashboard" element={<HospitalDashboardPage />} />
           <Route path="requests" element={<HospitalPage tab="requests" />} />
           <Route path="requests/:requestId" element={<HospitalPage tab="requests" />} />
           <Route path="emergencies" element={<HospitalPage tab="requests" />} />

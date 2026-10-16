@@ -8,7 +8,7 @@ export interface AmbulanceDriverDocument {
   fullName: string; email: string; phone: string; passwordHash: string; authProvider: AuthProvider; providerSubject?: string; licenseNumber: string;
   licenseVerificationStatus: VerificationStatus; profileCompletionStatus: DriverProfileCompletionStatus; address?: string; city?: string; state?: string; country?: string;
   registeredLatitude?: number; registeredLongitude?: number; providerId: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus; isOnDuty?: boolean; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
-  accountStatus: AccountStatus; createdAt: Date; updatedAt: Date;
+  accountStatus: AccountStatus; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceDriverDocument>({
   fullName: { type: String, required: true, trim: true }, email: { type: String, required: true, unique: true, lowercase: true }, phone: { type: String, required: true },
@@ -21,6 +21,8 @@ const schema = new Schema<AmbulanceDriverDocument>({
   isOnDuty: { type: Boolean, default: false, index: true },
   dispatchReservationId: { type: Schema.Types.ObjectId, ref: 'DispatchJob', index: true },
   dispatchReservationExpiresAt: Date, accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
+  passwordResetTokenHash: { type: String, select: false },
+  passwordResetExpiresAt: { type: Date, select: false },
 }, { timestamps: true });
 schema.pre('save', function () {
   if (this.availabilityStatus) {
