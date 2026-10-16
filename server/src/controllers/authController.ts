@@ -36,10 +36,11 @@ export const driverProfileController=async(req:AuthenticatedRequest,res:Response
 export const providerProfileController=async(req:AuthenticatedRequest,res:Response)=>sendSuccess(res,await updateProviderProfile(req.auth!,req.body as ProviderProfileInput));
 export const forgotPasswordController = async (req: Request, res: Response): Promise<void> => {
   const { email } = (req.body as ForgotPasswordInput);
-  const result = await initiatePasswordReset(email);
+  await initiatePasswordReset(email);
+  // Generic response: identical whether or not the account exists, and it
+  // never contains the raw reset token. The token is delivered by email only.
   sendSuccess(res, {
     message: 'If an account with this email exists, a reset link has been sent.',
-    ...(result.resetToken ? { resetToken: result.resetToken, expiresAt: result.expiresAt } : {}),
   });
 };
 

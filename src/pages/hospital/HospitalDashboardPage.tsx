@@ -9,20 +9,11 @@ import {
   Calendar,
   MapPin,
   Clock,
-  RefreshCw,
   CheckCircle2,
-  TrendingUp,
   Phone,
-  Bell,
-  BarChart3,
-  ChevronRight,
-  Activity,
   Ambulance,
-  UserCheck,
   FileText,
-  Radio,
   Megaphone,
-  ToggleRight,
   Stethoscope,
 } from 'lucide-react';
 import { MapView } from '../../components/map/MapView';
@@ -106,11 +97,6 @@ export const HospitalDashboardPage = () => {
   const ambulances = useQuery({
     queryKey: ['hospital', 'ambulances', { limit: 10 }],
     queryFn: () => hospitalApi.getAmbulances({ limit: 10 }),
-  });
-  const summary = useQuery({
-    queryKey: ['hospital', 'summary'],
-    queryFn: hospitalApi.getEmergencySummary,
-    refetchInterval: 30000,
   });
 
   /* Derived */

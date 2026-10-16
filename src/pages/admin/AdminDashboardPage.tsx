@@ -90,11 +90,12 @@ const DonutChart = ({
   const cx = 60;
   const cy = 60;
   const circumference = 2 * Math.PI * r;
-  let offset = 0;
-  const arcs = segments.map((seg) => {
-    const dash = (seg.pct / 100) * circumference;
+  const dashes = segments.map((seg) => (seg.pct / 100) * circumference);
+  const arcs = segments.map((seg, i) => {
+    const dash = dashes[i] ?? 0;
     const gap = circumference - dash;
-    const arc = (
+    const offset = dashes.slice(0, i).reduce((acc, d) => acc + d, 0);
+    return (
       <circle
         key={seg.label}
         cx={cx}
@@ -108,8 +109,6 @@ const DonutChart = ({
         style={{ transform: 'rotate(-90deg)', transformOrigin: `${cx}px ${cy}px` }}
       />
     );
-    offset += dash;
-    return arc;
   });
   return (
     <svg width={120} height={120} viewBox="0 0 120 120">

@@ -15,7 +15,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install
+          cache-dependency-path: package-lock.json
+      - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
@@ -25,13 +26,63 @@ jobs:
     defaults:
       run:
         working-directory: server
+    # Integration tests require MongoDB transactions, which need a replica
+    # set. This single-node replica set is ephemeral and only reachable from
+    # this job; the test-database guard additionally enforces that the target
+    # database name contains "test".
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --replSet rs0
+          --bind_ip_all
+    env:
+      NODE_ENV: test
+      # Throwaway, test-only credentials for the ephemeral container above.
+      # They are never valid outside this job.
+      MONGODB_URI: mongodb://127.0.0.1:27017/resq_automated_test?replicaSet=rs0&directConnection=true
+      TEST_MONGODB_URI: mongodb://127.0.0.1:27017/resq_automated_test?replicaSet=rs0&directConnection=true
+      JWT_SECRET: ci-test-only-jwt-secret-0123456789abcdef
+      JWT_REFRESH_SECRET: ci-test-only-jwt-refresh-0123456789abcdef
+      RESQ_ADMIN_EMAIL: admin@resq.test
+      RESQ_ADMIN_PASSWORD: ci-test-only-admin-password-123
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm install
+          cache-dependency-path: server/package-lock.json
+      - name: Initiate MongoDB replica set
+        working-directory: server
+        run: |
+          node --input-type=module -e "
+          import { MongoClient } from 'mongodb';
+          const client = new MongoClient('mongodb://127.0.0.1:27017/admin?directConnection=true');
+          for (let attempt = 1; attempt <= 30; attempt++) {
+            try {
+              await client.connect();
+              await client.db().command({ replSetInitiate: { _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] } });
+              console.log('Replica set rs0 initiated');
+              break;
+            } catch (error) {
+              if (String(error).includes('already initialized')) { console.log('Replica set already initialized'); break; }
+              if (attempt === 30) throw error;
+              await new Promise((r) => setTimeout(r, 2000));
+            }
+          }
+          // Wait until the replica set elects a primary.
+          for (let attempt = 1; attempt <= 30; attempt++) {
+            const hello = await client.db().command({ hello: 1 });
+            if (hello.isWritablePrimary) { console.log('Primary ready'); break; }
+            if (attempt === 30) throw new Error('Replica set primary not elected in time');
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+          await client.close();
+          "
+      - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

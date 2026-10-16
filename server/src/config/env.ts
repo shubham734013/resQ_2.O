@@ -33,6 +33,12 @@ const envSchema = z.object({
   GOOGLE_ROUTES_API_KEY: z.string().trim().optional(),
   GOOGLE_PLACES_API_KEY: z.string().trim().optional(),
   GOOGLE_MAPS_SERVER_API_KEY: z.string().trim().optional(),
+  // Public base URL of the frontend, used to build password-reset links.
+  APP_BASE_URL: z.string().url().default('http://localhost:5173'),
+  // Transactional email (Resend) configuration for password recovery.
+  // Delivery is enabled only when RESEND_API_KEY and MAIL_FROM are both set.
+  RESEND_API_KEY: z.string().trim().optional(),
+  MAIL_FROM: z.string().trim().optional(),
 }).transform((data) => {
   const mergedCors = (data.CORS_ORIGINS || data.CORS_ORIGIN || '').trim();
   const effectiveCors = mergedCors || (data.NODE_ENV !== 'production' ? 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173' : '');
