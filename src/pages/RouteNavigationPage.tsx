@@ -24,6 +24,7 @@ import { useFacility } from '../hooks/useFacility';
 import { useFacilities } from '../hooks/useFacilities';
 import { useNearbyFacilities } from '../hooks/useNearbyFacilities';
 import { useMapRoute } from '../hooks/useMapRoute';
+import { useLocationState } from '../hooks/useLocationState';
 import { mapsApi } from '../services/mapsApi';
 import { MapView } from '../components/map/MapView';
 import { RouteOption } from '../components/route/RouteOption';
@@ -59,7 +60,12 @@ export const RouteNavigationPage = () => {
   const [searchParams] = useSearchParams();
   const isEmergency = searchParams.get('emergency') === 'true';
 
-  const { currentLocation, location, permissionState, refreshLocation } = useOutletContext<LayoutContext>();
+  const outletContext = useOutletContext<LayoutContext | undefined>();
+  const fallback = useLocationState();
+  const currentLocation = outletContext?.currentLocation ?? fallback.currentLocation;
+  const location = outletContext?.location ?? fallback.location;
+  const permissionState = outletContext?.permissionState ?? fallback.permissionState;
+  const refreshLocation = outletContext?.refreshLocation ?? fallback.refreshLocation;
   const { facility } = useFacility(facilityId);
 
   // Direction Search & Overrides

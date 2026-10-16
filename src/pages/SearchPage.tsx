@@ -8,6 +8,7 @@ import { FacilityPreview } from '../components/facility/FacilityPreview';
 import { useFacilities } from '../hooks/useFacilities';
 import { MapView } from '../components/map/MapView';
 import { DEFAULT_JAIPUR_COORDINATES } from '../types/maps';
+import { useLocationState } from '../hooks/useLocationState';
 import type { Facility, FacilityCategory, UserLocation } from '../types/facility';
 
 interface LayoutContext {
@@ -19,7 +20,10 @@ interface LayoutContext {
 const QUICK_TERMS = ['Hospital', 'Emergency', 'Trauma', 'Clinic', 'City Hospital'];
 
 export const SearchPage = () => {
-  const { currentLocation, refreshLocation } = useOutletContext<LayoutContext>();
+  const outletContext = useOutletContext<LayoutContext | undefined>();
+  const fallback = useLocationState();
+  const currentLocation = outletContext?.currentLocation ?? fallback.currentLocation;
+  const refreshLocation = outletContext?.refreshLocation ?? fallback.refreshLocation;
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<FacilityCategory>('all');
   const [emergencyOnly, setEmergencyOnly] = useState(false);

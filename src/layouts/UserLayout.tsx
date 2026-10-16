@@ -41,9 +41,18 @@ const userNavItems = [
 export const UserLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { currentLocation, isUpdating, refreshLocation } = useLocationState();
+  const locationState = useLocationState();
+  const { currentLocation, isUpdating, refreshLocation } = locationState;
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const context = {
+    currentLocation: locationState.currentLocation,
+    location: locationState.location,
+    permissionState: locationState.permissionState,
+    locationError: locationState.locationError,
+    refreshLocation: locationState.refreshLocation,
+    isUpdating: locationState.isUpdating,
+  };
 
   const handleLogout = async () => {
     try {
@@ -224,7 +233,7 @@ export const UserLayout = () => {
 
         {/* ── Page Content ─────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col">
-          <Outlet />
+          <Outlet context={context} />
         </main>
       </div>
     </div>

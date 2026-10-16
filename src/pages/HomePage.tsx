@@ -14,6 +14,7 @@ import { FacilityPreview } from '../components/facility/FacilityPreview';
 import { MapView } from '../components/map/MapView';
 import { useNearbyFacilities } from '../hooks/useNearbyFacilities';
 import { useFacilities } from '../hooks/useFacilities';
+import { useLocationState } from '../hooks/useLocationState';
 import type { Facility, FacilityCategory, UserLocation } from '../types/facility';
 
 interface LayoutContext {
@@ -24,7 +25,10 @@ interface LayoutContext {
 
 export const HomePage = () => {
   const navigate = useNavigate();
-  const { currentLocation, refreshLocation } = useOutletContext<LayoutContext>();
+  const outletContext = useOutletContext<LayoutContext | undefined>();
+  const fallback = useLocationState();
+  const currentLocation = outletContext?.currentLocation ?? fallback.currentLocation;
+  const refreshLocation = outletContext?.refreshLocation ?? fallback.refreshLocation;
   const hasLocation = Number.isFinite(currentLocation.latitude) && Number.isFinite(currentLocation.longitude) && (currentLocation.latitude !== 0 || currentLocation.longitude !== 0);
   const nearby = useNearbyFacilities(hasLocation ? currentLocation.latitude : null, hasLocation ? currentLocation.longitude : null);
 

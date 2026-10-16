@@ -13,6 +13,7 @@ import { FacilityContact } from '../components/facility/FacilityContact';
 import { FacilityLocation } from '../components/facility/FacilityLocation';
 import { FacilityActions } from '../components/facility/FacilityActions';
 import { Button } from '../components/common/Button';
+import { useLocationState } from '../hooks/useLocationState';
 import type { UserLocation } from '../types/facility';
 
 interface LayoutContext {
@@ -27,7 +28,9 @@ export const FacilityDetailPage = () => {
   const [searchParams] = useSearchParams();
   const fromEmergency = searchParams.get('emergency') === 'true';
 
-  const { currentLocation } = useOutletContext<LayoutContext>();
+  const outletContext = useOutletContext<LayoutContext | undefined>();
+  const fallback = useLocationState();
+  const currentLocation = outletContext?.currentLocation ?? fallback.currentLocation;
   const { facility, isLoading, isNotFound } = useFacility(id);
 
   // 1. Loading State
