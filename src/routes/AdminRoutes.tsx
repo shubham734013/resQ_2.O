@@ -2,7 +2,6 @@ import { Navigate, Route } from 'react-router-dom';
 import { RequireAuth, RoleRoute } from './ProtectedRoute';
 import { AdminLayout } from '../layouts/AdminLayout';
 import {
-  AdminOverviewPage,
   AdminEmergenciesPage,
   AdminReportsPage,
   AdminAnalyticsPage,

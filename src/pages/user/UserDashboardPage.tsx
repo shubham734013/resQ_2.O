@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,16 +12,12 @@ import {
   MapPin,
   Star,
   Ambulance,
-  HeartPulse,
   Share2,
   FileText,
   Users,
   Beaker,
-  CheckCircle2,
-  XCircle,
   RefreshCw,
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
 import { emergencyApi } from '../../services/emergencyApi';
 import { hospitalAppointmentApi, type HospitalAppointment } from '../../services/hospitalAppointmentApi';
 import { facilityApi } from '../../services/facilityApi';
@@ -100,7 +96,6 @@ const requestStatusLabel = (status: string) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export const UserDashboardPage = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const { currentLocation, location: geoLocation } = useLocationState();
   const [activeTab, setActiveTab] = useState<TabKey>('ambulances');

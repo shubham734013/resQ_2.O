@@ -3,15 +3,27 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { ROUTES } from '../../routes/routePaths';
+import { authApi } from '../../services/authApi';
 
 export const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    setSubmitted(true);
+    if (!email.trim() || submitting) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await authApi.forgotPassword({ email: email.trim() });
+      setSubmitted(true);
+    } catch {
+      setError('We could not send the reset instructions right now. Please try again in a moment.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -51,6 +63,12 @@ export const ForgotPasswordPage = () => {
               Enter your registered ResQ email address. We will verify your account and transmit a secure recovery link.
             </p>
 
+            {error && (
+              <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                {error}
+              </div>
+            )}
+
             <label className="block text-xs font-semibold text-slate-700">
               Email Address
               <div className="relative mt-1">
@@ -66,8 +84,8 @@ export const ForgotPasswordPage = () => {
               </div>
             </label>
 
-            <Button type="submit" variant="primary" className="w-full">
-              Send Recovery Instructions
+            <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
+              {submitting ? 'Sending…' : 'Send Recovery Instructions'}
             </Button>
 
             <div className="text-center pt-2">

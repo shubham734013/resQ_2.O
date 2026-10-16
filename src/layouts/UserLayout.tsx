@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
@@ -18,7 +18,6 @@ import {
   Search,
   ChevronDown,
   HeartPulse,
-  ChevronRight,
   RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -42,18 +41,9 @@ const userNavItems = [
 export const UserLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { currentLocation, location: geoLocation, isUpdating, refreshLocation } = useLocationState();
+  const { currentLocation, isUpdating, refreshLocation } = useLocationState();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const currentItem =
-    userNavItems.find((item) =>
-      item.path === ROUTES.USER.DASHBOARD
-        ? location.pathname === ROUTES.USER.DASHBOARD || location.pathname === '/user'
-        : location.pathname.startsWith(item.path) && item.path !== ROUTES.USER.HOSPITALS
-    ) ??
-    userNavItems.find((item) => location.pathname.startsWith(item.path)) ??
-    userNavItems[0];
 
   const handleLogout = async () => {
     try {
@@ -66,7 +56,7 @@ export const UserLayout = () => {
   const cityLabel = currentLocation.label?.split(',')[0]?.trim() || 'Jaipur';
   const stateLabel = currentLocation.label?.split(',')[1]?.trim() || 'Rajasthan';
 
-  const SidebarContent = () => (
+  const sidebarContent = (
     <>
       {/* Brand ─────────────────────────────────────────────── */}
       <div className="flex h-16 items-center gap-3 border-b border-slate-100 px-5">
@@ -143,7 +133,7 @@ export const UserLayout = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
       {/* ── Desktop Sidebar ─────────────────────────────────────────────── */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
@@ -227,7 +217,7 @@ export const UserLayout = () => {
           {/* Mobile Navigation Drawer */}
           {mobileOpen && (
             <div className="lg:hidden border-t border-slate-200 bg-white flex flex-col max-h-[80vh] overflow-y-auto">
-              <SidebarContent />
+              {sidebarContent}
             </div>
           )}
         </header>

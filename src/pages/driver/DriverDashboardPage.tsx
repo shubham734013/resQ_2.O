@@ -11,10 +11,7 @@ import {
   Share2,
   AlertTriangle,
   ChevronRight,
-  Wifi,
-  WifiOff,
   Radio,
-  Power,
   RefreshCw,
   Calendar,
   Fuel,
@@ -31,7 +28,6 @@ import { ambulanceDriverApi } from '../../services/ambulanceDriverApi';
 import { useAmbulanceRoute } from '../../hooks/useAmbulanceRoute';
 import { trackingApi, trackingRouteOption } from '../../services/trackingApi';
 import { useLocationState } from '../../hooks/useLocationState';
-import { useAuth } from '../../context/AuthContext';
 import { ROUTES } from '../../routes/routePaths';
 import type { UserLocation } from '../../types/facility';
 import type { RouteOptionItem } from '../../types/route';
@@ -80,7 +76,6 @@ const getCurrentGpsFix = () =>
 export const DriverDashboardPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   // Location context from DriverLayout
   const outletContext = useOutletContext<LayoutContext | undefined>();
@@ -91,7 +86,6 @@ export const DriverDashboardPage = () => {
   const refreshLocation = outletContext?.refreshLocation ?? fallbackLocationState.refreshLocation;
 
   // API queries
-  const profile = useQuery({ queryKey: ['ambulance-driver', 'profile'], queryFn: ambulanceDriverApi.getProfile });
   const status = useQuery({
     queryKey: ['ambulance-driver', 'status'],
     queryFn: ambulanceDriverApi.getStatus,
@@ -132,12 +126,6 @@ export const DriverDashboardPage = () => {
     enabled: Boolean(activeTrip?.emergencyRequestId),
   });
 
-  const incoming =
-    requests.data?.items.find(
-      (r) =>
-        !r.driverId &&
-        ['RECEIVED', 'REVIEWING', 'PREPARING', 'AMBULANCE_COORDINATION'].includes(r.status),
-    ) ?? null;
 
   // Map destinations
   const destination = useMemo(
@@ -236,7 +224,7 @@ export const DriverDashboardPage = () => {
   const [locationHealth, setLocationHealth] = useState<'PAUSED' | 'TRACKING' | 'RETRYING' | 'ERROR'>('PAUSED');
   const [locationError, setLocationError] = useState('');
   const [gpsPermissionDenied, setGpsPermissionDenied] = useState(false);
-  const [trackingRestartToken, setTrackingRestartToken] = useState(0);
+  const [trackingRestartToken] = useState(0);
   const lastGpsSentAtRef = useRef(0);
   const locationRequestInFlightRef = useRef(false);
 
@@ -378,7 +366,6 @@ export const DriverDashboardPage = () => {
   const isOnDuty = status.data?.status === 'ONLINE' || status.data?.status === 'BUSY';
   const incomingOffer = offers.data?.[0] ?? null;
   const vehicleInfo = status.data?.assignedAmbulance;
-  const driverName = profile.data?.fullName || user?.name || 'Driver';
   const todayTrips = trips.data?.items ?? [];
 
   // Nearby requests for the "Available Requests Nearby" panel

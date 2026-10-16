@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Bell,
   User,
-  Settings,
   LogOut,
   ChevronRight,
   Menu,

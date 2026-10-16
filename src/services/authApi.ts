@@ -25,5 +25,7 @@ export const authApi={
  me:():Promise<CurrentUserResponse>=>request('/auth/me'),
  logout:():Promise<{success:true;data:{loggedOut:boolean}}>=>postJson('/auth/logout',{}),
  refresh:():Promise<AuthResponse>=>postJson('/auth/refresh',{}),
+ forgotPassword:(input:{email:string}):Promise<{success:true;data:{message:string}}>=>postJson('/auth/forgot-password',input),
+ resetPassword:(input:{token:string;password:string}):Promise<{success:true;data:{message:string}}>=>postJson('/auth/reset-password',input),
 };
 export const getAuthApiBaseUrl=():string=>API_BASE_URL;

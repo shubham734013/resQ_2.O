@@ -1,19 +1,27 @@
 import { Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { ROUTES } from '../../routes/routePaths';
+import { authApi, AuthApiError } from '../../services/authApi';
 
 export const ResetPasswordPage = () => {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') ?? '';
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!token) {
+      setError('This reset link is missing its security token. Please request a new reset link.');
+      return;
+    }
     if (password.length < 8) {
       setError('Password must contain at least 8 characters.');
       return;
@@ -22,7 +30,19 @@ export const ResetPasswordPage = () => {
       setError('Passwords do not match.');
       return;
     }
-    setSuccess(true);
+    setSubmitting(true);
+    try {
+      await authApi.resetPassword({ token, password });
+      setSuccess(true);
+    } catch (err) {
+      if (err instanceof AuthApiError && err.code === 'INVALID_RESET_TOKEN') {
+        setError('This reset link is invalid or has expired. Please request a new one.');
+      } else {
+        setError('We could not update your password right now. Please try again in a moment.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -87,8 +107,8 @@ export const ResetPasswordPage = () => {
               />
             </label>
 
-            <Button type="submit" variant="primary" className="w-full">
-              Update Password
+            <Button type="submit" variant="primary" className="w-full" disabled={submitting || !token}>
+              {submitting ? 'Updating…' : 'Update Password'}
             </Button>
 
             <div className="text-center pt-2">

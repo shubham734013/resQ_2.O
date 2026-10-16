@@ -20,7 +20,7 @@ import {
   Search,
   Phone,
 } from 'lucide-react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useHospitalProfile } from '../hooks/useHospitalManagement';
 import { useAuth } from '../context/AuthContext';
@@ -44,7 +44,6 @@ const hospitalNavItems = [
 export const HospitalLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const profile = useHospitalProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -68,12 +67,6 @@ export const HospitalLayout = () => {
 
   const unreadNotifications = activeEmergencyCount; // proxy for header bell
 
-  const currentItem =
-    hospitalNavItems.find((item) =>
-      item.path === ROUTES.HOSPITAL.DASHBOARD
-        ? location.pathname === ROUTES.HOSPITAL.DASHBOARD || location.pathname === '/hospital'
-        : location.pathname.startsWith(item.path),
-    ) ?? hospitalNavItems[0];
 
   const handleLogout = async () => {
     try { await logout(); } finally { navigate(ROUTES.PUBLIC.LOGIN, { replace: true }); }

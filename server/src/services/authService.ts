@@ -11,6 +11,7 @@ import { UserModel } from '../models/User.js';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { verifySocialCredential, type VerifiedSocialIdentity } from '../providers/socialIdentity.js';
+import { defaultMailSender, sendPasswordResetEmail, type MailSender } from './mailer.js';
 import type { AuthenticatedIdentity, SocialProvider, JwtClaims } from '../types/auth.js';
 import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js';
 import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, DriverProfileInput, ProviderProfileInput, UserProfileUpdateInput } from '../schemas/auth.js';
@@ -502,10 +503,12 @@ export const getActiveProvidersForRegistration = async () => {
 };
 
 // -----------------------------------------------------------------------
-// Password Reset (token-based, no email delivery — token returned in response)
-// In production, integrate an email provider and send the token via email.
-// For now the token is returned in the API response so it can be relayed
-// through a frontend "email sent" flow during development / demo.
+// Password Reset (token-based, delivered via email)
+// - The raw token is NEVER returned through the API. It is delivered only
+//   through the configured mail channel (see services/mailer.ts).
+// - Only a SHA-256 hash of the token is stored, with a 30-minute expiry.
+// - Responses are generic whether or not the account exists.
+// - A successful reset invalidates all existing auth sessions.
 // -----------------------------------------------------------------------
 
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -524,28 +527,28 @@ const findModelByEmail = async (email: string) => {
   return null;
 };
 
-export const initiatePasswordReset = async (email: string): Promise<{ resetToken: string; expiresAt: Date }> => {
-  // Always return a generic response to prevent user enumeration.
-  // We still compute and return the token in dev mode.
+export const initiatePasswordReset = async (email: string, sendMail: MailSender = defaultMailSender): Promise<void> => {
+  // The caller must always render the same generic response, whether or not
+  // the account exists, to prevent user enumeration.
   const found = await findModelByEmail(email);
   if (!found) {
     // Timing-safe: still do a fake hash operation so response time is consistent.
     await bcrypt.hash('timing-safe-fake', RESET_TOKEN_HASH_ROUNDS);
-    const fakeExpiry = new Date(Date.now() + RESET_TOKEN_TTL_MS);
-    // Return a fake token so the frontend always gets the same shape response.
-    return { resetToken: '', expiresAt: fakeExpiry };
+    return;
   }
   const { randomBytes } = await import('node:crypto');
   const rawToken = randomBytes(32).toString('hex');
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
-  // Store the hashed token and expiry on the document.
+  // Store only the hashed token and expiry on the document.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc = found.doc as any;
   doc.passwordResetTokenHash = tokenHash;
   doc.passwordResetExpiresAt = expiresAt;
   await doc.save();
-  return { resetToken: rawToken, expiresAt };
+  // Deliver the raw token exclusively through the mail channel.
+  const resetUrl = `${env.APP_BASE_URL.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
+  await sendPasswordResetEmail(normalizeEmail(email), resetUrl, sendMail);
 };
 
 export const completePasswordReset = async (rawToken: string, newPassword: string): Promise<void> => {
@@ -569,5 +572,11 @@ export const completePasswordReset = async (rawToken: string, newPassword: strin
   doc.passwordResetTokenHash = undefined;
   doc.passwordResetExpiresAt = undefined;
   await doc.save();
+  // Invalidate all existing sessions so that stolen credentials or tokens
+  // cannot be used after the password change.
+  const docId = (doc as unknown as { _id?: { toString(): string } })._id?.toString();
+  if (docId) {
+    await AuthSessionModel.deleteMany({ accountId: docId }).exec();
+  }
 };
 
