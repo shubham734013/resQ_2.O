@@ -6,7 +6,7 @@ import type { AuthUser } from '../../types/auth';
 
 declare global {
   interface Window {
-    google?: { accounts:{ id:{ initialize:(config:{client_id:string;callback:(response:{credential:string})=>void;ux_mode?:'popup'|'redirect'})=>void;renderButton:(parent:HTMLElement,options:Record<string,unknown>)=>void; }; }; };
+    google?: { accounts:{ id:{ initialize:(config:{client_id:string;callback:(response:{credential:string})=>void;error_callback?:(error:unknown)=>void;ux_mode?:'popup'|'redirect'})=>void;renderButton:(parent:HTMLElement,options:Record<string,unknown>)=>void; }; }; };
     msal?: { PublicClientApplication:new(config:{auth:{clientId:string;authority:string;redirectUri:string};cache?:{cacheLocation?:'localStorage'|'sessionStorage'}})=>{initialize?:()=>Promise<void>;loginPopup:(request:{scopes:string[]})=>Promise<{idToken:string}>;}; };
   }
 }
@@ -57,6 +57,9 @@ export const SocialAuthButtons=({roleHint,onSuccess,onError}:Props)=>{
         window.google.accounts.id.initialize({
           client_id: googleClientId,
           ux_mode: 'popup',
+          error_callback: (error) => {
+            console.warn('[GSI] Google Sign-In origin/initialization notice:', error);
+          },
           callback: async ({ credential }) => {
             const latest = latestGoogleConfig.current;
             setLoading('google');
