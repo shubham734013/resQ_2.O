@@ -96,6 +96,7 @@ export const FacilityActions = ({
 
       {/* Direct Care Request Modal */}
       <CareRequestModal
+        key={facility.id}
         facility={facility}
         isOpen={isCareRequestOpen}
         onClose={() => setIsCareRequestOpen(false)}
@@ -103,6 +104,7 @@ export const FacilityActions = ({
 
       {/* Appointment Booking Modal */}
       <AppointmentBookingModal
+        key={facility.id}
         facility={facility}
         isOpen={isAppointmentOpen}
         onClose={() => setIsAppointmentOpen(false)}
