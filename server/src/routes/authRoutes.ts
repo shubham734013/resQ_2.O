@@ -23,6 +23,7 @@ import {
   adminMfaStatusController,
 } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/authenticate.js';
+import { authenticateMfaSetup } from '../middlewares/authenticateMfaSetup.js';
 import { authorizeRole } from '../middlewares/authorizeRole.js';
 import { validateBody } from '../middlewares/validate.js';
 import { rateLimit } from '../middlewares/rateLimit.js';
@@ -71,8 +72,9 @@ authRouter.post('/login/hospital', authLimiter, validateBody(loginSchema), (req:
 authRouter.post('/admin/login', adminLimiter, validateBody(loginSchema), adminLoginController);
 authRouter.post('/admin/mfa/verify-login', adminLimiter, validateBody(adminMfaVerifyLoginSchema), adminMfaVerifyLoginController);
 authRouter.get('/admin/mfa/status', authenticate, authorizeRole('ADMIN'), adminMfaStatusController);
-authRouter.post('/admin/mfa/setup', authenticate, authorizeRole('ADMIN'), adminMfaSetupController);
-authRouter.post('/admin/mfa/confirm', authenticate, authorizeRole('ADMIN'), validateBody(adminMfaConfirmSetupSchema), adminMfaConfirmSetupController);
+// AUTH-02: Setup and confirm accept the restricted mfa_setup_pending token from adminLogin.
+authRouter.post('/admin/mfa/setup', authenticateMfaSetup, adminMfaSetupController);
+authRouter.post('/admin/mfa/confirm', authenticateMfaSetup, validateBody(adminMfaConfirmSetupSchema), adminMfaConfirmSetupController);
 authRouter.post('/admin/mfa/disable', authenticate, authorizeRole('ADMIN'), validateBody(adminMfaDisableSchema), adminMfaDisableController);
 
 authRouter.post('/login', authLimiter, validateBody(loginSchema), loginController);

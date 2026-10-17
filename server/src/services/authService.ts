@@ -341,9 +341,19 @@ export const login=async(input:LoginInput)=>{
   assertLoginAllowed(a.accountStatus);
   return createAuthResult(a);
 };
+/**
+ * AUTH-02: AdminLoginResult — three mutually exclusive shapes:
+ *  1. mfaRequired=true  — MFA enrolled; client must complete TOTP challenge.
+ *  2. mfaRequired=false, mfaSetupRequired=true  — MFA not yet enrolled;
+ *     client receives a restricted mfaSetupToken (NOT access/refresh tokens)
+ *     that may only call POST /auth/admin/mfa/setup and POST /auth/admin/mfa/confirm.
+ *  3. mfaRequired=false, mfaSetupRequired=false  — (unreachable in production;
+ *     present only for type-completeness.)
+ */
 export type AdminLoginResult =
-  | (AuthResult & { mfaRequired: false; mfaSetupRequired?: boolean })
-  | { mfaRequired: true; mfaToken: string; user: { email: string; name: string; role: 'ADMIN' } };
+  | { mfaRequired: true; mfaToken: string; user: { email: string; name: string; role: 'ADMIN' } }
+  | { mfaRequired: false; mfaSetupRequired: true; mfaSetupToken: string; user: { email: string; name: string; role: 'ADMIN' } }
+  | (AuthResult & { mfaRequired: false; mfaSetupRequired: false });
 
 export const adminLogin = async (input: LoginInput): Promise<AdminLoginResult> => {
   if (normalizeEmail(input.email) !== normalizeEmail(env.RESQ_ADMIN_EMAIL)) throw INVALID_CREDENTIALS;
@@ -355,10 +365,11 @@ export const adminLogin = async (input: LoginInput): Promise<AdminLoginResult> =
   assertLoginAllowed(userDoc.accountStatus);
 
   if (userDoc.mfaEnabled) {
+    // MFA enrolled — issue a short-lived challenge token; no session created yet.
     const mfaToken = jwt.sign(
       { sub: userDoc._id.toString(), email: userDoc.email, role: 'ADMIN', type: 'mfa_pending' },
       env.JWT_SECRET,
-      { expiresIn: 300 } // 5 minutes validity
+      { expiresIn: 300 }, // 5 minutes
     );
     return {
       mfaRequired: true,
@@ -367,19 +378,19 @@ export const adminLogin = async (input: LoginInput): Promise<AdminLoginResult> =
     };
   }
 
-  const account = accountFrom(
-    userDoc._id.toString(),
-    userDoc.email,
-    userDoc.name,
-    'ADMIN',
-    userDoc.accountStatus,
-    userDoc.passwordHash
+  // AUTH-02: MFA NOT enrolled — return a restricted setup token only.
+  // The caller MUST NOT treat this as an authenticated session.
+  // This token is accepted exclusively by the MFA setup endpoints.
+  const mfaSetupToken = jwt.sign(
+    { sub: userDoc._id.toString(), email: userDoc.email, role: 'ADMIN', type: 'mfa_setup_pending' },
+    env.JWT_SECRET,
+    { expiresIn: 600 }, // 10 minutes to complete enrollment
   );
-  const authRes = await createAuthResult(account);
   return {
-    ...authRes,
     mfaRequired: false,
     mfaSetupRequired: true,
+    mfaSetupToken,
+    user: { email: userDoc.email, name: userDoc.name, role: 'ADMIN' },
   };
 };
 
@@ -403,34 +414,42 @@ export const verifyAdminMfaLogin = async (input: { mfaToken: string; code: strin
   }
 
   const cleanCode = input.code.trim();
-  let authenticated = false;
 
   if (/^\d{6}$/.test(cleanCode)) {
+    // AUTH-03: Verify the code against the stored secret first.
     const verification = verifyTotpCode(admin.mfaSecret, cleanCode, 1);
     if (!verification.valid || typeof verification.step !== 'number') {
       throw new AppError('INVALID_MFA_CODE', 'Invalid 6-digit verification code.', 400);
     }
-    if (verification.step <= (admin.mfaLastUsedWindow ?? 0)) {
+    // AUTH-03: Atomically claim the time-step. The condition ensures only one concurrent
+    // request with the same step can succeed (whether mfaLastUsedWindow is unset or older).
+    const claimed = await UserModel.findOneAndUpdate(
+      {
+        _id: admin._id,
+        $or: [
+          { mfaLastUsedWindow: { $lt: verification.step } },
+          { mfaLastUsedWindow: { $exists: false } },
+          { mfaLastUsedWindow: null },
+        ],
+      },
+      { $set: { mfaLastUsedWindow: verification.step } },
+      { returnDocument: 'after' },
+    ).exec();
+    if (!claimed) {
       throw new AppError('MFA_CODE_REPLAYED', 'Verification code has already been used. Please wait for the next 30-second code.', 400);
     }
-    admin.mfaLastUsedWindow = verification.step;
-    await admin.save();
-    authenticated = true;
   } else {
+    // AUTH-03: Atomically $pull the recovery code hash — concurrent redemptions of the same
+    // code will only succeed for the first caller; subsequent calls find the hash gone.
     const hashedInput = hashRecoveryCode(cleanCode);
-    const existingHashes = admin.mfaRecoveryCodeHashes ?? [];
-    const matchIndex = existingHashes.indexOf(hashedInput);
-    if (matchIndex === -1) {
+    const consumed = await UserModel.findOneAndUpdate(
+      { _id: admin._id, mfaRecoveryCodeHashes: hashedInput },
+      { $pull: { mfaRecoveryCodeHashes: hashedInput } },
+      { returnDocument: 'after' },
+    ).exec();
+    if (!consumed) {
       throw new AppError('INVALID_MFA_CODE', 'Invalid verification code or recovery code.', 400);
     }
-    // Single-use: remove used recovery code hash
-    admin.mfaRecoveryCodeHashes?.splice(matchIndex, 1);
-    await admin.save();
-    authenticated = true;
-  }
-
-  if (!authenticated) {
-    throw new AppError('INVALID_MFA_CODE', 'MFA verification failed.', 400);
   }
 
   assertLoginAllowed(admin.accountStatus);
@@ -477,8 +496,12 @@ export const confirmAdminMfaSetup = async (
   admin.mfaRecoveryCodeHashes = admin.mfaPendingRecoveryCodeHashes ?? [];
   admin.mfaPendingSecret = undefined;
   admin.mfaPendingRecoveryCodeHashes = undefined;
-  admin.mfaLastUsedWindow = verification.step;
+  admin.mfaLastUsedWindow = undefined;
   await admin.save();
+
+  // AUTH-05: Invalidate all existing sessions so previously issued tokens cannot
+  // be used with a different MFA state.
+  await AuthSessionModel.deleteMany({ accountId: admin._id.toString() }).exec();
 
   return { success: true, recoveryCodesCount: admin.mfaRecoveryCodeHashes.length };
 };
@@ -514,6 +537,9 @@ export const disableAdminMfa = async (
   admin.mfaPendingRecoveryCodeHashes = undefined;
   admin.mfaLastUsedWindow = undefined;
   await admin.save();
+
+  // AUTH-05: Revoke all existing sessions so previously issued tokens are invalidated.
+  await AuthSessionModel.deleteMany({ accountId: admin._id.toString() }).exec();
 
   return { disabled: true };
 };

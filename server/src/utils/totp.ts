@@ -120,9 +120,9 @@ export const buildOtpauthUri = (secret: string, accountName: string, issuer = 'R
 export const generateRecoveryCodes = (count = 8): string[] => {
   const codes: string[] = [];
   for (let i = 0; i < count; i++) {
-    // 8 alphanumeric chars formatted as XXXX-XXXX (e.g. A3F8-92B1)
-    const raw = randomBytes(4).toString('hex').toUpperCase();
-    codes.push(`${raw.slice(0, 4)}-${raw.slice(4, 8)}`);
+    // 16 bytes (128-bit cryptographic entropy) formatted as 4 blocks: XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX
+    const raw = randomBytes(16).toString('hex').toUpperCase();
+    codes.push(`${raw.slice(0, 8)}-${raw.slice(8, 16)}-${raw.slice(16, 24)}-${raw.slice(24, 32)}`);
   }
   return codes;
 };

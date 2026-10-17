@@ -40,13 +40,14 @@ describe('Admin Two-Factor Authentication (TOTP MFA) Workflow', () => {
     await mongoose.disconnect();
   });
 
-  it('admin login without MFA returns mfaRequired=false and mfaSetupRequired=true', async () => {
+  it('admin login without MFA returns mfaSetupRequired=true and mfaSetupToken (no session tokens)', async () => {
     const res = await adminLogin({ email: adminEmail, password: adminPassword });
     assert.equal(res.mfaRequired, false);
-    if (!res.mfaRequired) {
+    if (!res.mfaRequired && res.mfaSetupRequired) {
       assert.equal(res.mfaSetupRequired, true);
-      assert.ok(res.accessToken);
-      assert.ok(res.refreshToken);
+      // AUTH-02: Must NOT receive full auth tokens; only a restricted setup token.
+      assert.ok(res.mfaSetupToken, 'Should receive mfaSetupToken');
+      assert.equal('accessToken' in res, false, 'Must NOT receive accessToken before MFA enrollment');
       assert.equal(res.user.role, 'ADMIN');
     }
   });
@@ -86,7 +87,7 @@ describe('Admin Two-Factor Authentication (TOTP MFA) Workflow', () => {
           '000000'
         );
       },
-      { message: /Invalid 6-digit verification code/ }
+      { message: /Verification code does not match the generated TOTP secret/ }
     );
   });
 
@@ -170,9 +171,18 @@ describe('Admin Two-Factor Authentication (TOTP MFA) Workflow', () => {
   });
 
   it('prevents replay of the same TOTP code within the same window', async () => {
-    const loginRes = await adminLogin({ email: adminEmail, password: adminPassword });
-    assert.equal(loginRes.mfaRequired, true);
-    if (!loginRes.mfaRequired) return;
+    // Reset mfaLastUsedWindow so this test can independently demonstrate:
+    // 1. First-use of valid code succeeds
+    // 2. Replay of same code in same window is rejected
+    await UserModel.updateOne(
+      { email: adminEmail.toLowerCase() },
+      { $unset: { mfaLastUsedWindow: 1 } }
+    ).exec();
+
+    // First login attempt — obtain a challenge token.
+    const loginRes1 = await adminLogin({ email: adminEmail, password: adminPassword });
+    assert.equal(loginRes1.mfaRequired, true);
+    if (!loginRes1.mfaRequired) return;
 
     const admin = await UserModel.findOne({ email: adminEmail.toLowerCase() })
       .select('+mfaSecret')
@@ -181,12 +191,23 @@ describe('Admin Two-Factor Authentication (TOTP MFA) Workflow', () => {
 
     const validCode = generateTotpCode(admin.mfaSecret);
 
-    // Replay attempt with same code
+    // First use of the code MUST succeed.
+    const firstResult = await verifyAdminMfaLogin({
+      mfaToken: loginRes1.mfaToken,
+      code: validCode,
+    });
+    assert.ok(firstResult.accessToken, 'First use of valid code should succeed');
+
+    // Second use of the SAME code in the SAME 30-second window MUST be rejected.
+    const loginRes2 = await adminLogin({ email: adminEmail, password: adminPassword });
+    assert.equal(loginRes2.mfaRequired, true);
+    if (!loginRes2.mfaRequired) return;
+
     await assert.rejects(
       async () => {
         await verifyAdminMfaLogin({
-          mfaToken: loginRes.mfaToken,
-          code: validCode,
+          mfaToken: loginRes2.mfaToken,
+          code: validCode, // exact same code / same time-step
         });
       },
       { message: /Verification code has already been used/ }

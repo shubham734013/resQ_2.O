@@ -61,7 +61,7 @@ test('TOTP Utilities', async (t) => {
     const codes = generateRecoveryCodes(8);
     assert.equal(codes.length, 8);
     codes.forEach((code) => {
-      assert.match(code, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+      assert.match(code, /^[A-Z0-9]{8}-[A-Z0-9]{8}-[A-Z0-9]{8}-[A-Z0-9]{8}$/);
       const hash1 = hashRecoveryCode(code);
       const hash2 = hashRecoveryCode(code.toLowerCase().replace('-', ''));
       assert.equal(hash1, hash2);

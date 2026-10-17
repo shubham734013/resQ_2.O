@@ -55,6 +55,7 @@ export const loginController=async(req:Request,res:Response)=>sendLoginResponse(
 export const adminLoginController = async (req: Request, res: Response) => {
   const result = await adminLogin(req.body as LoginInput);
   if (result.mfaRequired) {
+    // MFA enrolled — return challenge token; no session yet.
     sendSuccess(res, {
       mfaRequired: true,
       mfaToken: result.mfaToken,
@@ -62,6 +63,17 @@ export const adminLoginController = async (req: Request, res: Response) => {
     });
     return;
   }
+  if (result.mfaSetupRequired) {
+    // AUTH-02: MFA not enrolled — return restricted setup token ONLY. No auth cookies.
+    sendSuccess(res, {
+      mfaRequired: false,
+      mfaSetupRequired: true,
+      mfaSetupToken: result.mfaSetupToken,
+      user: result.user,
+    });
+    return;
+  }
+  // Fully authenticated (unreachable in production once MFA is mandatory)
   sendLoginResponse(res, result);
 };
 
