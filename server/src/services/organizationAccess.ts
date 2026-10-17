@@ -4,7 +4,12 @@ import {
   OrganizationMembershipModel,
   type OrganizationMembershipDocument,
   type MembershipPrincipalType,
+  type MembershipRole,
 } from '../models/OrganizationMembership.js';
+import { HospitalModel } from '../models/Hospital.js';
+import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
+import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { AuditLogModel } from '../models/AuditLog.js';
 import type { AuthenticatedIdentity } from '../types/auth.js';
 import { AppError } from '../utils/AppError.js';
 import type { CreateOrganizationInput, AddMembershipInput } from '../schemas/organization.js';
@@ -18,6 +23,17 @@ export interface RequireMembershipParams {
 export interface AssertResourceOrganizationParams {
   resourceOrganizationId?: string | Types.ObjectId | null;
   authorizedOrgIds: string[];
+}
+
+export interface ScopeByOrganizationOptions {
+  allowGlobalAdminAccess?: boolean;
+}
+
+export interface EmergencyCoordinationContext {
+  patientId: string;
+  assignedHospitalId?: string;
+  assignedProviderId?: string;
+  assignedDriverId?: string;
 }
 
 /**
@@ -34,7 +50,12 @@ export const requireOrganizationMembership = async ({
     throw new AppError('UNAUTHORIZED', 'Authentication is required for organizational access', 401);
   }
 
-  const orgId = typeof organizationId === 'string' ? new Types.ObjectId(organizationId) : organizationId;
+  const orgIdStr = typeof organizationId === 'string' ? organizationId : organizationId.toString();
+  if (!Types.ObjectId.isValid(orgIdStr)) {
+    throw new AppError('INVALID_ID', 'Invalid organization identifier format', 400);
+  }
+
+  const orgId = new Types.ObjectId(orgIdStr);
 
   // Verify the organization itself exists and is ACTIVE
   const organization = await OrganizationModel.findById(orgId).exec();
@@ -45,12 +66,12 @@ export const requireOrganizationMembership = async ({
     throw new AppError('ORGANIZATION_SUSPENDED', `Organization is ${organization.status.toLowerCase()}`, 403);
   }
 
-  // System ADMINISTRATOR has oversight access, but org must be active
+  // System ADMINISTRATOR has oversight access, but organization must exist and be active
   if (principal.role === 'ADMIN') {
     return new OrganizationMembershipModel({
       organizationId: orgId,
       principalType: 'HOSPITAL',
-      principalId: new Types.ObjectId(principal.id),
+      principalId: Types.ObjectId.isValid(principal.id) ? new Types.ObjectId(principal.id) : new Types.ObjectId(),
       role: 'ORG_ADMIN',
       permissions: ['*'],
       status: 'ACTIVE',
@@ -60,6 +81,10 @@ export const requireOrganizationMembership = async ({
   // Citizens (USER) do not hold organizational memberships
   if (principal.role === 'USER') {
     throw new AppError('FORBIDDEN', 'Citizens cannot access organizational tenancy workflows', 403);
+  }
+
+  if (!Types.ObjectId.isValid(principal.id)) {
+    throw new AppError('INVALID_ID', 'Invalid principal identifier format', 400);
   }
 
   // Find active membership matching authenticated principal
@@ -103,6 +128,8 @@ export const getAuthorizedOrganizationIds = async (principal: AuthenticatedIdent
   if (principal.role === 'USER') {
     return [];
   }
+
+  if (!Types.ObjectId.isValid(principal.id)) return [];
 
   const memberships = await OrganizationMembershipModel.find({
     principalType: principal.role as MembershipPrincipalType,
@@ -148,6 +175,10 @@ export const assertResourceOrganization = ({
   }
 
   const resourceOrgStr = resourceOrganizationId.toString();
+  if (!Types.ObjectId.isValid(resourceOrgStr)) {
+    throw new AppError('INVALID_ID', 'Resource organization identifier is invalid', 400);
+  }
+
   if (!authorizedOrgIds.includes(resourceOrgStr)) {
     throw new AppError('FORBIDDEN', 'Resource belongs to another organization. Access denied.', 403);
   }
@@ -155,26 +186,53 @@ export const assertResourceOrganization = ({
 
 /**
  * Construct a server-derived MongoDB query filter scoped to the principal's authorized organizations.
- * If principal has no authorized organizations, returns a non-matching query ({ _id: null }) to fail closed.
+ * - Prevents caller-supplied filters from overriding tenant constraints using $and.
+ * - Fails closed with an un-matchable {_id: {$in: []}} if principal has no authorized organizations.
+ * - Requires explicit allowGlobalAdminAccess: true for platform administrators to execute cross-tenant queries.
  */
 export const scopeByOrganization = async (
   principal: AuthenticatedIdentity,
-  additionalFilter: Record<string, unknown> = {}
+  additionalFilter: Record<string, unknown> = {},
+  options?: ScopeByOrganizationOptions
 ): Promise<Record<string, unknown>> => {
-  if (principal.role === 'ADMIN') {
+  if (!principal || !principal.id) {
+    throw new AppError('UNAUTHORIZED', 'Authentication is required for query scoping', 401);
+  }
+
+  // Explicit global admin access: only allowed if explicitly requested
+  if (principal.role === 'ADMIN' && options?.allowGlobalAdminAccess === true) {
     return { ...additionalFilter };
   }
 
   const authorizedIds = await getAuthorizedOrganizationIds(principal);
   if (authorizedIds.length === 0) {
-    // Fail-closed: matches nothing
-    return { _id: null, ...additionalFilter };
+    // Fail-closed: Ensure the query CANNOT match anything, regardless of additionalFilter.
+    // Combining with $and ensures caller cannot overwrite _id through object spread.
+    return {
+      $and: [
+        { _id: { $in: [] } },
+        { ...additionalFilter },
+      ],
+    };
   }
 
   const orgObjectIds = authorizedIds.map((id) => new Types.ObjectId(id));
+  const sanitizedFilter = { ...additionalFilter };
+
+  // If caller provided an organizationId in additionalFilter, ensure it is within authorizedIds!
+  if ('organizationId' in sanitizedFilter) {
+    const requestedOrgId = String(sanitizedFilter.organizationId);
+    if (!authorizedIds.includes(requestedOrgId)) {
+      throw new AppError('FORBIDDEN', 'Query filter requests an unauthorized organization', 403);
+    }
+  }
+
+  // Safe typed combination using $and to prevent property override attacks
   return {
-    organizationId: { $in: orgObjectIds },
-    ...additionalFilter,
+    $and: [
+      { organizationId: { $in: orgObjectIds } },
+      sanitizedFilter,
+    ],
   };
 };
 
@@ -194,7 +252,14 @@ export const assertSameOrganization = (
     );
   }
 
-  if (resourceAOrgId.toString() !== resourceBOrgId.toString()) {
+  const strA = resourceAOrgId.toString();
+  const strB = resourceBOrgId.toString();
+
+  if (!Types.ObjectId.isValid(strA) || !Types.ObjectId.isValid(strB)) {
+    throw new AppError('INVALID_ID', 'Invalid organization identifier format', 400);
+  }
+
+  if (strA !== strB) {
     throw new AppError(
       'CROSS_ORGANIZATION_CONFLICT',
       'Resources belong to different organizations and cannot be linked',
@@ -204,49 +269,128 @@ export const assertSameOrganization = (
 };
 
 /**
- * Create a new organization and optionally link the creator as ORG_ADMIN.
+ * Create a new organization and establish initial membership with defined least-privilege permissions.
+ * Creator is strictly required and must be an authenticated, authorized principal.
  */
 export const createOrganization = async (
   input: CreateOrganizationInput,
-  creator?: AuthenticatedIdentity
-): Promise<OrganizationDocument> => {
-  const org = await OrganizationModel.create(input);
-
-  if (creator && creator.role !== 'ADMIN' && creator.role !== 'USER') {
-    await OrganizationMembershipModel.create({
-      organizationId: org._id,
-      principalType: creator.role as MembershipPrincipalType,
-      principalId: new Types.ObjectId(creator.id),
-      role: 'ORG_ADMIN',
-      permissions: ['*'],
-      status: 'ACTIVE',
-    });
+  creator: AuthenticatedIdentity
+): Promise<{ organization: OrganizationDocument; membership?: OrganizationMembershipDocument }> => {
+  if (!creator || !creator.id) {
+    throw new AppError('UNAUTHORIZED', 'Authenticated creator required to provision organization', 401);
   }
 
-  return org;
+  // Only platform ADMIN, HOSPITAL, or AMBULANCE_PROVIDER can create organizations
+  if (creator.role !== 'ADMIN' && creator.role !== 'HOSPITAL' && creator.role !== 'AMBULANCE_PROVIDER') {
+    throw new AppError('FORBIDDEN', 'Citizens and drivers cannot provision organization tenants', 403);
+  }
+
+  // Type compatibility check with creator
+  if (creator.role === 'HOSPITAL' && input.type !== 'HOSPITAL_NETWORK') {
+    throw new AppError('FORBIDDEN', 'Hospitals can only provision HOSPITAL_NETWORK organizations', 403);
+  }
+  if (creator.role === 'AMBULANCE_PROVIDER' && input.type !== 'AMBULANCE_OPERATOR') {
+    throw new AppError('FORBIDDEN', 'Ambulance providers can only provision AMBULANCE_OPERATOR organizations', 403);
+  }
+
+  const org = await OrganizationModel.create(input);
+
+  let membership: OrganizationMembershipDocument | undefined;
+
+  // Provision initial membership for healthcare creators with defined least-privilege permissions
+  if (creator.role === 'HOSPITAL' || creator.role === 'AMBULANCE_PROVIDER') {
+    try {
+      const defaultRole: MembershipRole = creator.role === 'HOSPITAL' ? 'HOSPITAL_ADMIN' : 'PROVIDER_ADMIN';
+      const defaultPermissions: string[] =
+        creator.role === 'HOSPITAL'
+          ? ['hospital:manage', 'membership:manage', 'patient:manage', 'emergency:coordinate']
+          : ['fleet:manage', 'driver:manage', 'membership:manage', 'dispatch:manage'];
+
+      membership = await OrganizationMembershipModel.create({
+        organizationId: org._id,
+        principalType: creator.role as MembershipPrincipalType,
+        principalId: new Types.ObjectId(creator.id),
+        role: defaultRole,
+        permissions: defaultPermissions,
+        status: 'ACTIVE',
+      });
+    } catch (membershipError) {
+      // Rollback organization creation to prevent orphaned tenant record
+      await OrganizationModel.deleteOne({ _id: org._id }).exec();
+      throw membershipError;
+    }
+  }
+
+  // Audit log organization creation
+  await AuditLogModel.create({
+    actorId: Types.ObjectId.isValid(creator.id) ? new Types.ObjectId(creator.id) : undefined,
+    actorRole: creator.role,
+    action: 'ORGANIZATION_CREATED',
+    entityType: 'ORGANIZATION',
+    entityId: org._id,
+    newState: {
+      name: org.name,
+      type: org.type,
+      status: org.status,
+    },
+  }).catch(() => null);
+
+  return { organization: org, membership };
 };
 
 /**
  * Add or update a principal's membership within an organization.
+ * Acting principal is strictly required and must be authorized to manage memberships.
  */
 export const addPrincipalToOrganization = async (
   input: AddMembershipInput,
-  actingAdmin?: AuthenticatedIdentity
+  actingPrincipal: AuthenticatedIdentity
 ): Promise<OrganizationMembershipDocument> => {
-  if (actingAdmin) {
-    await requireOrganizationMembership({
-      principal: actingAdmin,
+  if (!actingPrincipal || !actingPrincipal.id) {
+    throw new AppError('UNAUTHORIZED', 'Authenticated actor is required to manage memberships', 401);
+  }
+
+  if (!Types.ObjectId.isValid(input.organizationId)) {
+    throw new AppError('INVALID_ID', 'Invalid organization identifier format', 400);
+  }
+  if (!Types.ObjectId.isValid(input.principalId)) {
+    throw new AppError('INVALID_ID', 'Invalid principal identifier format', 400);
+  }
+
+  const orgId = new Types.ObjectId(input.organizationId);
+  const princId = new Types.ObjectId(input.principalId);
+
+  // Authorize actingPrincipal
+  if (actingPrincipal.role !== 'ADMIN') {
+    const actorMembership = await requireOrganizationMembership({
+      principal: actingPrincipal,
       organizationId: input.organizationId,
       permission: 'membership:manage',
     });
+
+    // Prevent privilege escalation: normal managers cannot grant ORG_ADMIN or permissions beyond their own
+    if (actorMembership.role !== 'ORG_ADMIN') {
+      if (input.role === 'ORG_ADMIN') {
+        throw new AppError('FORBIDDEN', 'Only organization administrators can grant ORG_ADMIN role', 403);
+      }
+      for (const perm of input.permissions ?? []) {
+        if (!actorMembership.permissions.includes(perm) && !actorMembership.permissions.includes('*')) {
+          throw new AppError('FORBIDDEN', `Cannot grant permission (${perm}) not held by actor`, 403);
+        }
+      }
+    }
   }
 
-  const org = await OrganizationModel.findById(input.organizationId).exec();
+  // Check organization exists and is ACTIVE
+  const org = await OrganizationModel.findById(orgId).exec();
   if (!org) {
     throw new AppError('ORGANIZATION_NOT_FOUND', 'Organization not found', 404);
   }
+  if (org.status !== 'ACTIVE') {
+    throw new AppError('ORGANIZATION_SUSPENDED', `Cannot add members to a ${org.status.toLowerCase()} organization`, 403);
+  }
 
-  // Type compatibility validation
+  // Validate type compatibility
   if (org.type === 'HOSPITAL_NETWORK' && input.principalType !== 'HOSPITAL') {
     throw new AppError(
       'INCOMPATIBLE_PRINCIPAL_TYPE',
@@ -266,11 +410,33 @@ export const addPrincipalToOrganization = async (
     );
   }
 
+  // Verify referenced principal exists in authoritative collections and is not suspended/rejected
+  if (input.principalType === 'HOSPITAL') {
+    const hosp = await HospitalModel.findById(princId).exec();
+    if (!hosp) throw new AppError('PRINCIPAL_NOT_FOUND', 'Hospital principal record not found', 404);
+    if (hosp.accountStatus === 'SUSPENDED' || hosp.accountStatus === 'REJECTED') {
+      throw new AppError('PRINCIPAL_SUSPENDED', 'Hospital account is suspended or rejected', 403);
+    }
+  } else if (input.principalType === 'AMBULANCE_PROVIDER') {
+    const prov = await AmbulanceProviderModel.findById(princId).exec();
+    if (!prov) throw new AppError('PRINCIPAL_NOT_FOUND', 'Ambulance provider principal record not found', 404);
+    if (prov.accountStatus === 'SUSPENDED' || prov.accountStatus === 'REJECTED') {
+      throw new AppError('PRINCIPAL_SUSPENDED', 'Ambulance provider account is suspended or rejected', 403);
+    }
+  } else if (input.principalType === 'AMBULANCE_DRIVER') {
+    const driver = await AmbulanceDriverModel.findById(princId).exec();
+    if (!driver) throw new AppError('PRINCIPAL_NOT_FOUND', 'Ambulance driver principal record not found', 404);
+    if (driver.accountStatus === 'SUSPENDED' || driver.accountStatus === 'REJECTED') {
+      throw new AppError('PRINCIPAL_SUSPENDED', 'Ambulance driver account is suspended or rejected', 403);
+    }
+  }
+
+  // Atomic update or insert with concurrency handling
   const membership = await OrganizationMembershipModel.findOneAndUpdate(
     {
-      organizationId: new Types.ObjectId(input.organizationId),
+      organizationId: orgId,
       principalType: input.principalType,
-      principalId: new Types.ObjectId(input.principalId),
+      principalId: princId,
     },
     {
       $set: {
@@ -282,7 +448,45 @@ export const addPrincipalToOrganization = async (
     { upsert: true, returnDocument: 'after' }
   ).exec();
 
+  // Audit log the membership assignment
+  await AuditLogModel.create({
+    actorId: Types.ObjectId.isValid(actingPrincipal.id) ? new Types.ObjectId(actingPrincipal.id) : undefined,
+    actorRole: actingPrincipal.role,
+    action: 'ORGANIZATION_MEMBERSHIP_ASSIGNED',
+    entityType: 'ORGANIZATION_MEMBERSHIP',
+    entityId: membership!._id,
+    newState: {
+      organizationId: input.organizationId,
+      principalType: input.principalType,
+      principalId: input.principalId,
+      role: input.role,
+      permissions: input.permissions,
+      status: input.status ?? 'ACTIVE',
+    },
+  }).catch(() => null);
+
   return membership!;
+};
+
+/**
+ * Dedicated internal provisioning helper for seed scripts or initial system bootstrapping.
+ * Strictly NOT exposed via HTTP controllers or public routes.
+ */
+export const bootstrapInternalMembership = async (
+  organizationId: Types.ObjectId,
+  principalType: MembershipPrincipalType,
+  principalId: Types.ObjectId,
+  role: MembershipRole,
+  permissions: string[]
+): Promise<OrganizationMembershipDocument> => {
+  return OrganizationMembershipModel.create({
+    organizationId,
+    principalType,
+    principalId,
+    role,
+    permissions,
+    status: 'ACTIVE',
+  });
 };
 
 /**
@@ -298,4 +502,45 @@ export const getOrganizationDetails = async (
     throw new AppError('ORGANIZATION_NOT_FOUND', 'Organization not found', 404);
   }
   return org;
+};
+
+/**
+ * Validate that an authenticated caller has legitimate participation rights in an emergency.
+ * Preserves cross-tenant emergency coordination between citizens, hospitals, and fleet operators.
+ */
+export const assertEmergencyCoordinationAccess = (
+  principal: AuthenticatedIdentity,
+  emergency: EmergencyCoordinationContext
+): void => {
+  if (principal.role === 'ADMIN') return;
+
+  if (principal.role === 'USER') {
+    if (principal.id !== emergency.patientId) {
+      throw new AppError('FORBIDDEN', 'Citizens can only access their own emergencies', 403);
+    }
+    return;
+  }
+
+  if (principal.role === 'HOSPITAL') {
+    if (principal.id !== emergency.assignedHospitalId) {
+      throw new AppError('FORBIDDEN', 'Hospital is not assigned to this emergency coordination workflow', 403);
+    }
+    return;
+  }
+
+  if (principal.role === 'AMBULANCE_PROVIDER') {
+    if (principal.id !== emergency.assignedProviderId) {
+      throw new AppError('FORBIDDEN', 'Provider is not assigned to this emergency dispatch', 403);
+    }
+    return;
+  }
+
+  if (principal.role === 'AMBULANCE_DRIVER') {
+    if (principal.id !== emergency.assignedDriverId) {
+      throw new AppError('FORBIDDEN', 'Driver is not assigned to this emergency dispatch', 403);
+    }
+    return;
+  }
+
+  throw new AppError('FORBIDDEN', 'Caller has no operational role in this emergency', 403);
 };
