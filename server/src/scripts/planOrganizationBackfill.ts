@@ -89,6 +89,7 @@ export interface BackfillPlanReport {
   configuration: {
     batchSize: number;
     maxEntities: number;
+    maxLedgerEntries: number;
     includeDetailedIdentifiers: boolean;
     migrationVersion: string;
   };
@@ -108,6 +109,7 @@ export interface BackfillPlanReport {
 export interface PlannerOptions {
   batchSize?: number;
   maxEntities?: number;
+  maxLedgerEntries?: number;
   includeDetailedIdentifiers?: boolean;
   migrationVersion?: string;
 }
@@ -118,6 +120,81 @@ export class PlannerThresholdExceededError extends Error {
     this.name = 'PlannerThresholdExceededError';
   }
 }
+
+export class PlannerLedgerLimitExceededError extends Error {
+  constructor(public readonly limit: number) {
+    super(`Planner ledger limit exceeded: proposed action count exceeded configured limit of ${limit}. Aborting to avoid unbounded memory.`);
+    this.name = 'PlannerLedgerLimitExceededError';
+  }
+}
+
+export class PlannerConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PlannerConfigurationError';
+  }
+}
+
+export interface ParsedCliConfig {
+  batchSize: number;
+  maxEntities: number;
+  maxLedgerEntries: number;
+  outputPath?: string;
+  isJson: boolean;
+  includeDetailedIdentifiers: boolean;
+}
+
+export const validateIntegerArg = (flagName: string, rawVal: string, min: number, max: number): number => {
+  const trimmed = rawVal.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new PlannerConfigurationError(
+      `Invalid ${flagName}: expected a positive integer between ${min} and ${max}, received '${rawVal}'.`
+    );
+  }
+  const val = Number.parseInt(trimmed, 10);
+  if (!Number.isSafeInteger(val) || val < min || val > max) {
+    throw new PlannerConfigurationError(
+      `Invalid ${flagName}: expected a positive integer between ${min} and ${max}, received ${val}.`
+    );
+  }
+  return val;
+};
+
+export const parseCliOptions = (args: string[]): ParsedCliConfig => {
+  let batchSize = 500;
+  let maxEntities = 100000;
+  let maxLedgerEntries = 100000;
+  let outputPath: string | undefined;
+  const isJson = args.includes('--json');
+  const includeDetailedIdentifiers = args.includes('--include-identifiers');
+
+  for (const arg of args) {
+    if (arg.startsWith('--batch-size=')) {
+      const raw = arg.split('=')[1] ?? '';
+      batchSize = validateIntegerArg('--batch-size', raw, 1, 10000);
+    } else if (arg.startsWith('--max-entities=')) {
+      const raw = arg.split('=')[1] ?? '';
+      maxEntities = validateIntegerArg('--max-entities', raw, 1, 1000000);
+    } else if (arg.startsWith('--max-ledger-entries=')) {
+      const raw = arg.split('=')[1] ?? '';
+      maxLedgerEntries = validateIntegerArg('--max-ledger-entries', raw, 1, 1000000);
+    } else if (arg.startsWith('--output=')) {
+      outputPath = arg.split('=')[1];
+      if (!outputPath || outputPath.trim() === '') {
+        throw new PlannerConfigurationError('Invalid --output: expected a non-empty file path.');
+      }
+    }
+  }
+
+  return {
+    batchSize,
+    maxEntities,
+    maxLedgerEntries,
+    outputPath,
+    isJson,
+    includeDetailedIdentifiers,
+  };
+};
 
 /**
  * Generate a deterministic 24-character hexadecimal ObjectId string from a seed.
@@ -130,6 +207,7 @@ export const generateDeterministicId = (seed: string): string => {
 export const planOrganizationBackfill = async (options: PlannerOptions = {}): Promise<BackfillPlanReport> => {
   const batchSize = Math.max(1, options.batchSize ?? 500);
   const maxEntities = options.maxEntities ?? 100000;
+  const maxLedgerEntries = options.maxLedgerEntries ?? 100000;
   const includeDetailedIdentifiers = options.includeDetailedIdentifiers ?? false;
   const migrationVersion = options.migrationVersion ?? 'DATA-01C-V1';
 
@@ -145,6 +223,9 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
   let totalEntitiesScanned = 0;
 
   const addEntry = (entry: MigrationLedgerEntry): void => {
+    if (ledger.length >= maxLedgerEntries) {
+      throw new PlannerLedgerLimitExceededError(maxLedgerEntries);
+    }
     ledger.push(entry);
   };
 
@@ -190,7 +271,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
     const batchHospitalIds = hospitalBatch.map((h) => h._id);
 
-    // Keyset batch-scoped membership query: load only memberships for this batch
+    // Keyset batch-scoped membership query: load all memberships (all statuses) for this batch
     const batchMemberships = await OrganizationMembershipModel.find(
       { principalType: 'HOSPITAL', principalId: { $in: batchHospitalIds } },
       { organizationId: 1, principalType: 1, principalId: 1, role: 1, status: 1 }
@@ -236,6 +317,15 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
       const allMemberships = membershipsByHospital.get(hospId) || [];
       const activeMemberships = allMemberships.filter((m) => m.status === 'ACTIVE');
+      const inactiveMemberships = allMemberships.filter((m) => m.status !== 'ACTIVE');
+
+      // Check for duplicate membership conflict (multiple records for the same organization)
+      const orgCounts = new Map<string, number>();
+      for (const m of allMemberships) {
+        const orgKey = String(m.organizationId);
+        orgCounts.set(orgKey, (orgCounts.get(orgKey) || 0) + 1);
+      }
+      const hasDuplicateMembershipInSameOrg = Array.from(orgCounts.values()).some((count) => count > 1);
 
       if (hosp.organizationId) {
         const directOrgId = String(hosp.organizationId);
@@ -272,6 +362,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             ...(identifier ? { identifier } : {}),
           });
         } else if (directOrg.status !== 'ACTIVE') {
+          // Explicit policy: suspended or archived organizations cannot receive automated assignment or skip
           hospitalCounts.manualReview++;
           addEntry({
             migrationVersion,
@@ -286,7 +377,54 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             reason: `Hospital references organization '${directOrgId}' which has status '${directOrg.status}' (expected ACTIVE). Suspended/archived organizations cannot receive automated backfill.`,
             ...(identifier ? { identifier } : {}),
           });
-        } else if (activeMemberships.some((m) => String(m.organizationId) !== directOrgId)) {
+        } else if (hasDuplicateMembershipInSameOrg) {
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:duplicate-membership-conflict:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Hospital has multiple duplicate memberships in the same organization. Data integrity violation requires manual review.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length > 0) {
+          // Mixed active and inactive membership states
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:mixed-membership-states:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Hospital has mixed membership states: ${activeMemberships.length} active and ${inactiveMemberships.length} inactive (SUSPENDED/REVOKED) membership(s). Inactive membership history cannot be bypassed automatically. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length === 0) {
+          // Only inactive memberships exist
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:unresolved-membership-evidence:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Hospital has non-active membership evidence in organization '${inactiveMemberships[0]!.organizationId}' (status: ${inactiveMemberships[0]!.status}). Inactive membership cannot be bypassed. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (allMemberships.some((m) => String(m.organizationId) !== directOrgId)) {
           hospitalCounts.manualReview++;
           addEntry({
             migrationVersion,
@@ -298,11 +436,11 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             status: 'MANUAL_REVIEW',
             requiresManualReview: true,
             mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
-            reason: `Hospital has conflicting organization assignments between direct organizationId and active membership.`,
+            reason: `Hospital has conflicting organization assignments between direct organizationId and membership records.`,
             ...(identifier ? { identifier } : {}),
           });
         } else {
-          // Valid existing assignment to active HOSPITAL_NETWORK
+          // Valid existing assignment to active HOSPITAL_NETWORK with no inactive memberships
           const hasValidMembership = activeMemberships.some(
             (m) => String(m.organizationId) === directOrgId && m.role === 'HOSPITAL_ADMIN'
           );
@@ -370,7 +508,55 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
         }
       } else {
         // Hospital without organizationId
-        if (activeMemberships.length > 1) {
+        if (hasDuplicateMembershipInSameOrg) {
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:duplicate-membership-conflict:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Hospital has multiple duplicate memberships in the same organization. Data integrity violation requires manual review.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length > 0) {
+          // Mixed active and inactive membership states
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:mixed-membership-states:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Hospital has mixed membership states: ${activeMemberships.length} active and ${inactiveMemberships.length} inactive (SUSPENDED/REVOKED) membership(s). Inactive membership history cannot be bypassed automatically. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length === 0) {
+          // Inactive/suspended memberships exist -> unresolved membership evidence requires manual review
+          hospitalCounts.manualReview++;
+          const inactiveMem = inactiveMemberships[0]!;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:unresolved-membership-evidence:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Hospital has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Never create a new organization while unresolved membership evidence exists.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeMemberships.length > 1) {
           hospitalCounts.manualReview++;
           addEntry({
             migrationVersion,
@@ -454,25 +640,8 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
               ...(identifier ? { identifier } : {}),
             });
           }
-        } else if (allMemberships.length > 0) {
-          // Inactive/suspended memberships exist -> unresolved membership evidence requires manual review
-          hospitalCounts.manualReview++;
-          const inactiveMem = allMemberships[0]!;
-          addEntry({
-            migrationVersion,
-            idempotencyKey: `hosp:unresolved-membership-evidence:${hospId}`,
-            sourceEntity: 'HOSPITAL',
-            sourceId: hospId,
-            action: 'MANUAL_REVIEW',
-            confidence: 'AMBIGUOUS',
-            status: 'MANUAL_REVIEW',
-            requiresManualReview: true,
-            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-            reason: `Hospital has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Never create a new organization while unresolved membership evidence exists.`,
-            ...(identifier ? { identifier } : {}),
-          });
         } else {
-          // Standalone hospital: deterministically create dedicated HOSPITAL_NETWORK
+          // Zero memberships exist and no direct organizationId: pure standalone hospital
           hospitalCounts.plannedCreates++;
           hospitalCounts.plannedUpdates++;
 
@@ -570,7 +739,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
     const batchProviderIds = providerBatch.map((p) => p._id);
 
-    // Keyset batch-scoped membership query: load only memberships for this batch
+    // Keyset batch-scoped membership query: load all memberships (all statuses) for this batch
     const batchMemberships = await OrganizationMembershipModel.find(
       { principalType: 'AMBULANCE_PROVIDER', principalId: { $in: batchProviderIds } },
       { organizationId: 1, principalType: 1, principalId: 1, role: 1, status: 1 }
@@ -616,6 +785,15 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
       const allMemberships = membershipsByProvider.get(provId) || [];
       const activeMemberships = allMemberships.filter((m) => m.status === 'ACTIVE');
+      const inactiveMemberships = allMemberships.filter((m) => m.status !== 'ACTIVE');
+
+      // Check for duplicate membership conflict (multiple records for the same organization)
+      const orgCounts = new Map<string, number>();
+      for (const m of allMemberships) {
+        const orgKey = String(m.organizationId);
+        orgCounts.set(orgKey, (orgCounts.get(orgKey) || 0) + 1);
+      }
+      const hasDuplicateMembershipInSameOrg = Array.from(orgCounts.values()).some((count) => count > 1);
 
       if (prov.organizationId) {
         const directOrgId = String(prov.organizationId);
@@ -669,7 +847,55 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             reason: `Provider references organization '${directOrgId}' which has status '${directOrg.status}' (expected ACTIVE). Suspended/archived organizations cannot receive automated backfill.`,
             ...(identifier ? { identifier } : {}),
           });
-        } else if (activeMemberships.some((m) => String(m.organizationId) !== directOrgId)) {
+        } else if (hasDuplicateMembershipInSameOrg) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:duplicate-membership-conflict:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Provider has multiple duplicate memberships in the same organization. Data integrity violation requires manual review.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length > 0) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:mixed-membership-states:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Provider has mixed membership states: ${activeMemberships.length} active and ${inactiveMemberships.length} inactive (SUSPENDED/REVOKED) membership(s). Inactive membership history cannot be bypassed automatically. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length === 0) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:unresolved-membership-evidence:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Provider has non-active membership evidence in organization '${inactiveMemberships[0]!.organizationId}' (status: ${inactiveMemberships[0]!.status}). Inactive membership cannot be bypassed. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (allMemberships.some((m) => String(m.organizationId) !== directOrgId)) {
           providerCounts.manualReview++;
           plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
           addEntry({
@@ -682,11 +908,11 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             status: 'MANUAL_REVIEW',
             requiresManualReview: true,
             mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
-            reason: `Provider has conflicting organization assignments between direct organizationId and active membership.`,
+            reason: `Provider has conflicting organization assignments between direct organizationId and membership records.`,
             ...(identifier ? { identifier } : {}),
           });
         } else {
-          // Valid existing provider assignment to active AMBULANCE_OPERATOR
+          // Valid existing provider assignment to active AMBULANCE_OPERATOR with no inactive memberships
           const hasValidMembership = activeMemberships.some(
             (m) => String(m.organizationId) === directOrgId && m.role === 'PROVIDER_ADMIN'
           );
@@ -757,7 +983,56 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
         }
       } else {
         // Provider without organizationId
-        if (activeMemberships.length > 1) {
+        if (hasDuplicateMembershipInSameOrg) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:duplicate-membership-conflict:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Provider has multiple duplicate memberships in the same organization. Data integrity violation requires manual review.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length > 0) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:mixed-membership-states:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Provider has mixed membership states: ${activeMemberships.length} active and ${inactiveMemberships.length} inactive (SUSPENDED/REVOKED) membership(s). Inactive membership history cannot be bypassed automatically. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (inactiveMemberships.length > 0 && activeMemberships.length === 0) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          const inactiveMem = inactiveMemberships[0]!;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:unresolved-membership-evidence:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Provider has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Never create a new organization while unresolved membership evidence exists.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeMemberships.length > 1) {
           providerCounts.manualReview++;
           plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
           addEntry({
@@ -846,24 +1121,6 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
               ...(identifier ? { identifier } : {}),
             });
           }
-        } else if (allMemberships.length > 0) {
-          // Inactive/suspended memberships exist -> unresolved membership evidence requires manual review
-          providerCounts.manualReview++;
-          plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
-          const inactiveMem = allMemberships[0]!;
-          addEntry({
-            migrationVersion,
-            idempotencyKey: `prov:unresolved-membership-evidence:${provId}`,
-            sourceEntity: 'AMBULANCE_PROVIDER',
-            sourceId: provId,
-            action: 'MANUAL_REVIEW',
-            confidence: 'AMBIGUOUS',
-            status: 'MANUAL_REVIEW',
-            requiresManualReview: true,
-            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-            reason: `Provider has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Never create a new organization while unresolved membership evidence exists.`,
-            ...(identifier ? { identifier } : {}),
-          });
         } else {
           // Pure standalone provider: deterministically create dedicated AMBULANCE_OPERATOR
           providerCounts.plannedCreates++;
@@ -1060,7 +1317,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
     const batchDriverIds = driverBatch.map((d) => d._id);
 
-    // Keyset batch-scoped membership query for drivers
+    // Keyset batch-scoped membership query for drivers (all statuses)
     const batchDriverMemberships = await OrganizationMembershipModel.find(
       { principalType: 'AMBULANCE_DRIVER', principalId: { $in: batchDriverIds } },
       { organizationId: 1, principalType: 1, principalId: 1, role: 1, status: 1 }
@@ -1103,6 +1360,15 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
       const allDriverMemberships = membershipsByDriver.get(drvId) || [];
       const activeDriverMemberships = allDriverMemberships.filter((m) => m.status === 'ACTIVE');
+      const inactiveDriverMemberships = allDriverMemberships.filter((m) => m.status !== 'ACTIVE');
+
+      // Check for duplicate membership conflict (multiple records for the same organization)
+      const driverOrgCounts = new Map<string, number>();
+      for (const m of allDriverMemberships) {
+        const orgKey = String(m.organizationId);
+        driverOrgCounts.set(orgKey, (driverOrgCounts.get(orgKey) || 0) + 1);
+      }
+      const hasDuplicateDriverMembership = Array.from(driverOrgCounts.values()).some((count) => count > 1);
 
       if (!d.providerId || !parentProvider) {
         driverCounts.manualReview++;
@@ -1165,9 +1431,55 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
           reason: `Parent provider '${d.providerId}' has ambiguous or invalid organization status.`,
           ...(identifier ? { identifier } : {}),
         });
+      } else if (hasDuplicateDriverMembership) {
+        driverCounts.manualReview++;
+        addEntry({
+          migrationVersion,
+          idempotencyKey: `drv:duplicate-membership-conflict:${drvId}`,
+          sourceEntity: 'AMBULANCE_DRIVER',
+          sourceId: drvId,
+          action: 'MANUAL_REVIEW',
+          confidence: 'AMBIGUOUS',
+          status: 'MANUAL_REVIEW',
+          requiresManualReview: true,
+          mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+          reason: `Driver has multiple duplicate memberships in the same organization. Data integrity violation requires manual review.`,
+          ...(identifier ? { identifier } : {}),
+        });
+      } else if (inactiveDriverMemberships.length > 0 && activeDriverMemberships.length > 0) {
+        // Mixed active and inactive membership states
+        driverCounts.manualReview++;
+        addEntry({
+          migrationVersion,
+          idempotencyKey: `drv:mixed-membership-states:${drvId}`,
+          sourceEntity: 'AMBULANCE_DRIVER',
+          sourceId: drvId,
+          action: 'MANUAL_REVIEW',
+          confidence: 'AMBIGUOUS',
+          status: 'MANUAL_REVIEW',
+          requiresManualReview: true,
+          mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+          reason: `Driver has mixed membership states: ${activeDriverMemberships.length} active and ${inactiveDriverMemberships.length} inactive (SUSPENDED/REVOKED) membership(s). Inactive membership history cannot be bypassed automatically. Manual review required.`,
+          ...(identifier ? { identifier } : {}),
+        });
+      } else if (inactiveDriverMemberships.length > 0 && activeDriverMemberships.length === 0) {
+        driverCounts.manualReview++;
+        const inactiveMem = inactiveDriverMemberships[0]!;
+        addEntry({
+          migrationVersion,
+          idempotencyKey: `drv:unresolved-membership-evidence:${drvId}`,
+          sourceEntity: 'AMBULANCE_DRIVER',
+          sourceId: drvId,
+          action: 'MANUAL_REVIEW',
+          confidence: 'AMBIGUOUS',
+          status: 'MANUAL_REVIEW',
+          requiresManualReview: true,
+          mappingRule: 'RULE_4_DRIVER_PROVIDER_INHERITANCE',
+          reason: `Driver has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Inactive membership cannot be bypassed. Manual review required.`,
+          ...(identifier ? { identifier } : {}),
+        });
       } else {
-        // Parent provider is deterministic!
-        // Inspect all active memberships across all organizations
+        // Parent provider is deterministic, and driver has no inactive or duplicate memberships
         const activeOrgIds = new Set(activeDriverMemberships.map((m) => String(m.organizationId)));
 
         if (activeOrgIds.size > 1) {
@@ -1332,11 +1644,12 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
       databaseLevelEnforcementRecommendation:
         'Run planner using a dedicated MongoDB user configured with the least-privilege "read" role: db.createUser({ user: "resq_readonly", pwd: "<password>", roles: [{ role: "read", db: "resq" }] })',
       memoryComplexity:
-        'Bounded O(batchSize) active working memory per entity/membership lookup batch. Keyset pagination using { _id: { $gt: lastId } } ensures O(1) index-backed page traversal without offset scanning. Output ledger is O(M) bounded by maxEntities with threshold guard.',
+        'Documented Complexity: Query working memory per batch is O(batchSize). Cumulative in-memory ledger is O(M) and provider mapping is O(P), where M <= maxLedgerEntries (default 100,000) and P <= maxEntities (default 100,000). Total memory is strictly bounded by explicit configuration limits and enforced via PlannerThresholdExceededError and PlannerLedgerLimitExceededError.',
     },
     configuration: {
       batchSize,
       maxEntities,
+      maxLedgerEntries,
       includeDetailedIdentifiers,
       migrationVersion,
     },
@@ -1406,19 +1719,81 @@ export const savePlanToFile = (plan: BackfillPlanReport, outputPath?: string): s
   }
 
   const resolvedPath = path.resolve(rawPath);
-  const dir = path.dirname(resolvedPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+
+  // Security check: Refuse to write to symbolic links
+  if (fs.existsSync(resolvedPath)) {
+    const stat = fs.lstatSync(resolvedPath);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Refusing to write to symlink target: '${resolvedPath}'`);
+    }
   }
 
-  // Restrictive file permissions (0o600: read/write by owner only)
-  fs.writeFileSync(resolvedPath, JSON.stringify(plan, null, 2), { encoding: 'utf-8', mode: 0o600 });
-  try {
-    fs.chmodSync(resolvedPath, 0o600);
-  } catch {
-    // Graceful handling on platforms or filesystems that do not support POSIX chmod
+  // Ensure no directory component in path is a symlink
+  let currentDir = path.dirname(resolvedPath);
+  while (currentDir && currentDir !== path.dirname(currentDir)) {
+    if (fs.existsSync(currentDir)) {
+      const dirStat = fs.lstatSync(currentDir);
+      if (dirStat.isSymbolicLink()) {
+        throw new Error(`Refusing to write through symlink directory: '${currentDir}'`);
+      }
+    }
+    currentDir = path.dirname(currentDir);
   }
-  return resolvedPath;
+
+  const dir = path.dirname(resolvedPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+
+  // Write through a secure temporary file with restrictive permissions (0o600)
+  const tempPath = path.join(dir, `.tmp-plan-${process.pid}-${crypto.randomBytes(8).toString('hex')}.json`);
+  let fd: number | null = null;
+
+  try {
+    // Open exclusively with O_CREAT | O_EXCL to prevent symlink and race conditions
+    fd = fs.openSync(tempPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, 0o600);
+    fs.writeFileSync(fd, JSON.stringify(plan, null, 2), { encoding: 'utf-8' });
+    fs.closeSync(fd);
+    fd = null;
+
+    // Fail-closed permission enforcement
+    fs.chmodSync(tempPath, 0o600);
+    const tempStat = fs.statSync(tempPath);
+    const tempMode = tempStat.mode & 0o777;
+    if (process.platform !== 'win32' && tempMode !== 0o600) {
+      throw new Error(`Failed to enforce restrictive 0o600 permissions on temporary plan file; got 0o${tempMode.toString(8)}. Failing closed.`);
+    }
+
+    // Atomically finalize report via rename
+    fs.renameSync(tempPath, resolvedPath);
+
+    // Fail-closed enforcement on target file
+    fs.chmodSync(resolvedPath, 0o600);
+    const finalStat = fs.statSync(resolvedPath);
+    const finalMode = finalStat.mode & 0o777;
+    if (process.platform !== 'win32' && finalMode !== 0o600) {
+      throw new Error(`Failed to enforce restrictive 0o600 permissions on finalized plan file; got 0o${finalMode.toString(8)}. Failing closed.`);
+    }
+
+    return resolvedPath;
+  } catch (err) {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // ignore
+      }
+    }
+    // Clean up partial temp file on failure
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // ignore
+      }
+    }
+    throw err;
+  }
 };
 
 const isMainModule = (): boolean => {
@@ -1432,11 +1807,17 @@ const isMainModule = (): boolean => {
 };
 
 export const execute = async (): Promise<void> => {
-  const isJson = process.argv.includes('--json');
-  const includeDetailedIdentifiers = process.argv.includes('--include-identifiers');
-  const batchSizeArg = process.argv.find((a) => a.startsWith('--batch-size='));
-  const batchSize = batchSizeArg ? parseInt(batchSizeArg.split('=')[1] || '500', 10) : 500;
+  let cliConfig: ParsedCliConfig;
+  try {
+    cliConfig = parseCliOptions(process.argv.slice(2));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`\n[CONFIGURATION ERROR] ${msg}\n`);
+    process.exitCode = 1;
+    return;
+  }
 
+  const { batchSize, maxEntities, maxLedgerEntries, outputPath, isJson, includeDetailedIdentifiers } = cliConfig;
   const sanitizedUri = sanitizeMongoUri(env.MONGODB_URI);
 
   if (!isJson) {
@@ -1459,8 +1840,13 @@ export const execute = async (): Promise<void> => {
   }
 
   try {
-    const plan = await planOrganizationBackfill({ batchSize, includeDetailedIdentifiers });
-    const savedPath = savePlanToFile(plan);
+    const plan = await planOrganizationBackfill({
+      batchSize,
+      maxEntities,
+      maxLedgerEntries,
+      includeDetailedIdentifiers,
+    });
+    const savedPath = savePlanToFile(plan, outputPath);
 
     if (isJson) {
       console.log(JSON.stringify(plan, null, 2));

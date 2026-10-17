@@ -17,7 +17,11 @@ import {
   planOrganizationBackfill,
   savePlanToFile,
   generateDeterministicId,
+  parseCliOptions,
+  validateIntegerArg,
   PlannerThresholdExceededError,
+  PlannerLedgerLimitExceededError,
+  PlannerConfigurationError,
   type BackfillPlanReport,
 } from '../scripts/planOrganizationBackfill.js';
 
@@ -83,6 +87,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
   let hospMemSuspendedId: Types.ObjectId;
   let hospMemInactiveEvidenceId: Types.ObjectId;
   let hospIndexConflictId: Types.ObjectId;
+  let hospMixedMembershipsId: Types.ObjectId;
 
   // Provider fixtures
   let configuredProviderId: Types.ObjectId;
@@ -94,6 +99,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
   let provMemSuspendedId: Types.ObjectId;
   let provMemInactiveEvidenceId: Types.ObjectId;
   let provIndexConflictId: Types.ObjectId;
+  let provMixedMembershipsId: Types.ObjectId;
 
   // Ambulance fixtures
   let ambulanceForConfiguredProvId: Types.ObjectId;
@@ -107,6 +113,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
   let multiOrgDriverId: Types.ObjectId;
   let conflictingOrgDriverId: Types.ObjectId;
   let driverIndexConflictId: Types.ObjectId;
+  let driverMixedMembershipsId: Types.ObjectId;
 
   // User & Emergency fixtures
   let citizenUserId: Types.ObjectId;
@@ -146,7 +153,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       registry.orgIds.push(hospOrg._id, provOrg._id, suspHospOrg._id, suspProvOrg._id);
 
       // 2. Create Hospitals
-      const [hosp1, hosp2, hosp3, hosp4, hosp5, hosp6, hosp7, hosp8, hosp9, hosp10, hosp11] = await Promise.all([
+      const [hosp1, hosp2, hosp3, hosp4, hosp5, hosp6, hosp7, hosp8, hosp9, hosp10, hosp11, hosp12] = await Promise.all([
         HospitalModel.create({
           name: 'TEST_Configured General Hospital',
           registrationNumber: 'TEST_PLAN_HOSP_001',
@@ -245,6 +252,15 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
           hospitalType: 'General',
           organizationId: validHospitalOrgId,
         }),
+        HospitalModel.create({
+          name: 'TEST_Mixed Memberships Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_012',
+          email: 'test_plan_hosp_012@example.com',
+          phone: '1112223356',
+          passwordHash: 'secret_hosp_plan_12',
+          hospitalType: 'General',
+          organizationId: validHospitalOrgId,
+        }),
       ]);
       configuredHospitalId = hosp1._id;
       standaloneHospitalId = hosp2._id;
@@ -257,6 +273,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       hospMemSuspendedId = hosp9._id;
       hospMemInactiveEvidenceId = hosp10._id;
       hospIndexConflictId = hosp11._id;
+      hospMixedMembershipsId = hosp12._id;
       registry.hospitalIds.push(
         hosp1._id,
         hosp2._id,
@@ -268,11 +285,12 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
         hosp8._id,
         hosp9._id,
         hosp10._id,
-        hosp11._id
+        hosp11._id,
+        hosp12._id
       );
 
       // 3. Create Providers
-      const [prov1, prov2, prov3, prov4, prov5, prov6, prov7, prov8, prov9] = await Promise.all([
+      const [prov1, prov2, prov3, prov4, prov5, prov6, prov7, prov8, prov9, prov10] = await Promise.all([
         AmbulanceProviderModel.create({
           name: 'TEST_Configured Ambulance Corp',
           registrationNumber: 'TEST_PLAN_PROV_001',
@@ -340,6 +358,14 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
           serviceType: 'Emergency',
           organizationId: validProviderOrgId,
         }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Mixed Memberships Provider',
+          registrationNumber: 'TEST_PLAN_PROV_010',
+          email: 'test_plan_prov_010@example.com',
+          phone: '1112223357',
+          serviceType: 'Emergency',
+          organizationId: validProviderOrgId,
+        }),
       ]);
       configuredProviderId = prov1._id;
       standaloneProviderId = prov2._id;
@@ -350,6 +376,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       provMemSuspendedId = prov7._id;
       provMemInactiveEvidenceId = prov8._id;
       provIndexConflictId = prov9._id;
+      provMixedMembershipsId = prov10._id;
       registry.providerIds.push(
         prov1._id,
         prov2._id,
@@ -359,7 +386,8 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
         prov6._id,
         prov7._id,
         prov8._id,
-        prov9._id
+        prov9._id,
+        prov10._id
       );
 
       // 4. Create Memberships
@@ -428,6 +456,21 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
           role: 'ORG_MEMBER',
           status: 'ACTIVE',
         }),
+        // hospMixedMembershipsId -> 1 active membership in validHospitalOrgId, 1 suspended in suspendedHospitalOrgId
+        OrganizationMembershipModel.create({
+          organizationId: validHospitalOrgId,
+          principalType: 'HOSPITAL',
+          principalId: hospMixedMembershipsId,
+          role: 'HOSPITAL_ADMIN',
+          status: 'ACTIVE',
+        }),
+        OrganizationMembershipModel.create({
+          organizationId: suspendedHospitalOrgId,
+          principalType: 'HOSPITAL',
+          principalId: hospMixedMembershipsId,
+          role: 'HOSPITAL_ADMIN',
+          status: 'SUSPENDED',
+        }),
         // provMemMissingOrgId -> active membership to nonexistent org
         OrganizationMembershipModel.create({
           organizationId: new Types.ObjectId(),
@@ -468,6 +511,21 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
           role: 'ORG_MEMBER',
           status: 'ACTIVE',
         }),
+        // provMixedMembershipsId -> 1 active in validProviderOrgId, 1 suspended in suspendedProviderOrgId
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provMixedMembershipsId,
+          role: 'PROVIDER_ADMIN',
+          status: 'ACTIVE',
+        }),
+        OrganizationMembershipModel.create({
+          organizationId: suspendedProviderOrgId,
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provMixedMembershipsId,
+          role: 'PROVIDER_ADMIN',
+          status: 'SUSPENDED',
+        }),
       ]);
       for (const m of createdMemberships) {
         registry.membershipIds.push(m._id);
@@ -503,7 +561,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       registry.ambulanceIds.push(amb1._id, amb2._id, amb3._id);
 
       // 6. Create Drivers
-      const [drv1, drv2, drv3, drv4, drv5, drv6] = await Promise.all([
+      const [drv1, drv2, drv3, drv4, drv5, drv6, drv7] = await Promise.all([
         AmbulanceDriverModel.create({
           fullName: 'TEST_Driver Alpha',
           email: 'test_plan_drv1@example.com',
@@ -554,6 +612,14 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
           licenseNumber: 'TEST_PLAN_DRV_006',
           providerId: configuredProviderId,
         }),
+        AmbulanceDriverModel.create({
+          fullName: 'TEST_Driver Mixed Memberships',
+          email: 'test_plan_drv7@example.com',
+          phone: '1112223358',
+          passwordHash: 'secret_drv_plan_7',
+          licenseNumber: 'TEST_PLAN_DRV_007',
+          providerId: configuredProviderId,
+        }),
       ]);
       driverForConfiguredProvId = drv1._id;
       mismatchedDriverId = drv2._id;
@@ -561,7 +627,8 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       multiOrgDriverId = drv4._id;
       conflictingOrgDriverId = drv5._id;
       driverIndexConflictId = drv6._id;
-      registry.driverIds.push(drv1._id, drv2._id, drv3._id, drv4._id, drv5._id, drv6._id);
+      driverMixedMembershipsId = drv7._id;
+      registry.driverIds.push(drv1._id, drv2._id, drv3._id, drv4._id, drv5._id, drv6._id, drv7._id);
 
       // Create Driver memberships
       const driverMemberships = await Promise.all([
@@ -595,6 +662,21 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
           principalId: driverIndexConflictId,
           role: 'DISPATCHER',
           status: 'ACTIVE',
+        }),
+        // Driver mixed memberships: 1 active in validProviderOrgId, 1 suspended in suspendedProviderOrgId
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'AMBULANCE_DRIVER',
+          principalId: driverMixedMembershipsId,
+          role: 'DRIVER',
+          status: 'ACTIVE',
+        }),
+        OrganizationMembershipModel.create({
+          organizationId: suspendedProviderOrgId,
+          principalType: 'AMBULANCE_DRIVER',
+          principalId: driverMixedMembershipsId,
+          role: 'DRIVER',
+          status: 'SUSPENDED',
         }),
       ]);
       for (const dm of driverMemberships) {
@@ -1126,6 +1208,175 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
         defaultBatchPlan.ledger[i],
         `Ledger entry ${i} must be identical between batchSize=1 and default batchSize`
       );
+    }
+  });
+
+  it('19. mixed active and inactive membership states: halts for manual review', async () => {
+    const plan = await planOrganizationBackfill();
+
+    // 1. Hospital with 1 active and 1 suspended membership
+    const mixedHospEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospMixedMembershipsId)
+    );
+    assert.ok(mixedHospEntry, 'Mixed-membership hospital must be recorded');
+    assert.equal(mixedHospEntry.action, 'MANUAL_REVIEW');
+    assert.equal(mixedHospEntry.confidence, 'AMBIGUOUS');
+    assert.ok(mixedHospEntry.reason.includes('mixed membership states'));
+
+    // 2. Provider with 1 active and 1 suspended membership
+    const mixedProvEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provMixedMembershipsId)
+    );
+    assert.ok(mixedProvEntry, 'Mixed-membership provider must be recorded');
+    assert.equal(mixedProvEntry.action, 'MANUAL_REVIEW');
+    assert.equal(mixedProvEntry.confidence, 'AMBIGUOUS');
+    assert.ok(mixedProvEntry.reason.includes('mixed membership states'));
+
+    // 3. Driver with 1 active and 1 suspended membership
+    const mixedDriverEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_DRIVER' && e.sourceId === String(driverMixedMembershipsId)
+    );
+    assert.ok(mixedDriverEntry, 'Mixed-membership driver must be recorded');
+    assert.equal(mixedDriverEntry.action, 'MANUAL_REVIEW');
+    assert.equal(mixedDriverEntry.confidence, 'AMBIGUOUS');
+    assert.ok(mixedDriverEntry.reason.includes('mixed membership states'));
+  });
+
+  it('20. CLI configuration validation: strictly rejects non-integer, negative, zero, and out-of-range parameters', () => {
+    // Direct validator assertions
+    assert.equal(validateIntegerArg('--batch-size', '50', 1, 100), 50);
+
+    // Valid options parsing
+    const valid = parseCliOptions([
+      '--batch-size=250',
+      '--max-entities=5000',
+      '--max-ledger-entries=8000',
+      '--output=/tmp/valid-plan.json',
+      '--json',
+      '--include-identifiers',
+    ]);
+    assert.equal(valid.batchSize, 250);
+    assert.equal(valid.maxEntities, 5000);
+    assert.equal(valid.maxLedgerEntries, 8000);
+    assert.equal(valid.outputPath, '/tmp/valid-plan.json');
+    assert.equal(valid.isJson, true);
+    assert.equal(valid.includeDetailedIdentifiers, true);
+
+    // Reject non-integer batch size
+    assert.throws(
+      () => parseCliOptions(['--batch-size=abc']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --batch-size'));
+        return true;
+      }
+    );
+
+    // Reject zero batch size
+    assert.throws(
+      () => parseCliOptions(['--batch-size=0']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --batch-size'));
+        return true;
+      }
+    );
+
+    // Reject negative batch size
+    assert.throws(
+      () => parseCliOptions(['--batch-size=-100']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --batch-size'));
+        return true;
+      }
+    );
+
+    // Reject batch size exceeding max limit (10000)
+    assert.throws(
+      () => parseCliOptions(['--batch-size=50000']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --batch-size'));
+        return true;
+      }
+    );
+
+    // Reject invalid max-entities
+    assert.throws(
+      () => parseCliOptions(['--max-entities=invalid']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --max-entities'));
+        return true;
+      }
+    );
+
+    // Reject invalid max-ledger-entries
+    assert.throws(
+      () => parseCliOptions(['--max-ledger-entries=0']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --max-ledger-entries'));
+        return true;
+      }
+    );
+
+    // Reject empty output path
+    assert.throws(
+      () => parseCliOptions(['--output=']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --output'));
+        return true;
+      }
+    );
+  });
+
+  it('21. ledger limit enforcement: maxLedgerEntries limit throws PlannerLedgerLimitExceededError', async () => {
+    await assert.rejects(
+      async () => {
+        await planOrganizationBackfill({ maxLedgerEntries: 1 });
+      },
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerLedgerLimitExceededError);
+        assert.equal(err.limit, 1);
+        return true;
+      }
+    );
+  });
+
+  it('22. fail-closed file security: rejects symlink targets and invalid paths, cleans up temporary files', async () => {
+    const plan = await planOrganizationBackfill();
+
+    // 1. Rejects path containing null byte
+    assert.throws(
+      () => savePlanToFile(plan, '/tmp/test\0plan.json'),
+      /contains null byte/
+    );
+
+    // 2. Rejects writing to an existing symlink
+    const tempDir = path.resolve(process.cwd(), 'reports', 'test-symlink-dir');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
+    }
+
+    const realTarget = path.join(tempDir, 'real-target.json');
+    const symlinkTarget = path.join(tempDir, 'symlink-target.json');
+
+    try {
+      fs.writeFileSync(realTarget, '{}', { mode: 0o600 });
+      if (fs.existsSync(symlinkTarget)) fs.unlinkSync(symlinkTarget);
+      fs.symlinkSync(realTarget, symlinkTarget);
+
+      assert.throws(
+        () => savePlanToFile(plan, symlinkTarget),
+        /Refusing to write to symlink target/
+      );
+    } finally {
+      if (fs.existsSync(symlinkTarget)) fs.unlinkSync(symlinkTarget);
+      if (fs.existsSync(realTarget)) fs.unlinkSync(realTarget);
+      if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
     }
   });
 });
