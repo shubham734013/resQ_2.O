@@ -34,9 +34,17 @@ export const rateLimit = ({ windowMs, max, keyPrefix }: { windowMs: number; max:
     const key = `${keyPrefix}:${sourceIp}`;
     const now = Date.now();
 
-    // Prevent unbounded memory growth
+    // Prevent unbounded memory growth with strict capacity bound
     if (buckets.size >= MAX_BUCKETS) {
       pruneExpiredBuckets(now);
+      while (buckets.size >= MAX_BUCKETS) {
+        const oldestKey = buckets.keys().next().value;
+        if (oldestKey) {
+          buckets.delete(oldestKey);
+        } else {
+          break;
+        }
+      }
     }
 
     const existing = buckets.get(key);

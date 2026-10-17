@@ -1,9 +1,45 @@
 import type { Request, Response } from 'express';
 import type { AuthenticatedRequest, SocialProvider } from '../types/auth.js';
-import { adminLogin, getCurrentUser, login, logout, refreshAuthentication, registerAmbulanceDriver, registerAmbulanceProvider, registerHospital, registerUser, socialLogin, linkSocialAccount, updateDriverProfile, updateProviderProfile, getActiveProvidersForRegistration, initiatePasswordReset, completePasswordReset } from '../services/authService.js';
+import {
+  adminLogin,
+  getCurrentUser,
+  login,
+  logout,
+  refreshAuthentication,
+  registerAmbulanceDriver,
+  registerAmbulanceProvider,
+  registerHospital,
+  registerUser,
+  socialLogin,
+  linkSocialAccount,
+  updateDriverProfile,
+  updateProviderProfile,
+  getActiveProvidersForRegistration,
+  initiatePasswordReset,
+  completePasswordReset,
+  verifyAdminMfaLogin,
+  setupAdminMfa,
+  confirmAdminMfaSetup,
+  disableAdminMfa,
+  getAdminMfaStatus,
+} from '../services/authService.js';
 import { clearAuthCookies, getCookie, REFRESH_TOKEN_COOKIE, setAuthCookies } from '../utils/cookies.js';
 import { sendSuccess } from '../utils/apiResponse.js';
-import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, SocialAuthInput, DriverProfileInput, ProviderProfileInput, ForgotPasswordInput, ResetPasswordInput } from '../schemas/auth.js';
+import type {
+  AmbulanceDriverRegistrationInput,
+  AmbulanceProviderRegistrationInput,
+  HospitalRegistrationInput,
+  LoginInput,
+  UserRegistrationInput,
+  SocialAuthInput,
+  DriverProfileInput,
+  ProviderProfileInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  AdminMfaVerifyLoginInput,
+  AdminMfaConfirmSetupInput,
+  AdminMfaDisableInput,
+} from '../schemas/auth.js';
 
 export const registerUserController = async (req: Request, res: Response) => {
   const result = await registerUser(req.body as UserRegistrationInput);
@@ -16,7 +52,43 @@ export const registerAmbulanceDriverController=async(req:Request,res:Response)=>
 export const listActiveProvidersController=async(_req:Request,res:Response)=>{sendSuccess(res,await getActiveProvidersForRegistration());};
 const sendLoginResponse=(res:Response,result:Awaited<ReturnType<typeof login>>)=>{setAuthCookies(res,result.accessToken,result.refreshToken);sendSuccess(res,{user:result.user});};
 export const loginController=async(req:Request,res:Response)=>sendLoginResponse(res,await login(req.body as LoginInput));
-export const adminLoginController=async(req:Request,res:Response)=>sendLoginResponse(res,await adminLogin(req.body as LoginInput));
+export const adminLoginController = async (req: Request, res: Response) => {
+  const result = await adminLogin(req.body as LoginInput);
+  if (result.mfaRequired) {
+    sendSuccess(res, {
+      mfaRequired: true,
+      mfaToken: result.mfaToken,
+      user: result.user,
+    });
+    return;
+  }
+  sendLoginResponse(res, result);
+};
+
+export const adminMfaVerifyLoginController = async (req: Request, res: Response) => {
+  const result = await verifyAdminMfaLogin(req.body as AdminMfaVerifyLoginInput);
+  sendLoginResponse(res, result);
+};
+
+export const adminMfaSetupController = async (req: AuthenticatedRequest, res: Response) => {
+  const result = await setupAdminMfa(req.auth!);
+  sendSuccess(res, result);
+};
+
+export const adminMfaConfirmSetupController = async (req: AuthenticatedRequest, res: Response) => {
+  const result = await confirmAdminMfaSetup(req.auth!, (req.body as AdminMfaConfirmSetupInput).code);
+  sendSuccess(res, result);
+};
+
+export const adminMfaDisableController = async (req: AuthenticatedRequest, res: Response) => {
+  const result = await disableAdminMfa(req.auth!, req.body as AdminMfaDisableInput);
+  sendSuccess(res, result);
+};
+
+export const adminMfaStatusController = async (req: AuthenticatedRequest, res: Response) => {
+  const result = await getAdminMfaStatus(req.auth!);
+  sendSuccess(res, result);
+};
 export const socialLoginController=async(req:Request,res:Response)=>{
   const provider= req.params.provider as SocialProvider;
   const input=req.body as SocialAuthInput;

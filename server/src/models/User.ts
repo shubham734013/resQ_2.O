@@ -10,6 +10,12 @@ export interface UserDocument {
   emailVerified: boolean; phoneVerified: boolean;
   passwordResetTokenHash?: string;
   passwordResetExpiresAt?: Date;
+  mfaEnabled?: boolean;
+  mfaSecret?: string;
+  mfaPendingSecret?: string;
+  mfaRecoveryCodeHashes?: string[];
+  mfaPendingRecoveryCodeHashes?: string[];
+  mfaLastUsedWindow?: number;
   createdAt: Date; updatedAt: Date;
 }
 const userSchema = new Schema<UserDocument>({
@@ -24,9 +30,15 @@ const userSchema = new Schema<UserDocument>({
   savedFacilityIds: { type: [{ type: Schema.Types.ObjectId, ref: 'Hospital' }], default: [] },
   accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
   emailVerified: { type: Boolean, default: false },
-phoneVerified: { type: Boolean, default: false },
-passwordResetTokenHash: { type: String, select: false },
-passwordResetExpiresAt: { type: Date, select: false },
+  phoneVerified: { type: Boolean, default: false },
+  passwordResetTokenHash: { type: String, select: false },
+  passwordResetExpiresAt: { type: Date, select: false },
+  mfaEnabled: { type: Boolean, default: false },
+  mfaSecret: { type: String, select: false },
+  mfaPendingSecret: { type: String, select: false },
+  mfaRecoveryCodeHashes: { type: [String], select: false, default: undefined },
+  mfaPendingRecoveryCodeHashes: { type: [String], select: false, default: undefined },
+  mfaLastUsedWindow: { type: Number, select: false },
 }, { timestamps: true });
 userSchema.index({ authProvider: 1, providerSubject: 1 }, { unique: true, partialFilterExpression: { providerSubject: { $type: 'string' } } });
 userSchema.index({ latitude: 1, longitude: 1 });
