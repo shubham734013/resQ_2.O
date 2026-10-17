@@ -187,7 +187,44 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
         </span>
       </header>
 
-      {(!snapshot.trip || snapshot.trip.status === 'ASSIGNED') && (
+      {snapshot.dispatch?.status === 'EXHAUSTED' && !snapshot.trip && (
+        <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-950 space-y-3">
+          <div className="flex items-start gap-2.5">
+            <Radio className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+            <div>
+              <p className="font-bold text-sm text-rose-900">No Ambulances Immediately Available</p>
+              <p className="mt-1 leading-relaxed text-rose-800">
+                All regional ambulance units in your vicinity are currently committed to other emergency calls.
+                Do not wait—contact state emergency dispatch immediately or arrange urgent private transport to the nearest facility:
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <a
+              href="tel:108"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-800 transition"
+            >
+              📞 Dial 108 (Ambulance)
+            </a>
+            <a
+              href="tel:112"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition"
+            >
+              📞 Dial 112 (National Emergency)
+            </a>
+            {snapshot.hospital?.phone && (
+              <a
+                href={`tel:${snapshot.hospital.phone}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-teal-800 transition"
+              >
+                📞 Call {snapshot.hospital.name}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(!snapshot.trip || snapshot.trip.status === 'ASSIGNED') && snapshot.dispatch?.status !== 'EXHAUSTED' && (
         <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-3.5 text-xs text-sky-950 flex items-start gap-2.5">
           <Radio className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 animate-pulse" />
           <p className="leading-relaxed">

@@ -32,6 +32,17 @@ const schema = new Schema<AuditLogDocument>({
   createdAt: { type: Date, default: Date.now, index: true },
 }, { versionKey: false });
 
+// Enforce immutability: Audit logs are strictly append-only.
+schema.pre('save', function () {
+  if (!this.isNew) {
+    throw new Error('IMMUTABLE_AUDIT_LOG: Existing audit log records cannot be modified.');
+  }
+});
+
+schema.pre(['updateOne', 'updateMany', 'findOneAndUpdate', 'deleteOne', 'deleteMany', 'findOneAndDelete', 'findOneAndReplace'], function () {
+  throw new Error('IMMUTABLE_AUDIT_LOG: Audit logs are append-only and cannot be modified or deleted.');
+});
+
 schema.index({ entityType: 1, entityId: 1, createdAt: -1 });
 schema.index({ actorId: 1, createdAt: -1 });
 

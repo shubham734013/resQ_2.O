@@ -15,6 +15,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   RESQ_ADMIN_EMAIL: z.string().email(),
   RESQ_ADMIN_PASSWORD: z.string().min(12),
+  TRUST_PROXY: z.string().optional(),
   CORS_ORIGIN: z.string().optional(),
   CORS_ORIGINS: z.string().optional(),
   DRIVER_LOCATION_UPDATE_INTERVAL_MS: z.coerce.number().int().min(3000).max(5000).default(4000),

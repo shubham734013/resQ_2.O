@@ -87,9 +87,9 @@
   - Password reuse verification and token replay protection are verified by automated tests in `passwordReset.test.ts`.
 
 ### 3.2 Vulnerability & Secrets Audit (CRITICAL ACTION REQUIRED)
-- ⚠️ **Exposed Credentials in Repository:**
-  - `server/.env` contains active MongoDB Atlas credentials (`mongodb+srv://shubhamvaishnav640_db_user:...@cluster0.drh5kyt.mongodb.net/`).
-  - `server/.env` contains Google Cloud Maps API keys (`AIzaSyA--4CZaj1Ql6eSSHSzYct1HU_q2xyOCLI`).
+- ⚠️ **Exposed Credentials in Local Environment Files:**
+  - `server/.env` previously contained active MongoDB Atlas connection strings (`mongodb+srv://[REDACTED_USER]:[REDACTED_PASSWORD]@cluster0...`).
+  - `server/.env` contained Google Cloud Maps API keys (`[REDACTED_MAPS_KEY]`).
   - **Resolution Plan:** These keys MUST be revoked and rotated immediately in Google Cloud Console and MongoDB Atlas. In production, no `.env` files must be committed to source control; environment configuration must be injected via AWS Secrets Manager, Doppler, or HashiCorp Vault.
 
 ### 3.3 Authorization & Cross-Tenant IDOR Guards

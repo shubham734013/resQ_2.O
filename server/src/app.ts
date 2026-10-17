@@ -21,6 +21,10 @@ import { getAllowedOrigins, mutationOriginGuard, originGuard, securityHeaders } 
 
 export const app=express();
 
+if (process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1') {
+  app.set('trust proxy', 1);
+}
+
 app.disable('x-powered-by');
 app.use(securityHeaders);
 // Handle CORS preflight before origin/CSRF guards.
