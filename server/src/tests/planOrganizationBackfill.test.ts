@@ -63,30 +63,52 @@ class FixtureRegistry {
   }
 }
 
-describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => {
+describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENING)', () => {
   const registry = new FixtureRegistry();
 
   let validHospitalOrgId: Types.ObjectId;
   let validProviderOrgId: Types.ObjectId;
+  let suspendedHospitalOrgId: Types.ObjectId;
+  let suspendedProviderOrgId: Types.ObjectId;
 
+  // Hospital fixtures
   let configuredHospitalId: Types.ObjectId;
   let standaloneHospitalId: Types.ObjectId;
   let wrongTypeHospitalId: Types.ObjectId;
   let missingOrgHospitalId: Types.ObjectId;
   let conflictingHospitalId: Types.ObjectId;
+  let hospSuspendedDirectId: Types.ObjectId;
+  let hospMemMissingOrgId: Types.ObjectId;
+  let hospMemWrongTypeId: Types.ObjectId;
+  let hospMemSuspendedId: Types.ObjectId;
+  let hospMemInactiveEvidenceId: Types.ObjectId;
+  let hospIndexConflictId: Types.ObjectId;
 
+  // Provider fixtures
   let configuredProviderId: Types.ObjectId;
   let standaloneProviderId: Types.ObjectId;
   let wrongTypeProviderId: Types.ObjectId;
+  let provSuspendedDirectId: Types.ObjectId;
+  let provMemMissingOrgId: Types.ObjectId;
+  let provMemWrongTypeId: Types.ObjectId;
+  let provMemSuspendedId: Types.ObjectId;
+  let provMemInactiveEvidenceId: Types.ObjectId;
+  let provIndexConflictId: Types.ObjectId;
 
+  // Ambulance fixtures
   let ambulanceForConfiguredProvId: Types.ObjectId;
   let ambulanceForStandaloneProvId: Types.ObjectId;
   let orphanedAmbulanceId: Types.ObjectId;
 
+  // Driver fixtures
   let driverForConfiguredProvId: Types.ObjectId;
   let mismatchedDriverId: Types.ObjectId;
   let orphanedDriverId: Types.ObjectId;
+  let multiOrgDriverId: Types.ObjectId;
+  let conflictingOrgDriverId: Types.ObjectId;
+  let driverIndexConflictId: Types.ObjectId;
 
+  // User & Emergency fixtures
   let citizenUserId: Types.ObjectId;
   let citizenEmergencyId: Types.ObjectId;
 
@@ -95,7 +117,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
 
     try {
       // 1. Create Organizations
-      const [hospOrg, provOrg] = await Promise.all([
+      const [hospOrg, provOrg, suspHospOrg, suspProvOrg] = await Promise.all([
         OrganizationModel.create({
           name: 'TEST_Metro Hospital System',
           type: 'HOSPITAL_NETWORK',
@@ -106,13 +128,25 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           type: 'AMBULANCE_OPERATOR',
           status: 'ACTIVE',
         }),
+        OrganizationModel.create({
+          name: 'TEST_Suspended Hospital System',
+          type: 'HOSPITAL_NETWORK',
+          status: 'SUSPENDED',
+        }),
+        OrganizationModel.create({
+          name: 'TEST_Suspended Ambulance Fleet',
+          type: 'AMBULANCE_OPERATOR',
+          status: 'SUSPENDED',
+        }),
       ]);
       validHospitalOrgId = hospOrg._id;
       validProviderOrgId = provOrg._id;
-      registry.orgIds.push(hospOrg._id, provOrg._id);
+      suspendedHospitalOrgId = suspHospOrg._id;
+      suspendedProviderOrgId = suspProvOrg._id;
+      registry.orgIds.push(hospOrg._id, provOrg._id, suspHospOrg._id, suspProvOrg._id);
 
       // 2. Create Hospitals
-      const [hosp1, hosp2, hosp3, hosp4, hosp5] = await Promise.all([
+      const [hosp1, hosp2, hosp3, hosp4, hosp5, hosp6, hosp7, hosp8, hosp9, hosp10, hosp11] = await Promise.all([
         HospitalModel.create({
           name: 'TEST_Configured General Hospital',
           registrationNumber: 'TEST_PLAN_HOSP_001',
@@ -129,7 +163,6 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           phone: '1112223331',
           passwordHash: 'secret_hosp_plan_2',
           hospitalType: 'Clinic',
-          // No organizationId
         }),
         HospitalModel.create({
           name: 'TEST_Wrong Org Type Hospital',
@@ -158,16 +191,88 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           hospitalType: 'General',
           organizationId: validHospitalOrgId,
         }),
+        HospitalModel.create({
+          name: 'TEST_Direct Suspended Org Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_006',
+          email: 'test_plan_hosp_006@example.com',
+          phone: '1112223341',
+          passwordHash: 'secret_hosp_plan_6',
+          hospitalType: 'General',
+          organizationId: suspendedHospitalOrgId, // Points to suspended org
+        }),
+        HospitalModel.create({
+          name: 'TEST_Mem Missing Org Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_007',
+          email: 'test_plan_hosp_007@example.com',
+          phone: '1112223342',
+          passwordHash: 'secret_hosp_plan_7',
+          hospitalType: 'Clinic',
+          // No direct org
+        }),
+        HospitalModel.create({
+          name: 'TEST_Mem Wrong Type Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_008',
+          email: 'test_plan_hosp_008@example.com',
+          phone: '1112223343',
+          passwordHash: 'secret_hosp_plan_8',
+          hospitalType: 'Clinic',
+          // No direct org
+        }),
+        HospitalModel.create({
+          name: 'TEST_Mem Suspended Org Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_009',
+          email: 'test_plan_hosp_009@example.com',
+          phone: '1112223344',
+          passwordHash: 'secret_hosp_plan_9',
+          hospitalType: 'Clinic',
+          // No direct org
+        }),
+        HospitalModel.create({
+          name: 'TEST_Inactive Evidence Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_010',
+          email: 'test_plan_hosp_010@example.com',
+          phone: '1112223345',
+          passwordHash: 'secret_hosp_plan_10',
+          hospitalType: 'Clinic',
+          // No direct org
+        }),
+        HospitalModel.create({
+          name: 'TEST_Index Conflict Hospital',
+          registrationNumber: 'TEST_PLAN_HOSP_011',
+          email: 'test_plan_hosp_011@example.com',
+          phone: '1112223346',
+          passwordHash: 'secret_hosp_plan_11',
+          hospitalType: 'General',
+          organizationId: validHospitalOrgId,
+        }),
       ]);
       configuredHospitalId = hosp1._id;
       standaloneHospitalId = hosp2._id;
       wrongTypeHospitalId = hosp3._id;
       missingOrgHospitalId = hosp4._id;
       conflictingHospitalId = hosp5._id;
-      registry.hospitalIds.push(hosp1._id, hosp2._id, hosp3._id, hosp4._id, hosp5._id);
+      hospSuspendedDirectId = hosp6._id;
+      hospMemMissingOrgId = hosp7._id;
+      hospMemWrongTypeId = hosp8._id;
+      hospMemSuspendedId = hosp9._id;
+      hospMemInactiveEvidenceId = hosp10._id;
+      hospIndexConflictId = hosp11._id;
+      registry.hospitalIds.push(
+        hosp1._id,
+        hosp2._id,
+        hosp3._id,
+        hosp4._id,
+        hosp5._id,
+        hosp6._id,
+        hosp7._id,
+        hosp8._id,
+        hosp9._id,
+        hosp10._id,
+        hosp11._id
+      );
 
       // 3. Create Providers
-      const [prov1, prov2, prov3] = await Promise.all([
+      const [prov1, prov2, prov3, prov4, prov5, prov6, prov7, prov8, prov9] = await Promise.all([
         AmbulanceProviderModel.create({
           name: 'TEST_Configured Ambulance Corp',
           registrationNumber: 'TEST_PLAN_PROV_001',
@@ -182,7 +287,6 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           email: 'test_plan_prov_002@example.com',
           phone: '1112223336',
           serviceType: 'Emergency',
-          // No organizationId
         }),
         AmbulanceProviderModel.create({
           name: 'TEST_Wrong Org Type Provider',
@@ -192,14 +296,75 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           serviceType: 'Emergency',
           organizationId: validHospitalOrgId, // Wrong org type
         }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Direct Suspended Provider',
+          registrationNumber: 'TEST_PLAN_PROV_004',
+          email: 'test_plan_prov_004@example.com',
+          phone: '1112223347',
+          serviceType: 'Emergency',
+          organizationId: suspendedProviderOrgId, // Suspended direct org
+        }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Mem Missing Org Provider',
+          registrationNumber: 'TEST_PLAN_PROV_005',
+          email: 'test_plan_prov_005@example.com',
+          phone: '1112223348',
+          serviceType: 'Emergency',
+        }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Mem Wrong Type Provider',
+          registrationNumber: 'TEST_PLAN_PROV_006',
+          email: 'test_plan_prov_006@example.com',
+          phone: '1112223349',
+          serviceType: 'Emergency',
+        }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Mem Suspended Org Provider',
+          registrationNumber: 'TEST_PLAN_PROV_007',
+          email: 'test_plan_prov_007@example.com',
+          phone: '1112223350',
+          serviceType: 'Emergency',
+        }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Inactive Evidence Provider',
+          registrationNumber: 'TEST_PLAN_PROV_008',
+          email: 'test_plan_prov_008@example.com',
+          phone: '1112223351',
+          serviceType: 'Emergency',
+        }),
+        AmbulanceProviderModel.create({
+          name: 'TEST_Index Conflict Provider',
+          registrationNumber: 'TEST_PLAN_PROV_009',
+          email: 'test_plan_prov_009@example.com',
+          phone: '1112223352',
+          serviceType: 'Emergency',
+          organizationId: validProviderOrgId,
+        }),
       ]);
       configuredProviderId = prov1._id;
       standaloneProviderId = prov2._id;
       wrongTypeProviderId = prov3._id;
-      registry.providerIds.push(prov1._id, prov2._id, prov3._id);
+      provSuspendedDirectId = prov4._id;
+      provMemMissingOrgId = prov5._id;
+      provMemWrongTypeId = prov6._id;
+      provMemSuspendedId = prov7._id;
+      provMemInactiveEvidenceId = prov8._id;
+      provIndexConflictId = prov9._id;
+      registry.providerIds.push(
+        prov1._id,
+        prov2._id,
+        prov3._id,
+        prov4._id,
+        prov5._id,
+        prov6._id,
+        prov7._id,
+        prov8._id,
+        prov9._id
+      );
 
       // 4. Create Memberships
-      const [mem1, mem2, mem3] = await Promise.all([
+      const createdMemberships = await Promise.all([
+        // Configured hospital membership
         OrganizationMembershipModel.create({
           organizationId: validHospitalOrgId,
           principalType: 'HOSPITAL',
@@ -207,6 +372,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           role: 'HOSPITAL_ADMIN',
           status: 'ACTIVE',
         }),
+        // Configured provider membership
         OrganizationMembershipModel.create({
           organizationId: validProviderOrgId,
           principalType: 'AMBULANCE_PROVIDER',
@@ -216,14 +382,96 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
         }),
         // Conflicting membership for conflictingHospitalId
         OrganizationMembershipModel.create({
-          organizationId: validProviderOrgId, // Different org
+          organizationId: validProviderOrgId,
           principalType: 'HOSPITAL',
           principalId: conflictingHospitalId,
           role: 'ORG_MEMBER',
           status: 'ACTIVE',
         }),
+        // hospMemMissingOrgId -> active membership to nonexistent org
+        OrganizationMembershipModel.create({
+          organizationId: new Types.ObjectId(),
+          principalType: 'HOSPITAL',
+          principalId: hospMemMissingOrgId,
+          role: 'HOSPITAL_ADMIN',
+          status: 'ACTIVE',
+        }),
+        // hospMemWrongTypeId -> active membership to wrong org type (AMBULANCE_OPERATOR)
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'HOSPITAL',
+          principalId: hospMemWrongTypeId,
+          role: 'ORG_MEMBER',
+          status: 'ACTIVE',
+        }),
+        // hospMemSuspendedId -> active membership to suspended org
+        OrganizationMembershipModel.create({
+          organizationId: suspendedHospitalOrgId,
+          principalType: 'HOSPITAL',
+          principalId: hospMemSuspendedId,
+          role: 'HOSPITAL_ADMIN',
+          status: 'ACTIVE',
+        }),
+        // hospMemInactiveEvidenceId -> suspended membership in valid org
+        OrganizationMembershipModel.create({
+          organizationId: validHospitalOrgId,
+          principalType: 'HOSPITAL',
+          principalId: hospMemInactiveEvidenceId,
+          role: 'HOSPITAL_ADMIN',
+          status: 'SUSPENDED',
+        }),
+        // hospIndexConflictId -> existing ORG_MEMBER membership in target org (prevents duplicate CREATE_MEMBERSHIP)
+        OrganizationMembershipModel.create({
+          organizationId: validHospitalOrgId,
+          principalType: 'HOSPITAL',
+          principalId: hospIndexConflictId,
+          role: 'ORG_MEMBER',
+          status: 'ACTIVE',
+        }),
+        // provMemMissingOrgId -> active membership to nonexistent org
+        OrganizationMembershipModel.create({
+          organizationId: new Types.ObjectId(),
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provMemMissingOrgId,
+          role: 'PROVIDER_ADMIN',
+          status: 'ACTIVE',
+        }),
+        // provMemWrongTypeId -> active membership to wrong org type (HOSPITAL_NETWORK)
+        OrganizationMembershipModel.create({
+          organizationId: validHospitalOrgId,
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provMemWrongTypeId,
+          role: 'ORG_MEMBER',
+          status: 'ACTIVE',
+        }),
+        // provMemSuspendedId -> active membership to suspended org
+        OrganizationMembershipModel.create({
+          organizationId: suspendedProviderOrgId,
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provMemSuspendedId,
+          role: 'PROVIDER_ADMIN',
+          status: 'ACTIVE',
+        }),
+        // provMemInactiveEvidenceId -> suspended membership
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provMemInactiveEvidenceId,
+          role: 'PROVIDER_ADMIN',
+          status: 'SUSPENDED',
+        }),
+        // provIndexConflictId -> existing ORG_MEMBER membership in target org
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'AMBULANCE_PROVIDER',
+          principalId: provIndexConflictId,
+          role: 'ORG_MEMBER',
+          status: 'ACTIVE',
+        }),
       ]);
-      registry.membershipIds.push(mem1._id, mem2._id, mem3._id);
+      for (const m of createdMemberships) {
+        registry.membershipIds.push(m._id);
+      }
 
       // 5. Create Ambulances
       const [amb1, amb2, amb3] = await Promise.all([
@@ -255,7 +503,7 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
       registry.ambulanceIds.push(amb1._id, amb2._id, amb3._id);
 
       // 6. Create Drivers
-      const [drv1, drv2, drv3] = await Promise.all([
+      const [drv1, drv2, drv3, drv4, drv5, drv6] = await Promise.all([
         AmbulanceDriverModel.create({
           fullName: 'TEST_Driver Alpha',
           email: 'test_plan_drv1@example.com',
@@ -282,11 +530,76 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
           licenseNumber: 'TEST_PLAN_DRV_003',
           providerId: new Types.ObjectId(), // Non-existent provider
         }),
+        AmbulanceDriverModel.create({
+          fullName: 'TEST_Driver Multi Org',
+          email: 'test_plan_drv4@example.com',
+          phone: '1112223353',
+          passwordHash: 'secret_drv_plan_4',
+          licenseNumber: 'TEST_PLAN_DRV_004',
+          providerId: configuredProviderId,
+        }),
+        AmbulanceDriverModel.create({
+          fullName: 'TEST_Driver Conflicting Org',
+          email: 'test_plan_drv5@example.com',
+          phone: '1112223354',
+          passwordHash: 'secret_drv_plan_5',
+          licenseNumber: 'TEST_PLAN_DRV_005',
+          providerId: configuredProviderId,
+        }),
+        AmbulanceDriverModel.create({
+          fullName: 'TEST_Driver Index Conflict',
+          email: 'test_plan_drv6@example.com',
+          phone: '1112223355',
+          passwordHash: 'secret_drv_plan_6',
+          licenseNumber: 'TEST_PLAN_DRV_006',
+          providerId: configuredProviderId,
+        }),
       ]);
       driverForConfiguredProvId = drv1._id;
       mismatchedDriverId = drv2._id;
       orphanedDriverId = drv3._id;
-      registry.driverIds.push(drv1._id, drv2._id, drv3._id);
+      multiOrgDriverId = drv4._id;
+      conflictingOrgDriverId = drv5._id;
+      driverIndexConflictId = drv6._id;
+      registry.driverIds.push(drv1._id, drv2._id, drv3._id, drv4._id, drv5._id, drv6._id);
+
+      // Create Driver memberships
+      const driverMemberships = await Promise.all([
+        // Multi-org driver: membership in validProviderOrgId AND validHospitalOrgId
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'AMBULANCE_DRIVER',
+          principalId: multiOrgDriverId,
+          role: 'DRIVER',
+          status: 'ACTIVE',
+        }),
+        OrganizationMembershipModel.create({
+          organizationId: validHospitalOrgId,
+          principalType: 'AMBULANCE_DRIVER',
+          principalId: multiOrgDriverId,
+          role: 'ORG_MEMBER',
+          status: 'ACTIVE',
+        }),
+        // Conflicting org driver: membership ONLY in validHospitalOrgId (different from parent provider)
+        OrganizationMembershipModel.create({
+          organizationId: validHospitalOrgId,
+          principalType: 'AMBULANCE_DRIVER',
+          principalId: conflictingOrgDriverId,
+          role: 'DRIVER',
+          status: 'ACTIVE',
+        }),
+        // Driver index conflict: already has DISPATCHER membership in validProviderOrgId
+        OrganizationMembershipModel.create({
+          organizationId: validProviderOrgId,
+          principalType: 'AMBULANCE_DRIVER',
+          principalId: driverIndexConflictId,
+          role: 'DISPATCHER',
+          status: 'ACTIVE',
+        }),
+      ]);
+      for (const dm of driverMemberships) {
+        registry.membershipIds.push(dm._id);
+      }
 
       // 7. Create Citizen User and Emergency Request
       const user = await UserModel.create({
@@ -622,5 +935,197 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03)', () => 
     assert.ok(plan.rollbackSpecification.reversalInstructions.length >= 4);
     assert.ok(plan.rollbackSpecification.databaseRequirements.includes('replica set'));
     assert.ok(plan.rollbackSpecification.safetyRules.length >= 3);
+  });
+
+  it('13. membership conflict & inactive status handling for hospitals: halts for manual review', async () => {
+    const plan = await planOrganizationBackfill();
+
+    // 1. Hospital with direct org pointing to suspended org -> MANUAL_REVIEW
+    const suspDirectEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospSuspendedDirectId)
+    );
+    assert.ok(suspDirectEntry, 'Hospital pointing to suspended org must be recorded');
+    assert.equal(suspDirectEntry.action, 'MANUAL_REVIEW');
+    assert.equal(suspDirectEntry.confidence, 'INVALID');
+    assert.ok(suspDirectEntry.reason.includes('has status \'SUSPENDED\''));
+
+    // 2. Hospital without direct org, but active membership in missing org -> MANUAL_REVIEW (never standalone create!)
+    const memMissingEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospMemMissingOrgId)
+    );
+    assert.ok(memMissingEntry);
+    assert.equal(memMissingEntry.action, 'MANUAL_REVIEW');
+    assert.equal(memMissingEntry.confidence, 'INVALID');
+    assert.ok(memMissingEntry.reason.includes('does not exist in Organizations collection'));
+
+    // 3. Hospital without direct org, but active membership in wrong org type -> MANUAL_REVIEW
+    const memWrongTypeEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospMemWrongTypeId)
+    );
+    assert.ok(memWrongTypeEntry);
+    assert.equal(memWrongTypeEntry.action, 'MANUAL_REVIEW');
+    assert.equal(memWrongTypeEntry.confidence, 'INVALID');
+    assert.ok(memWrongTypeEntry.reason.includes('expected HOSPITAL_NETWORK'));
+
+    // 4. Hospital without direct org, but active membership in suspended org -> MANUAL_REVIEW
+    const memSuspEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospMemSuspendedId)
+    );
+    assert.ok(memSuspEntry);
+    assert.equal(memSuspEntry.action, 'MANUAL_REVIEW');
+    assert.equal(memSuspEntry.confidence, 'INVALID');
+    assert.ok(memSuspEntry.reason.includes('has status \'SUSPENDED\''));
+
+    // 5. Hospital without direct org, but inactive/suspended membership evidence -> MANUAL_REVIEW
+    const inactiveEvidenceEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospMemInactiveEvidenceId)
+    );
+    assert.ok(inactiveEvidenceEntry);
+    assert.equal(inactiveEvidenceEntry.action, 'MANUAL_REVIEW');
+    assert.equal(inactiveEvidenceEntry.confidence, 'AMBIGUOUS');
+    assert.ok(inactiveEvidenceEntry.reason.includes('non-active membership evidence'));
+  });
+
+  it('14. membership conflict & inactive status handling for providers: halts for manual review', async () => {
+    const plan = await planOrganizationBackfill();
+
+    // 1. Provider with direct org pointing to suspended org -> MANUAL_REVIEW
+    const suspDirectEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provSuspendedDirectId)
+    );
+    assert.ok(suspDirectEntry, 'Provider pointing to suspended org must be recorded');
+    assert.equal(suspDirectEntry.action, 'MANUAL_REVIEW');
+    assert.equal(suspDirectEntry.confidence, 'INVALID');
+    assert.ok(suspDirectEntry.reason.includes('has status \'SUSPENDED\''));
+
+    // 2. Provider without direct org, but active membership in missing org -> MANUAL_REVIEW
+    const memMissingEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provMemMissingOrgId)
+    );
+    assert.ok(memMissingEntry);
+    assert.equal(memMissingEntry.action, 'MANUAL_REVIEW');
+    assert.equal(memMissingEntry.confidence, 'INVALID');
+    assert.ok(memMissingEntry.reason.includes('does not exist in Organizations collection'));
+
+    // 3. Provider without direct org, but active membership in wrong org type -> MANUAL_REVIEW
+    const memWrongTypeEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provMemWrongTypeId)
+    );
+    assert.ok(memWrongTypeEntry);
+    assert.equal(memWrongTypeEntry.action, 'MANUAL_REVIEW');
+    assert.equal(memWrongTypeEntry.confidence, 'INVALID');
+    assert.ok(memWrongTypeEntry.reason.includes('expected AMBULANCE_OPERATOR'));
+
+    // 4. Provider without direct org, but active membership in suspended org -> MANUAL_REVIEW
+    const memSuspEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provMemSuspendedId)
+    );
+    assert.ok(memSuspEntry);
+    assert.equal(memSuspEntry.action, 'MANUAL_REVIEW');
+    assert.equal(memSuspEntry.confidence, 'INVALID');
+    assert.ok(memSuspEntry.reason.includes('has status \'SUSPENDED\''));
+
+    // 5. Provider without direct org, but inactive/suspended membership evidence -> MANUAL_REVIEW
+    const inactiveEvidenceEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provMemInactiveEvidenceId)
+    );
+    assert.ok(inactiveEvidenceEntry);
+    assert.equal(inactiveEvidenceEntry.action, 'MANUAL_REVIEW');
+    assert.equal(inactiveEvidenceEntry.confidence, 'AMBIGUOUS');
+    assert.ok(inactiveEvidenceEntry.reason.includes('non-active membership evidence'));
+  });
+
+  it('15. compound unique index protection: prevents proposing duplicate membership when record exists', async () => {
+    const plan = await planOrganizationBackfill();
+
+    // Hospital that has organizationId set, but already has ORG_MEMBER membership in that org
+    const hospIndexConflict = plan.ledger.find(
+      (e) => e.sourceEntity === 'HOSPITAL' && e.sourceId === String(hospIndexConflictId)
+    );
+    assert.ok(hospIndexConflict);
+    assert.equal(hospIndexConflict.action, 'MANUAL_REVIEW');
+    assert.equal(hospIndexConflict.confidence, 'AMBIGUOUS');
+    assert.ok(hospIndexConflict.reason.includes('violating unique compound index') || hospIndexConflict.reason.includes('violate unique compound index'));
+
+    // Provider that has organizationId set, but already has ORG_MEMBER membership in that org
+    const provIndexConflict = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_PROVIDER' && e.sourceId === String(provIndexConflictId)
+    );
+    assert.ok(provIndexConflict);
+    assert.equal(provIndexConflict.action, 'MANUAL_REVIEW');
+    assert.equal(provIndexConflict.confidence, 'AMBIGUOUS');
+    assert.ok(provIndexConflict.reason.includes('violating unique compound index') || provIndexConflict.reason.includes('violate unique compound index'));
+
+    // Driver that belongs to configured provider, but already has DISPATCHER membership in that provider org
+    const driverIndexConflict = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_DRIVER' && e.sourceId === String(driverIndexConflictId)
+    );
+    assert.ok(driverIndexConflict);
+    assert.equal(driverIndexConflict.action, 'MANUAL_REVIEW');
+    assert.equal(driverIndexConflict.confidence, 'AMBIGUOUS');
+    assert.ok(driverIndexConflict.reason.includes('violating unique compound index') || driverIndexConflict.reason.includes('violate unique compound index'));
+  });
+
+  it('16. driver membership conflict handling: detects multi-org memberships and org mismatches', async () => {
+    const plan = await planOrganizationBackfill();
+
+    // Driver with memberships across multiple orgs -> MANUAL_REVIEW
+    const multiOrgEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_DRIVER' && e.sourceId === String(multiOrgDriverId)
+    );
+    assert.ok(multiOrgEntry);
+    assert.equal(multiOrgEntry.action, 'MANUAL_REVIEW');
+    assert.equal(multiOrgEntry.confidence, 'AMBIGUOUS');
+    assert.ok(multiOrgEntry.reason.includes('across multiple organizations'));
+
+    // Driver with membership in org different from parent provider -> MANUAL_REVIEW
+    const conflictingOrgEntry = plan.ledger.find(
+      (e) => e.sourceEntity === 'AMBULANCE_DRIVER' && e.sourceId === String(conflictingOrgDriverId)
+    );
+    assert.ok(conflictingOrgEntry);
+    assert.equal(conflictingOrgEntry.action, 'MANUAL_REVIEW');
+    assert.equal(conflictingOrgEntry.confidence, 'AMBIGUOUS');
+    assert.ok(conflictingOrgEntry.reason.includes('conflicting organization'));
+  });
+
+  it('17. report file permission hardening: chmodSync restricts pre-existing 0o644 files to 0o600 upon overwrite', async () => {
+    const plan = await planOrganizationBackfill();
+    const tempPlanPath = path.resolve(process.cwd(), 'reports', 'test-backfill-plan-overwrite.json');
+
+    try {
+      // Step 1: Pre-create file with permissive 0o644 permissions
+      fs.writeFileSync(tempPlanPath, '{"initial": true}', { encoding: 'utf-8', mode: 0o644 });
+      fs.chmodSync(tempPlanPath, 0o644);
+      const initialMode = fs.statSync(tempPlanPath).mode & 0o777;
+      assert.equal(initialMode, 0o644, 'Initial file must have 0o644 mode for the test');
+
+      // Step 2: Overwrite using savePlanToFile
+      savePlanToFile(plan, tempPlanPath);
+
+      // Step 3: Verify chmodSync strictly restricted permissions to 0o600
+      const finalMode = fs.statSync(tempPlanPath).mode & 0o777;
+      assert.equal(finalMode, 0o600, 'savePlanToFile must restrict pre-existing files to 0o600');
+    } finally {
+      if (fs.existsSync(tempPlanPath)) {
+        fs.unlinkSync(tempPlanPath);
+      }
+    }
+  });
+
+  it('18. keyset pagination equivalence: batchSize=1 produces identical deterministic ledger as default batchSize', async () => {
+    const defaultBatchPlan = await planOrganizationBackfill();
+    const smallBatchPlan = await planOrganizationBackfill({ batchSize: 1 });
+
+    assert.equal(smallBatchPlan.summary.totalEntitiesScanned, defaultBatchPlan.summary.totalEntitiesScanned);
+    assert.equal(smallBatchPlan.ledger.length, defaultBatchPlan.ledger.length);
+    assert.deepEqual(smallBatchPlan.summary, defaultBatchPlan.summary);
+
+    for (let i = 0; i < defaultBatchPlan.ledger.length; i++) {
+      assert.deepEqual(
+        smallBatchPlan.ledger[i],
+        defaultBatchPlan.ledger[i],
+        `Ledger entry ${i} must be identical between batchSize=1 and default batchSize`
+      );
+    }
   });
 });

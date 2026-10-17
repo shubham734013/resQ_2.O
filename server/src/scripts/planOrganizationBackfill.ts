@@ -84,6 +84,7 @@ export interface BackfillPlanReport {
     operationsAudited: string[];
     limitations: string;
     databaseLevelEnforcementRecommendation: string;
+    memoryComplexity: string;
   };
   configuration: {
     batchSize: number;
@@ -154,32 +155,11 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
     }
   };
 
-  // 1. Build narrow in-memory lookup index of existing organizations
-  const allExistingOrgs = await OrganizationModel.find({}, { _id: 1, type: 1, status: 1 }).lean().exec();
-  const existingOrgMap = new Map<string, { _id: Types.ObjectId; type: OrganizationType; status: OrganizationStatus }>();
-  for (const org of allExistingOrgs) {
-    existingOrgMap.set(String(org._id), org);
-  }
-
-  // 2. Build narrow in-memory index of active memberships for hospitals and providers
-  const activeMemberships = await OrganizationMembershipModel.find(
-    { status: 'ACTIVE', principalType: { $in: ['HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER'] } },
-    { organizationId: 1, principalType: 1, principalId: 1, role: 1 }
-  ).lean().exec();
-
-  const membershipsByPrincipal = new Map<string, typeof activeMemberships>();
-  for (const m of activeMemberships) {
-    const key = `${m.principalType}:${m.principalId}`;
-    const list = membershipsByPrincipal.get(key) || [];
-    list.push(m);
-    membershipsByPrincipal.set(key, list);
-  }
-
-  // Track planned organizations so providers/hospitals can register deterministic parent orgs
+  // Track planned organizations so providers can register deterministic parent orgs for ambulances/drivers
   const plannedOrganizations = new Map<string, { orgId: string; type: OrganizationType; isDeterministic: boolean }>();
 
   // -------------------------------------------------------------
-  // PHASE A: Plan Hospitals
+  // PHASE A: Plan Hospitals (Keyset pagination + batch-scoped lookups)
   // -------------------------------------------------------------
   const hospitalCounts: EntityPlanCounts = {
     total: 0,
@@ -189,110 +169,344 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
     manualReview: 0,
   };
 
-  const hospitalCursor = HospitalModel.find(
-    {},
-    {
-      _id: 1,
-      organizationId: 1,
-      ...(includeDetailedIdentifiers ? { name: 1, registrationNumber: 1 } : {}),
+  let lastHospitalId: Types.ObjectId | null = null;
+  while (true) {
+    const query = lastHospitalId ? { _id: { $gt: lastHospitalId } } : {};
+    const hospitalBatch = await HospitalModel.find(
+      query,
+      {
+        _id: 1,
+        organizationId: 1,
+        ...(includeDetailedIdentifiers ? { name: 1, registrationNumber: 1 } : {}),
+      }
+    )
+      .sort({ _id: 1 })
+      .limit(batchSize)
+      .lean()
+      .exec();
+
+    if (hospitalBatch.length === 0) break;
+    lastHospitalId = hospitalBatch[hospitalBatch.length - 1]!._id as Types.ObjectId;
+
+    const batchHospitalIds = hospitalBatch.map((h) => h._id);
+
+    // Keyset batch-scoped membership query: load only memberships for this batch
+    const batchMemberships = await OrganizationMembershipModel.find(
+      { principalType: 'HOSPITAL', principalId: { $in: batchHospitalIds } },
+      { organizationId: 1, principalType: 1, principalId: 1, role: 1, status: 1 }
+    ).lean().exec();
+
+    const membershipsByHospital = new Map<string, typeof batchMemberships>();
+    for (const m of batchMemberships) {
+      const key = String(m.principalId);
+      const list = membershipsByHospital.get(key) || [];
+      list.push(m);
+      membershipsByHospital.set(key, list);
     }
-  ).lean().cursor({ batchSize });
 
-  for await (const hosp of hospitalCursor) {
-    checkThreshold();
-    hospitalCounts.total++;
+    // Keyset batch-scoped organization query: load only organizations referenced in this batch
+    const referencedOrgIds = new Set<string>();
+    for (const h of hospitalBatch) {
+      if (h.organizationId) referencedOrgIds.add(String(h.organizationId));
+    }
+    for (const m of batchMemberships) {
+      if (m.organizationId) referencedOrgIds.add(String(m.organizationId));
+    }
 
-    const hospId = String(hosp._id);
-    const identifier = includeDetailedIdentifiers
-      ? (hosp as { registrationNumber?: string; name?: string }).registrationNumber || (hosp as { name?: string }).name
-      : undefined;
+    const batchOrgs = referencedOrgIds.size > 0
+      ? await OrganizationModel.find(
+          { _id: { $in: Array.from(referencedOrgIds) } },
+          { _id: 1, type: 1, status: 1 }
+        ).lean().exec()
+      : [];
 
-    const principalKey = `HOSPITAL:${hospId}`;
-    const memberships = membershipsByPrincipal.get(principalKey) || [];
+    const batchOrgMap = new Map<string, { _id: Types.ObjectId; type: OrganizationType; status: OrganizationStatus }>();
+    for (const org of batchOrgs) {
+      batchOrgMap.set(String(org._id), org);
+    }
 
-    if (hosp.organizationId) {
-      const directOrgId = String(hosp.organizationId);
-      const existingOrg = existingOrgMap.get(directOrgId);
+    for (const hosp of hospitalBatch) {
+      checkThreshold();
+      hospitalCounts.total++;
 
-      if (!existingOrg) {
-        hospitalCounts.manualReview++;
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:org-missing:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'INVALID',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-          reason: `Hospital references organizationId '${directOrgId}' which does not exist in Organizations collection.`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else if (existingOrg.type !== 'HOSPITAL_NETWORK') {
-        hospitalCounts.manualReview++;
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:wrong-org-type:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'INVALID',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-          reason: `Hospital references organization '${directOrgId}' of type '${existingOrg.type}' (expected HOSPITAL_NETWORK).`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else if (memberships.some((m) => String(m.organizationId) !== directOrgId)) {
-        hospitalCounts.manualReview++;
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:membership-conflict:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'AMBIGUOUS',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
-          reason: `Hospital has conflicting organization assignments between direct organizationId and active membership.`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else {
-        // Valid existing assignment
-        const hasValidMembership = memberships.some(
-          (m) => String(m.organizationId) === directOrgId && m.role === 'HOSPITAL_ADMIN'
-        );
+      const hospId = String(hosp._id);
+      const identifier = includeDetailedIdentifiers
+        ? (hosp as { registrationNumber?: string; name?: string }).registrationNumber || (hosp as { name?: string }).name
+        : undefined;
 
-        if (hasValidMembership) {
-          hospitalCounts.skips++;
+      const allMemberships = membershipsByHospital.get(hospId) || [];
+      const activeMemberships = allMemberships.filter((m) => m.status === 'ACTIVE');
+
+      if (hosp.organizationId) {
+        const directOrgId = String(hosp.organizationId);
+        const directOrg = batchOrgMap.get(directOrgId);
+
+        if (!directOrg) {
+          hospitalCounts.manualReview++;
           addEntry({
             migrationVersion,
-            idempotencyKey: `hosp:already-configured:${hospId}`,
+            idempotencyKey: `hosp:org-missing:${hospId}`,
             sourceEntity: 'HOSPITAL',
             sourceId: hospId,
-            action: 'SKIP_ALREADY_CONFIGURED',
-            proposedOrganizationId: directOrgId,
-            proposedOrganizationType: 'HOSPITAL_NETWORK',
-            confidence: 'DETERMINISTIC',
-            status: 'SKIPPED',
-            requiresManualReview: false,
-            mappingRule: 'RULE_6_PRESERVE_VALID_ASSIGNMENTS',
-            reason: `Hospital is already correctly configured with valid organization '${directOrgId}' and HOSPITAL_ADMIN membership.`,
+            action: 'MANUAL_REVIEW',
+            confidence: 'INVALID',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Hospital references organizationId '${directOrgId}' which does not exist in Organizations collection.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (directOrg.type !== 'HOSPITAL_NETWORK') {
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:wrong-org-type:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'INVALID',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Hospital references organization '${directOrgId}' of type '${directOrg.type}' (expected HOSPITAL_NETWORK).`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (directOrg.status !== 'ACTIVE') {
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:org-status-inactive:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'INVALID',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Hospital references organization '${directOrgId}' which has status '${directOrg.status}' (expected ACTIVE). Suspended/archived organizations cannot receive automated backfill.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeMemberships.some((m) => String(m.organizationId) !== directOrgId)) {
+          hospitalCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:membership-conflict:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Hospital has conflicting organization assignments between direct organizationId and active membership.`,
             ...(identifier ? { identifier } : {}),
           });
         } else {
-          // Needs missing membership
-          hospitalCounts.plannedCreates++;
-          const proposedMemId = generateDeterministicId(`mem:${directOrgId}:HOSPITAL:${hospId}`);
+          // Valid existing assignment to active HOSPITAL_NETWORK
+          const hasValidMembership = activeMemberships.some(
+            (m) => String(m.organizationId) === directOrgId && m.role === 'HOSPITAL_ADMIN'
+          );
+
+          if (hasValidMembership) {
+            hospitalCounts.skips++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `hosp:already-configured:${hospId}`,
+              sourceEntity: 'HOSPITAL',
+              sourceId: hospId,
+              action: 'SKIP_ALREADY_CONFIGURED',
+              proposedOrganizationId: directOrgId,
+              proposedOrganizationType: 'HOSPITAL_NETWORK',
+              confidence: 'DETERMINISTIC',
+              status: 'SKIPPED',
+              requiresManualReview: false,
+              mappingRule: 'RULE_6_PRESERVE_VALID_ASSIGNMENTS',
+              reason: `Hospital is already correctly configured with valid organization '${directOrgId}' and HOSPITAL_ADMIN membership.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else {
+            // Check unique compound index protection on { organizationId, principalType, principalId }
+            const existingMembershipInOrg = allMemberships.find(
+              (m) => String(m.organizationId) === directOrgId
+            );
+
+            if (existingMembershipInOrg) {
+              hospitalCounts.manualReview++;
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `hosp:membership-index-conflict:${hospId}`,
+                sourceEntity: 'HOSPITAL',
+                sourceId: hospId,
+                action: 'MANUAL_REVIEW',
+                confidence: 'AMBIGUOUS',
+                status: 'MANUAL_REVIEW',
+                requiresManualReview: true,
+                mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+                reason: `Hospital has valid organizationId '${directOrgId}' but already has an existing membership with status '${existingMembershipInOrg.status}' and role '${existingMembershipInOrg.role}'. Proposing CREATE_MEMBERSHIP would violate unique compound index. Manual review required.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            } else {
+              hospitalCounts.plannedCreates++;
+              const proposedMemId = generateDeterministicId(`mem:${directOrgId}:HOSPITAL:${hospId}`);
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `hosp:create-mem:${hospId}`,
+                sourceEntity: 'HOSPITAL',
+                sourceId: hospId,
+                action: 'CREATE_MEMBERSHIP',
+                proposedOrganizationId: directOrgId,
+                proposedOrganizationType: 'HOSPITAL_NETWORK',
+                proposedMembershipId: proposedMemId,
+                proposedMembershipRole: 'HOSPITAL_ADMIN',
+                confidence: 'DETERMINISTIC',
+                status: 'PLANNED',
+                requiresManualReview: false,
+                mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+                reason: `Hospital has valid organizationId '${directOrgId}' but is missing active HOSPITAL_ADMIN membership.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            }
+          }
+        }
+      } else {
+        // Hospital without organizationId
+        if (activeMemberships.length > 1) {
+          hospitalCounts.manualReview++;
           addEntry({
             migrationVersion,
-            idempotencyKey: `hosp:create-mem:${hospId}`,
+            idempotencyKey: `hosp:multi-membership-ambiguity:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Hospital has multiple active memberships across distinct organizations. Automatic assignment halted.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeMemberships.length === 1 && activeMemberships[0]) {
+          const mem = activeMemberships[0];
+          const memOrgId = String(mem.organizationId);
+          const memOrg = batchOrgMap.get(memOrgId);
+
+          if (!memOrg) {
+            hospitalCounts.manualReview++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `hosp:mem-org-missing:${hospId}`,
+              sourceEntity: 'HOSPITAL',
+              sourceId: hospId,
+              action: 'MANUAL_REVIEW',
+              confidence: 'INVALID',
+              status: 'MANUAL_REVIEW',
+              requiresManualReview: true,
+              mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+              reason: `Hospital has active membership in organization '${memOrgId}' which does not exist in Organizations collection. Automatic assignment halted.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else if (memOrg.type !== 'HOSPITAL_NETWORK') {
+            hospitalCounts.manualReview++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `hosp:mem-wrong-org-type:${hospId}`,
+              sourceEntity: 'HOSPITAL',
+              sourceId: hospId,
+              action: 'MANUAL_REVIEW',
+              confidence: 'INVALID',
+              status: 'MANUAL_REVIEW',
+              requiresManualReview: true,
+              mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+              reason: `Hospital has active membership in organization '${memOrgId}' of type '${memOrg.type}' (expected HOSPITAL_NETWORK). Automatic assignment halted.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else if (memOrg.status !== 'ACTIVE') {
+            hospitalCounts.manualReview++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `hosp:mem-org-inactive:${hospId}`,
+              sourceEntity: 'HOSPITAL',
+              sourceId: hospId,
+              action: 'MANUAL_REVIEW',
+              confidence: 'INVALID',
+              status: 'MANUAL_REVIEW',
+              requiresManualReview: true,
+              mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+              reason: `Hospital has active membership in organization '${memOrgId}' which has status '${memOrg.status}' (expected ACTIVE). Suspended/archived organizations cannot receive automated backfill.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else {
+            // Verified active HOSPITAL_NETWORK organization
+            hospitalCounts.plannedUpdates++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `hosp:update-from-mem:${hospId}`,
+              sourceEntity: 'HOSPITAL',
+              sourceId: hospId,
+              action: 'UPDATE_ENTITY_ORGANIZATION',
+              proposedOrganizationId: memOrgId,
+              proposedOrganizationType: 'HOSPITAL_NETWORK',
+              confidence: 'DETERMINISTIC',
+              status: 'PLANNED',
+              requiresManualReview: false,
+              mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+              reason: `Inherit organization from verified existing active membership in '${memOrgId}'.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          }
+        } else if (allMemberships.length > 0) {
+          // Inactive/suspended memberships exist -> unresolved membership evidence requires manual review
+          hospitalCounts.manualReview++;
+          const inactiveMem = allMemberships[0]!;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:unresolved-membership-evidence:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Hospital has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Never create a new organization while unresolved membership evidence exists.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else {
+          // Standalone hospital: deterministically create dedicated HOSPITAL_NETWORK
+          hospitalCounts.plannedCreates++;
+          hospitalCounts.plannedUpdates++;
+
+          const proposedOrgId = generateDeterministicId(`org:hospital:${hospId}`);
+          const proposedOrgName = includeDetailedIdentifiers
+            ? `${(hosp as { name?: string }).name || 'Hospital'} Network`
+            : `Hospital Network ${hospId.substring(18, 24).toUpperCase()}`;
+
+          const proposedMemId = generateDeterministicId(`mem:${proposedOrgId}:HOSPITAL:${hospId}`);
+
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:create-org:${hospId}`,
+            sourceEntity: 'HOSPITAL',
+            sourceId: hospId,
+            action: 'CREATE_ORGANIZATION',
+            proposedOrganizationId: proposedOrgId,
+            proposedOrganizationName: proposedOrgName,
+            proposedOrganizationType: 'HOSPITAL_NETWORK',
+            confidence: 'DETERMINISTIC',
+            status: 'PLANNED',
+            requiresManualReview: false,
+            mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+            reason: `Deterministic standalone hospital backfill: create dedicated HOSPITAL_NETWORK organization.`,
+            ...(identifier ? { identifier } : {}),
+          });
+
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `hosp:create-org-mem:${hospId}`,
             sourceEntity: 'HOSPITAL',
             sourceId: hospId,
             action: 'CREATE_MEMBERSHIP',
-            proposedOrganizationId: directOrgId,
+            proposedOrganizationId: proposedOrgId,
             proposedOrganizationType: 'HOSPITAL_NETWORK',
             proposedMembershipId: proposedMemId,
             proposedMembershipRole: 'HOSPITAL_ADMIN',
@@ -300,121 +514,32 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             status: 'PLANNED',
             requiresManualReview: false,
             mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-            reason: `Hospital has valid organizationId '${directOrgId}' but is missing active HOSPITAL_ADMIN membership.`,
+            reason: `Create initial HOSPITAL_ADMIN membership in newly planned organization '${proposedOrgId}'.`,
             ...(identifier ? { identifier } : {}),
           });
-        }
-      }
-    } else {
-      // Hospital without organizationId
-      if (memberships.length === 1 && memberships[0]) {
-        const memOrgId = String(memberships[0].organizationId);
-        const memOrg = existingOrgMap.get(memOrgId);
 
-        if (memOrg && memOrg.type === 'HOSPITAL_NETWORK') {
-          hospitalCounts.plannedUpdates++;
           addEntry({
             migrationVersion,
-            idempotencyKey: `hosp:update-from-mem:${hospId}`,
+            idempotencyKey: `hosp:set-org-ref:${hospId}`,
             sourceEntity: 'HOSPITAL',
             sourceId: hospId,
             action: 'UPDATE_ENTITY_ORGANIZATION',
-            proposedOrganizationId: memOrgId,
+            proposedOrganizationId: proposedOrgId,
             proposedOrganizationType: 'HOSPITAL_NETWORK',
             confidence: 'DETERMINISTIC',
             status: 'PLANNED',
             requiresManualReview: false,
             mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-            reason: `Inherit organization from verified existing active membership in '${memOrgId}'.`,
+            reason: `Set hospital organizationId to newly planned organization '${proposedOrgId}'.`,
             ...(identifier ? { identifier } : {}),
           });
-          continue;
         }
-      }
-
-      if (memberships.length > 1) {
-        hospitalCounts.manualReview++;
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:multi-membership-ambiguity:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'AMBIGUOUS',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
-          reason: `Hospital has multiple active memberships across distinct organizations. Automatic assignment halted.`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else {
-        // Standalone hospital: deterministically create dedicated HOSPITAL_NETWORK
-        hospitalCounts.plannedCreates++;
-        hospitalCounts.plannedUpdates++;
-
-        const proposedOrgId = generateDeterministicId(`org:hospital:${hospId}`);
-        const proposedOrgName = includeDetailedIdentifiers
-          ? `${(hosp as { name?: string }).name || 'Hospital'} Network`
-          : `Hospital Network ${hospId.substring(18, 24).toUpperCase()}`;
-
-        const proposedMemId = generateDeterministicId(`mem:${proposedOrgId}:HOSPITAL:${hospId}`);
-
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:create-org:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'CREATE_ORGANIZATION',
-          proposedOrganizationId: proposedOrgId,
-          proposedOrganizationName: proposedOrgName,
-          proposedOrganizationType: 'HOSPITAL_NETWORK',
-          confidence: 'DETERMINISTIC',
-          status: 'PLANNED',
-          requiresManualReview: false,
-          mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-          reason: `Deterministic standalone hospital backfill: create dedicated HOSPITAL_NETWORK organization.`,
-          ...(identifier ? { identifier } : {}),
-        });
-
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:create-org-mem:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'CREATE_MEMBERSHIP',
-          proposedOrganizationId: proposedOrgId,
-          proposedOrganizationType: 'HOSPITAL_NETWORK',
-          proposedMembershipId: proposedMemId,
-          proposedMembershipRole: 'HOSPITAL_ADMIN',
-          confidence: 'DETERMINISTIC',
-          status: 'PLANNED',
-          requiresManualReview: false,
-          mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-          reason: `Create initial HOSPITAL_ADMIN membership in newly planned organization '${proposedOrgId}'.`,
-          ...(identifier ? { identifier } : {}),
-        });
-
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `hosp:set-org-ref:${hospId}`,
-          sourceEntity: 'HOSPITAL',
-          sourceId: hospId,
-          action: 'UPDATE_ENTITY_ORGANIZATION',
-          proposedOrganizationId: proposedOrgId,
-          proposedOrganizationType: 'HOSPITAL_NETWORK',
-          confidence: 'DETERMINISTIC',
-          status: 'PLANNED',
-          requiresManualReview: false,
-          mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-          reason: `Set hospital organizationId to newly planned organization '${proposedOrgId}'.`,
-          ...(identifier ? { identifier } : {}),
-        });
       }
     }
   }
 
   // -------------------------------------------------------------
-  // PHASE B: Plan Ambulance Providers
+  // PHASE B: Plan Ambulance Providers (Keyset pagination + batch-scoped lookups)
   // -------------------------------------------------------------
   const providerCounts: EntityPlanCounts = {
     total: 0,
@@ -424,114 +549,358 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
     manualReview: 0,
   };
 
-  const providerCursor = AmbulanceProviderModel.find(
-    {},
-    {
-      _id: 1,
-      organizationId: 1,
-      ...(includeDetailedIdentifiers ? { name: 1, registrationNumber: 1 } : {}),
+  let lastProviderId: Types.ObjectId | null = null;
+  while (true) {
+    const query = lastProviderId ? { _id: { $gt: lastProviderId } } : {};
+    const providerBatch = await AmbulanceProviderModel.find(
+      query,
+      {
+        _id: 1,
+        organizationId: 1,
+        ...(includeDetailedIdentifiers ? { name: 1, registrationNumber: 1 } : {}),
+      }
+    )
+      .sort({ _id: 1 })
+      .limit(batchSize)
+      .lean()
+      .exec();
+
+    if (providerBatch.length === 0) break;
+    lastProviderId = providerBatch[providerBatch.length - 1]!._id as Types.ObjectId;
+
+    const batchProviderIds = providerBatch.map((p) => p._id);
+
+    // Keyset batch-scoped membership query: load only memberships for this batch
+    const batchMemberships = await OrganizationMembershipModel.find(
+      { principalType: 'AMBULANCE_PROVIDER', principalId: { $in: batchProviderIds } },
+      { organizationId: 1, principalType: 1, principalId: 1, role: 1, status: 1 }
+    ).lean().exec();
+
+    const membershipsByProvider = new Map<string, typeof batchMemberships>();
+    for (const m of batchMemberships) {
+      const key = String(m.principalId);
+      const list = membershipsByProvider.get(key) || [];
+      list.push(m);
+      membershipsByProvider.set(key, list);
     }
-  ).lean().cursor({ batchSize });
 
-  for await (const prov of providerCursor) {
-    checkThreshold();
-    providerCounts.total++;
+    // Keyset batch-scoped organization query: load only organizations referenced in this batch
+    const referencedOrgIds = new Set<string>();
+    for (const p of providerBatch) {
+      if (p.organizationId) referencedOrgIds.add(String(p.organizationId));
+    }
+    for (const m of batchMemberships) {
+      if (m.organizationId) referencedOrgIds.add(String(m.organizationId));
+    }
 
-    const provId = String(prov._id);
-    const identifier = includeDetailedIdentifiers
-      ? (prov as { registrationNumber?: string; name?: string }).registrationNumber || (prov as { name?: string }).name
-      : undefined;
+    const batchOrgs = referencedOrgIds.size > 0
+      ? await OrganizationModel.find(
+          { _id: { $in: Array.from(referencedOrgIds) } },
+          { _id: 1, type: 1, status: 1 }
+        ).lean().exec()
+      : [];
 
-    const principalKey = `AMBULANCE_PROVIDER:${provId}`;
-    const memberships = membershipsByPrincipal.get(principalKey) || [];
+    const batchOrgMap = new Map<string, { _id: Types.ObjectId; type: OrganizationType; status: OrganizationStatus }>();
+    for (const org of batchOrgs) {
+      batchOrgMap.set(String(org._id), org);
+    }
 
-    if (prov.organizationId) {
-      const directOrgId = String(prov.organizationId);
-      const existingOrg = existingOrgMap.get(directOrgId);
+    for (const prov of providerBatch) {
+      checkThreshold();
+      providerCounts.total++;
 
-      if (!existingOrg) {
-        providerCounts.manualReview++;
-        plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:org-missing:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'INVALID',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-          reason: `Provider references organizationId '${directOrgId}' which does not exist in Organizations collection.`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else if (existingOrg.type !== 'AMBULANCE_OPERATOR') {
-        providerCounts.manualReview++;
-        plannedOrganizations.set(provId, { orgId: directOrgId, type: existingOrg.type, isDeterministic: false });
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:wrong-org-type:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'INVALID',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-          reason: `Provider references organization '${directOrgId}' of type '${existingOrg.type}' (expected AMBULANCE_OPERATOR).`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else if (memberships.some((m) => String(m.organizationId) !== directOrgId)) {
-        providerCounts.manualReview++;
-        plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:membership-conflict:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'AMBIGUOUS',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
-          reason: `Provider has conflicting organization assignments between direct organizationId and active membership.`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else {
-        // Valid existing provider assignment
-        plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
+      const provId = String(prov._id);
+      const identifier = includeDetailedIdentifiers
+        ? (prov as { registrationNumber?: string; name?: string }).registrationNumber || (prov as { name?: string }).name
+        : undefined;
 
-        const hasValidMembership = memberships.some(
-          (m) => String(m.organizationId) === directOrgId && m.role === 'PROVIDER_ADMIN'
-        );
+      const allMemberships = membershipsByProvider.get(provId) || [];
+      const activeMemberships = allMemberships.filter((m) => m.status === 'ACTIVE');
 
-        if (hasValidMembership) {
-          providerCounts.skips++;
+      if (prov.organizationId) {
+        const directOrgId = String(prov.organizationId);
+        const directOrg = batchOrgMap.get(directOrgId);
+
+        if (!directOrg) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
           addEntry({
             migrationVersion,
-            idempotencyKey: `prov:already-configured:${provId}`,
+            idempotencyKey: `prov:org-missing:${provId}`,
             sourceEntity: 'AMBULANCE_PROVIDER',
             sourceId: provId,
-            action: 'SKIP_ALREADY_CONFIGURED',
-            proposedOrganizationId: directOrgId,
-            proposedOrganizationType: 'AMBULANCE_OPERATOR',
-            confidence: 'DETERMINISTIC',
-            status: 'SKIPPED',
-            requiresManualReview: false,
-            mappingRule: 'RULE_6_PRESERVE_VALID_ASSIGNMENTS',
-            reason: `Provider is already correctly configured with valid organization '${directOrgId}' and PROVIDER_ADMIN membership.`,
+            action: 'MANUAL_REVIEW',
+            confidence: 'INVALID',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Provider references organizationId '${directOrgId}' which does not exist in Organizations collection.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (directOrg.type !== 'AMBULANCE_OPERATOR') {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: directOrg.type, isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:wrong-org-type:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'INVALID',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Provider references organization '${directOrgId}' of type '${directOrg.type}' (expected AMBULANCE_OPERATOR).`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (directOrg.status !== 'ACTIVE') {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: directOrg.type, isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:org-status-inactive:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'INVALID',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Provider references organization '${directOrgId}' which has status '${directOrg.status}' (expected ACTIVE). Suspended/archived organizations cannot receive automated backfill.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeMemberships.some((m) => String(m.organizationId) !== directOrgId)) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:membership-conflict:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Provider has conflicting organization assignments between direct organizationId and active membership.`,
             ...(identifier ? { identifier } : {}),
           });
         } else {
-          providerCounts.plannedCreates++;
-          const proposedMemId = generateDeterministicId(`mem:${directOrgId}:AMBULANCE_PROVIDER:${provId}`);
+          // Valid existing provider assignment to active AMBULANCE_OPERATOR
+          const hasValidMembership = activeMemberships.some(
+            (m) => String(m.organizationId) === directOrgId && m.role === 'PROVIDER_ADMIN'
+          );
+
+          if (hasValidMembership) {
+            plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
+            providerCounts.skips++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `prov:already-configured:${provId}`,
+              sourceEntity: 'AMBULANCE_PROVIDER',
+              sourceId: provId,
+              action: 'SKIP_ALREADY_CONFIGURED',
+              proposedOrganizationId: directOrgId,
+              proposedOrganizationType: 'AMBULANCE_OPERATOR',
+              confidence: 'DETERMINISTIC',
+              status: 'SKIPPED',
+              requiresManualReview: false,
+              mappingRule: 'RULE_6_PRESERVE_VALID_ASSIGNMENTS',
+              reason: `Provider is already correctly configured with valid organization '${directOrgId}' and PROVIDER_ADMIN membership.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else {
+            // Check unique compound index protection on { organizationId, principalType, principalId }
+            const existingMembershipInOrg = allMemberships.find(
+              (m) => String(m.organizationId) === directOrgId
+            );
+
+            if (existingMembershipInOrg) {
+              plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+              providerCounts.manualReview++;
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `prov:membership-index-conflict:${provId}`,
+                sourceEntity: 'AMBULANCE_PROVIDER',
+                sourceId: provId,
+                action: 'MANUAL_REVIEW',
+                confidence: 'AMBIGUOUS',
+                status: 'MANUAL_REVIEW',
+                requiresManualReview: true,
+                mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+                reason: `Provider has valid organizationId '${directOrgId}' but already has an existing membership with status '${existingMembershipInOrg.status}' and role '${existingMembershipInOrg.role}'. Proposing CREATE_MEMBERSHIP would violate unique compound index. Manual review required.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            } else {
+              plannedOrganizations.set(provId, { orgId: directOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
+              providerCounts.plannedCreates++;
+              const proposedMemId = generateDeterministicId(`mem:${directOrgId}:AMBULANCE_PROVIDER:${provId}`);
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `prov:create-mem:${provId}`,
+                sourceEntity: 'AMBULANCE_PROVIDER',
+                sourceId: provId,
+                action: 'CREATE_MEMBERSHIP',
+                proposedOrganizationId: directOrgId,
+                proposedOrganizationType: 'AMBULANCE_OPERATOR',
+                proposedMembershipId: proposedMemId,
+                proposedMembershipRole: 'PROVIDER_ADMIN',
+                confidence: 'DETERMINISTIC',
+                status: 'PLANNED',
+                requiresManualReview: false,
+                mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+                reason: `Provider has valid organizationId '${directOrgId}' but is missing active PROVIDER_ADMIN membership.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            }
+          }
+        }
+      } else {
+        // Provider without organizationId
+        if (activeMemberships.length > 1) {
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
           addEntry({
             migrationVersion,
-            idempotencyKey: `prov:create-mem:${provId}`,
+            idempotencyKey: `prov:multi-membership-ambiguity:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Provider has multiple active memberships across distinct organizations. Automatic assignment halted.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeMemberships.length === 1 && activeMemberships[0]) {
+          const mem = activeMemberships[0];
+          const memOrgId = String(mem.organizationId);
+          const memOrg = batchOrgMap.get(memOrgId);
+
+          if (!memOrg) {
+            providerCounts.manualReview++;
+            plannedOrganizations.set(provId, { orgId: memOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `prov:mem-org-missing:${provId}`,
+              sourceEntity: 'AMBULANCE_PROVIDER',
+              sourceId: provId,
+              action: 'MANUAL_REVIEW',
+              confidence: 'INVALID',
+              status: 'MANUAL_REVIEW',
+              requiresManualReview: true,
+              mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+              reason: `Provider has active membership in organization '${memOrgId}' which does not exist in Organizations collection. Automatic assignment halted.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else if (memOrg.type !== 'AMBULANCE_OPERATOR') {
+            providerCounts.manualReview++;
+            plannedOrganizations.set(provId, { orgId: memOrgId, type: memOrg.type, isDeterministic: false });
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `prov:mem-wrong-org-type:${provId}`,
+              sourceEntity: 'AMBULANCE_PROVIDER',
+              sourceId: provId,
+              action: 'MANUAL_REVIEW',
+              confidence: 'INVALID',
+              status: 'MANUAL_REVIEW',
+              requiresManualReview: true,
+              mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+              reason: `Provider has active membership in organization '${memOrgId}' of type '${memOrg.type}' (expected AMBULANCE_OPERATOR). Automatic assignment halted.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else if (memOrg.status !== 'ACTIVE') {
+            providerCounts.manualReview++;
+            plannedOrganizations.set(provId, { orgId: memOrgId, type: memOrg.type, isDeterministic: false });
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `prov:mem-org-inactive:${provId}`,
+              sourceEntity: 'AMBULANCE_PROVIDER',
+              sourceId: provId,
+              action: 'MANUAL_REVIEW',
+              confidence: 'INVALID',
+              status: 'MANUAL_REVIEW',
+              requiresManualReview: true,
+              mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+              reason: `Provider has active membership in organization '${memOrgId}' which has status '${memOrg.status}' (expected ACTIVE). Suspended/archived organizations cannot receive automated backfill.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else {
+            // Verified active AMBULANCE_OPERATOR organization
+            providerCounts.plannedUpdates++;
+            plannedOrganizations.set(provId, { orgId: memOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `prov:update-from-mem:${provId}`,
+              sourceEntity: 'AMBULANCE_PROVIDER',
+              sourceId: provId,
+              action: 'UPDATE_ENTITY_ORGANIZATION',
+              proposedOrganizationId: memOrgId,
+              proposedOrganizationType: 'AMBULANCE_OPERATOR',
+              confidence: 'DETERMINISTIC',
+              status: 'PLANNED',
+              requiresManualReview: false,
+              mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+              reason: `Inherit organization from verified existing active membership in '${memOrgId}'.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          }
+        } else if (allMemberships.length > 0) {
+          // Inactive/suspended memberships exist -> unresolved membership evidence requires manual review
+          providerCounts.manualReview++;
+          plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
+          const inactiveMem = allMemberships[0]!;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:unresolved-membership-evidence:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Provider has non-active membership evidence in organization '${inactiveMem.organizationId}' (status: ${inactiveMem.status}). Never create a new organization while unresolved membership evidence exists.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else {
+          // Pure standalone provider: deterministically create dedicated AMBULANCE_OPERATOR
+          providerCounts.plannedCreates++;
+          providerCounts.plannedUpdates++;
+
+          const proposedOrgId = generateDeterministicId(`org:provider:${provId}`);
+          const proposedOrgName = includeDetailedIdentifiers
+            ? `${(prov as { name?: string }).name || 'Fleet'} Operator`
+            : `Ambulance Operator ${provId.substring(18, 24).toUpperCase()}`;
+
+          const proposedMemId = generateDeterministicId(`mem:${proposedOrgId}:AMBULANCE_PROVIDER:${provId}`);
+          plannedOrganizations.set(provId, { orgId: proposedOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
+
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:create-org:${provId}`,
+            sourceEntity: 'AMBULANCE_PROVIDER',
+            sourceId: provId,
+            action: 'CREATE_ORGANIZATION',
+            proposedOrganizationId: proposedOrgId,
+            proposedOrganizationName: proposedOrgName,
+            proposedOrganizationType: 'AMBULANCE_OPERATOR',
+            confidence: 'DETERMINISTIC',
+            status: 'PLANNED',
+            requiresManualReview: false,
+            mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+            reason: `Deterministic standalone provider backfill: create dedicated AMBULANCE_OPERATOR organization.`,
+            ...(identifier ? { identifier } : {}),
+          });
+
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `prov:create-org-mem:${provId}`,
             sourceEntity: 'AMBULANCE_PROVIDER',
             sourceId: provId,
             action: 'CREATE_MEMBERSHIP',
-            proposedOrganizationId: directOrgId,
+            proposedOrganizationId: proposedOrgId,
             proposedOrganizationType: 'AMBULANCE_OPERATOR',
             proposedMembershipId: proposedMemId,
             proposedMembershipRole: 'PROVIDER_ADMIN',
@@ -539,124 +908,32 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
             status: 'PLANNED',
             requiresManualReview: false,
             mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-            reason: `Provider has valid organizationId '${directOrgId}' but is missing active PROVIDER_ADMIN membership.`,
+            reason: `Create initial PROVIDER_ADMIN membership in newly planned organization '${proposedOrgId}'.`,
             ...(identifier ? { identifier } : {}),
           });
-        }
-      }
-    } else {
-      // Provider without organizationId
-      if (memberships.length === 1 && memberships[0]) {
-        const memOrgId = String(memberships[0].organizationId);
-        const memOrg = existingOrgMap.get(memOrgId);
 
-        if (memOrg && memOrg.type === 'AMBULANCE_OPERATOR') {
-          providerCounts.plannedUpdates++;
-          plannedOrganizations.set(provId, { orgId: memOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
           addEntry({
             migrationVersion,
-            idempotencyKey: `prov:update-from-mem:${provId}`,
+            idempotencyKey: `prov:set-org-ref:${provId}`,
             sourceEntity: 'AMBULANCE_PROVIDER',
             sourceId: provId,
             action: 'UPDATE_ENTITY_ORGANIZATION',
-            proposedOrganizationId: memOrgId,
+            proposedOrganizationId: proposedOrgId,
             proposedOrganizationType: 'AMBULANCE_OPERATOR',
             confidence: 'DETERMINISTIC',
             status: 'PLANNED',
             requiresManualReview: false,
             mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-            reason: `Inherit organization from verified existing active membership in '${memOrgId}'.`,
+            reason: `Set provider organizationId to newly planned organization '${proposedOrgId}'.`,
             ...(identifier ? { identifier } : {}),
           });
-          continue;
         }
-      }
-
-      if (memberships.length > 1) {
-        providerCounts.manualReview++;
-        plannedOrganizations.set(provId, { orgId: '', type: 'AMBULANCE_OPERATOR', isDeterministic: false });
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:multi-membership-ambiguity:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'MANUAL_REVIEW',
-          confidence: 'AMBIGUOUS',
-          status: 'MANUAL_REVIEW',
-          requiresManualReview: true,
-          mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
-          reason: `Provider has multiple active memberships across distinct organizations. Automatic assignment halted.`,
-          ...(identifier ? { identifier } : {}),
-        });
-      } else {
-        // Standalone provider: deterministically create dedicated AMBULANCE_OPERATOR
-        providerCounts.plannedCreates++;
-        providerCounts.plannedUpdates++;
-
-        const proposedOrgId = generateDeterministicId(`org:provider:${provId}`);
-        const proposedOrgName = includeDetailedIdentifiers
-          ? `${(prov as { name?: string }).name || 'Fleet'} Operator`
-          : `Ambulance Operator ${provId.substring(18, 24).toUpperCase()}`;
-
-        const proposedMemId = generateDeterministicId(`mem:${proposedOrgId}:AMBULANCE_PROVIDER:${provId}`);
-        plannedOrganizations.set(provId, { orgId: proposedOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
-
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:create-org:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'CREATE_ORGANIZATION',
-          proposedOrganizationId: proposedOrgId,
-          proposedOrganizationName: proposedOrgName,
-          proposedOrganizationType: 'AMBULANCE_OPERATOR',
-          confidence: 'DETERMINISTIC',
-          status: 'PLANNED',
-          requiresManualReview: false,
-          mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-          reason: `Deterministic standalone provider backfill: create dedicated AMBULANCE_OPERATOR organization.`,
-          ...(identifier ? { identifier } : {}),
-        });
-
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:create-org-mem:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'CREATE_MEMBERSHIP',
-          proposedOrganizationId: proposedOrgId,
-          proposedOrganizationType: 'AMBULANCE_OPERATOR',
-          proposedMembershipId: proposedMemId,
-          proposedMembershipRole: 'PROVIDER_ADMIN',
-          confidence: 'DETERMINISTIC',
-          status: 'PLANNED',
-          requiresManualReview: false,
-          mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-          reason: `Create initial PROVIDER_ADMIN membership in newly planned organization '${proposedOrgId}'.`,
-          ...(identifier ? { identifier } : {}),
-        });
-
-        addEntry({
-          migrationVersion,
-          idempotencyKey: `prov:set-org-ref:${provId}`,
-          sourceEntity: 'AMBULANCE_PROVIDER',
-          sourceId: provId,
-          action: 'UPDATE_ENTITY_ORGANIZATION',
-          proposedOrganizationId: proposedOrgId,
-          proposedOrganizationType: 'AMBULANCE_OPERATOR',
-          confidence: 'DETERMINISTIC',
-          status: 'PLANNED',
-          requiresManualReview: false,
-          mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-          reason: `Set provider organizationId to newly planned organization '${proposedOrgId}'.`,
-          ...(identifier ? { identifier } : {}),
-        });
       }
     }
   }
 
   // -------------------------------------------------------------
-  // PHASE C: Plan Ambulances
+  // PHASE C: Plan Ambulances (Keyset pagination)
   // -------------------------------------------------------------
   const ambulanceCounts: EntityPlanCounts = {
     total: 0,
@@ -667,78 +944,89 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
     manualReview: 0,
   };
 
-  const ambulanceCursor = AmbulanceModel.find(
-    {},
-    {
-      _id: 1,
-      providerId: 1,
-      ...(includeDetailedIdentifiers ? { vehicleNumber: 1, registrationNumber: 1 } : {}),
-    }
-  ).lean().cursor({ batchSize });
+  let lastAmbulanceId: Types.ObjectId | null = null;
+  while (true) {
+    const query = lastAmbulanceId ? { _id: { $gt: lastAmbulanceId } } : {};
+    const ambulanceBatch = await AmbulanceModel.find(
+      query,
+      {
+        _id: 1,
+        providerId: 1,
+        ...(includeDetailedIdentifiers ? { vehicleNumber: 1, registrationNumber: 1 } : {}),
+      }
+    )
+      .sort({ _id: 1 })
+      .limit(batchSize)
+      .lean()
+      .exec();
 
-  for await (const amb of ambulanceCursor) {
-    checkThreshold();
-    ambulanceCounts.total++;
+    if (ambulanceBatch.length === 0) break;
+    lastAmbulanceId = ambulanceBatch[ambulanceBatch.length - 1]!._id as Types.ObjectId;
 
-    const ambId = String(amb._id);
-    const identifier = includeDetailedIdentifiers
-      ? (amb as { vehicleNumber?: string; registrationNumber?: string }).vehicleNumber || (amb as { registrationNumber?: string }).registrationNumber
-      : undefined;
+    for (const amb of ambulanceBatch) {
+      checkThreshold();
+      ambulanceCounts.total++;
 
-    const parentProvider = plannedOrganizations.get(String(amb.providerId));
+      const ambId = String(amb._id);
+      const identifier = includeDetailedIdentifiers
+        ? (amb as { vehicleNumber?: string; registrationNumber?: string }).vehicleNumber || (amb as { registrationNumber?: string }).registrationNumber
+        : undefined;
 
-    if (!amb.providerId || !parentProvider) {
-      ambulanceCounts.manualReview++;
-      addEntry({
-        migrationVersion,
-        idempotencyKey: `amb:orphaned:${ambId}`,
-        sourceEntity: 'AMBULANCE',
-        sourceId: ambId,
-        action: 'MANUAL_REVIEW',
-        confidence: 'INVALID',
-        status: 'MANUAL_REVIEW',
-        requiresManualReview: true,
-        mappingRule: 'RULE_3_AMBULANCE_PROVIDER_INHERITANCE',
-        reason: `Ambulance references non-existent or unresolvable providerId '${amb.providerId}'.`,
-        ...(identifier ? { identifier } : {}),
-      });
-    } else if (parentProvider.isDeterministic) {
-      ambulanceCounts.plannedInherits!++;
-      addEntry({
-        migrationVersion,
-        idempotencyKey: `amb:inherit-org:${ambId}`,
-        sourceEntity: 'AMBULANCE',
-        sourceId: ambId,
-        action: 'INHERIT_PROVIDER_ORGANIZATION',
-        proposedOrganizationId: parentProvider.orgId,
-        proposedOrganizationType: 'AMBULANCE_OPERATOR',
-        confidence: 'DETERMINISTIC',
-        status: 'PLANNED',
-        requiresManualReview: false,
-        mappingRule: 'RULE_3_AMBULANCE_PROVIDER_INHERITANCE',
-        reason: `Ambulance inherits organization '${parentProvider.orgId}' from authoritative parent provider '${amb.providerId}'.`,
-        ...(identifier ? { identifier } : {}),
-      });
-    } else {
-      ambulanceCounts.manualReview++;
-      addEntry({
-        migrationVersion,
-        idempotencyKey: `amb:parent-ambiguous:${ambId}`,
-        sourceEntity: 'AMBULANCE',
-        sourceId: ambId,
-        action: 'MANUAL_REVIEW',
-        confidence: 'AMBIGUOUS',
-        status: 'MANUAL_REVIEW',
-        requiresManualReview: true,
-        mappingRule: 'RULE_3_AMBULANCE_PROVIDER_INHERITANCE',
-        reason: `Parent provider '${amb.providerId}' has ambiguous or invalid organization status.`,
-        ...(identifier ? { identifier } : {}),
-      });
+      const parentProvider = plannedOrganizations.get(String(amb.providerId));
+
+      if (!amb.providerId || !parentProvider) {
+        ambulanceCounts.manualReview++;
+        addEntry({
+          migrationVersion,
+          idempotencyKey: `amb:orphaned:${ambId}`,
+          sourceEntity: 'AMBULANCE',
+          sourceId: ambId,
+          action: 'MANUAL_REVIEW',
+          confidence: 'INVALID',
+          status: 'MANUAL_REVIEW',
+          requiresManualReview: true,
+          mappingRule: 'RULE_3_AMBULANCE_PROVIDER_INHERITANCE',
+          reason: `Ambulance references non-existent or unresolvable providerId '${amb.providerId}'.`,
+          ...(identifier ? { identifier } : {}),
+        });
+      } else if (parentProvider.isDeterministic) {
+        ambulanceCounts.plannedInherits!++;
+        addEntry({
+          migrationVersion,
+          idempotencyKey: `amb:inherit-org:${ambId}`,
+          sourceEntity: 'AMBULANCE',
+          sourceId: ambId,
+          action: 'INHERIT_PROVIDER_ORGANIZATION',
+          proposedOrganizationId: parentProvider.orgId,
+          proposedOrganizationType: 'AMBULANCE_OPERATOR',
+          confidence: 'DETERMINISTIC',
+          status: 'PLANNED',
+          requiresManualReview: false,
+          mappingRule: 'RULE_3_AMBULANCE_PROVIDER_INHERITANCE',
+          reason: `Ambulance inherits organization '${parentProvider.orgId}' from authoritative parent provider '${amb.providerId}'.`,
+          ...(identifier ? { identifier } : {}),
+        });
+      } else {
+        ambulanceCounts.manualReview++;
+        addEntry({
+          migrationVersion,
+          idempotencyKey: `amb:parent-ambiguous:${ambId}`,
+          sourceEntity: 'AMBULANCE',
+          sourceId: ambId,
+          action: 'MANUAL_REVIEW',
+          confidence: 'AMBIGUOUS',
+          status: 'MANUAL_REVIEW',
+          requiresManualReview: true,
+          mappingRule: 'RULE_3_AMBULANCE_PROVIDER_INHERITANCE',
+          reason: `Parent provider '${amb.providerId}' has ambiguous or invalid organization status.`,
+          ...(identifier ? { identifier } : {}),
+        });
+      }
     }
   }
 
   // -------------------------------------------------------------
-  // PHASE D: Plan Ambulance Drivers
+  // PHASE D: Plan Ambulance Drivers (Keyset pagination + batch lookups)
   // -------------------------------------------------------------
   const driverCounts: EntityPlanCounts = {
     total: 0,
@@ -750,10 +1038,11 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
     manualReview: 0,
   };
 
-  let driverSkip = 0;
+  let lastDriverId: Types.ObjectId | null = null;
   while (true) {
+    const query = lastDriverId ? { _id: { $gt: lastDriverId } } : {};
     const driverBatch = await AmbulanceDriverModel.find(
-      {},
+      query,
       {
         _id: 1,
         providerId: 1,
@@ -762,13 +1051,28 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
       }
     )
       .sort({ _id: 1 })
-      .skip(driverSkip)
       .limit(batchSize)
       .lean()
       .exec();
 
     if (driverBatch.length === 0) break;
-    driverSkip += driverBatch.length;
+    lastDriverId = driverBatch[driverBatch.length - 1]!._id as Types.ObjectId;
+
+    const batchDriverIds = driverBatch.map((d) => d._id);
+
+    // Keyset batch-scoped membership query for drivers
+    const batchDriverMemberships = await OrganizationMembershipModel.find(
+      { principalType: 'AMBULANCE_DRIVER', principalId: { $in: batchDriverIds } },
+      { organizationId: 1, principalType: 1, principalId: 1, role: 1, status: 1 }
+    ).lean().exec();
+
+    const membershipsByDriver = new Map<string, typeof batchDriverMemberships>();
+    for (const m of batchDriverMemberships) {
+      const key = String(m.principalId);
+      const list = membershipsByDriver.get(key) || [];
+      list.push(m);
+      membershipsByDriver.set(key, list);
+    }
 
     // Collect assignedAmbulanceIds only for this batch
     const batchAmbulanceIds = driverBatch
@@ -796,6 +1100,9 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
 
       const parentProvider = plannedOrganizations.get(String(d.providerId));
       const assignedAmbulance = d.assignedAmbulanceId ? batchAmbulanceMap.get(String(d.assignedAmbulanceId)) : undefined;
+
+      const allDriverMemberships = membershipsByDriver.get(drvId) || [];
+      const activeDriverMemberships = allDriverMemberships.filter((m) => m.status === 'ACTIVE');
 
       if (!d.providerId || !parentProvider) {
         driverCounts.manualReview++;
@@ -843,55 +1150,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
           reason: `Conflict: Driver belongs to provider '${d.providerId}' but assigned ambulance belongs to provider '${assignedAmbulance.providerId}'. Manual review required.`,
           ...(identifier ? { identifier } : {}),
         });
-      } else if (parentProvider.isDeterministic) {
-        driverCounts.plannedInherits!++;
-
-        // Plan driver membership if not already present
-        const driverPrincipalKey = `AMBULANCE_DRIVER:${drvId}`;
-        const driverMemberships = membershipsByPrincipal.get(driverPrincipalKey) || [];
-        const hasMembershipInOrg = driverMemberships.some(
-          (m) => String(m.organizationId) === parentProvider.orgId && m.role === 'DRIVER'
-        );
-
-        if (!hasMembershipInOrg) {
-          driverCounts.plannedMemberships!++;
-          const proposedMemId = generateDeterministicId(`mem:${parentProvider.orgId}:AMBULANCE_DRIVER:${drvId}`);
-          addEntry({
-            migrationVersion,
-            idempotencyKey: `drv:create-mem:${drvId}`,
-            sourceEntity: 'AMBULANCE_DRIVER',
-            sourceId: drvId,
-            action: 'CREATE_MEMBERSHIP',
-            proposedOrganizationId: parentProvider.orgId,
-            proposedOrganizationType: 'AMBULANCE_OPERATOR',
-            proposedMembershipId: proposedMemId,
-            proposedMembershipRole: 'DRIVER',
-            confidence: 'DETERMINISTIC',
-            status: 'PLANNED',
-            requiresManualReview: false,
-            mappingRule: 'RULE_4_DRIVER_PROVIDER_INHERITANCE',
-            reason: `Driver inherits organization '${parentProvider.orgId}' from parent provider '${d.providerId}'. Propose DRIVER membership.`,
-            ...(identifier ? { identifier } : {}),
-          });
-        } else {
-          driverCounts.skips++;
-          addEntry({
-            migrationVersion,
-            idempotencyKey: `drv:already-configured:${drvId}`,
-            sourceEntity: 'AMBULANCE_DRIVER',
-            sourceId: drvId,
-            action: 'SKIP_ALREADY_CONFIGURED',
-            proposedOrganizationId: parentProvider.orgId,
-            proposedOrganizationType: 'AMBULANCE_OPERATOR',
-            confidence: 'DETERMINISTIC',
-            status: 'SKIPPED',
-            requiresManualReview: false,
-            mappingRule: 'RULE_6_PRESERVE_VALID_ASSIGNMENTS',
-            reason: `Driver already has valid DRIVER membership in provider organization '${parentProvider.orgId}'.`,
-            ...(identifier ? { identifier } : {}),
-          });
-        }
-      } else {
+      } else if (!parentProvider.isDeterministic) {
         driverCounts.manualReview++;
         addEntry({
           migrationVersion,
@@ -906,6 +1165,110 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
           reason: `Parent provider '${d.providerId}' has ambiguous or invalid organization status.`,
           ...(identifier ? { identifier } : {}),
         });
+      } else {
+        // Parent provider is deterministic!
+        // Inspect all active memberships across all organizations
+        const activeOrgIds = new Set(activeDriverMemberships.map((m) => String(m.organizationId)));
+
+        if (activeOrgIds.size > 1) {
+          driverCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `drv:multi-org-membership:${drvId}`,
+            sourceEntity: 'AMBULANCE_DRIVER',
+            sourceId: drvId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Driver has active memberships across multiple organizations (${Array.from(activeOrgIds).join(', ')}). Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else if (activeDriverMemberships.some((m) => String(m.organizationId) !== parentProvider.orgId)) {
+          const conflictingOrgId = String(activeDriverMemberships[0]!.organizationId);
+          driverCounts.manualReview++;
+          addEntry({
+            migrationVersion,
+            idempotencyKey: `drv:membership-org-mismatch:${drvId}`,
+            sourceEntity: 'AMBULANCE_DRIVER',
+            sourceId: drvId,
+            action: 'MANUAL_REVIEW',
+            confidence: 'AMBIGUOUS',
+            status: 'MANUAL_REVIEW',
+            requiresManualReview: true,
+            mappingRule: 'RULE_7_PRESERVE_CONFLICTING_ASSIGNMENTS',
+            reason: `Driver belongs to provider with organization '${parentProvider.orgId}', but has active membership in conflicting organization '${conflictingOrgId}'. Manual review required.`,
+            ...(identifier ? { identifier } : {}),
+          });
+        } else {
+          // No active memberships in other orgs. Check target provider org:
+          const hasDriverMembership = activeDriverMemberships.some(
+            (m) => String(m.organizationId) === parentProvider.orgId && m.role === 'DRIVER'
+          );
+
+          if (hasDriverMembership) {
+            driverCounts.skips++;
+            addEntry({
+              migrationVersion,
+              idempotencyKey: `drv:already-configured:${drvId}`,
+              sourceEntity: 'AMBULANCE_DRIVER',
+              sourceId: drvId,
+              action: 'SKIP_ALREADY_CONFIGURED',
+              proposedOrganizationId: parentProvider.orgId,
+              proposedOrganizationType: 'AMBULANCE_OPERATOR',
+              confidence: 'DETERMINISTIC',
+              status: 'SKIPPED',
+              requiresManualReview: false,
+              mappingRule: 'RULE_6_PRESERVE_VALID_ASSIGNMENTS',
+              reason: `Driver already has valid DRIVER membership in provider organization '${parentProvider.orgId}'.`,
+              ...(identifier ? { identifier } : {}),
+            });
+          } else {
+            // Check unique compound index protection on { organizationId, principalType, principalId }
+            const existingMembershipInOrg = allDriverMemberships.find(
+              (m) => String(m.organizationId) === parentProvider.orgId
+            );
+
+            if (existingMembershipInOrg) {
+              driverCounts.manualReview++;
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `drv:membership-index-conflict:${drvId}`,
+                sourceEntity: 'AMBULANCE_DRIVER',
+                sourceId: drvId,
+                action: 'MANUAL_REVIEW',
+                confidence: 'AMBIGUOUS',
+                status: 'MANUAL_REVIEW',
+                requiresManualReview: true,
+                mappingRule: 'RULE_4_DRIVER_PROVIDER_INHERITANCE',
+                reason: `Driver belongs to provider organization '${parentProvider.orgId}' but already has a membership with status '${existingMembershipInOrg.status}' and role '${existingMembershipInOrg.role}'. Proposing CREATE_MEMBERSHIP would violate unique compound index. Manual review required.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            } else {
+              driverCounts.plannedInherits!++;
+              driverCounts.plannedMemberships!++;
+              const proposedMemId = generateDeterministicId(`mem:${parentProvider.orgId}:AMBULANCE_DRIVER:${drvId}`);
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `drv:create-mem:${drvId}`,
+                sourceEntity: 'AMBULANCE_DRIVER',
+                sourceId: drvId,
+                action: 'CREATE_MEMBERSHIP',
+                proposedOrganizationId: parentProvider.orgId,
+                proposedOrganizationType: 'AMBULANCE_OPERATOR',
+                proposedMembershipId: proposedMemId,
+                proposedMembershipRole: 'DRIVER',
+                confidence: 'DETERMINISTIC',
+                status: 'PLANNED',
+                requiresManualReview: false,
+                mappingRule: 'RULE_4_DRIVER_PROVIDER_INHERITANCE',
+                reason: `Driver inherits organization '${parentProvider.orgId}' from parent provider '${d.providerId}'. Propose DRIVER membership.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            }
+          }
+        }
       }
     }
   }
@@ -961,14 +1324,15 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
       executionPathAudited: true,
       writeOperationsCalled: 0,
       operationsAudited: [
-        'Model.find (read-only queries with projected fields)',
-        'Model.cursor (read-only streaming for large collections)',
+        'Model.find (keyset-paginated read-only queries with projected fields)',
         'Model.countDocuments (read-only count for emergency preservation check)',
       ],
       limitations:
         'Application-level code path verification guarantees that no Mongoose write APIs (save, create, insert, update, delete, bulkWrite) are called during dry-run planning. Database-level enforcement requires a user with "read" role.',
       databaseLevelEnforcementRecommendation:
         'Run planner using a dedicated MongoDB user configured with the least-privilege "read" role: db.createUser({ user: "resq_readonly", pwd: "<password>", roles: [{ role: "read", db: "resq" }] })',
+      memoryComplexity:
+        'Bounded O(batchSize) active working memory per entity/membership lookup batch. Keyset pagination using { _id: { $gt: lastId } } ensures O(1) index-backed page traversal without offset scanning. Output ledger is O(M) bounded by maxEntities with threshold guard.',
     },
     configuration: {
       batchSize,
@@ -1033,11 +1397,15 @@ export const printPlanSummary = (plan: BackfillPlanReport): void => {
 };
 
 export const savePlanToFile = (plan: BackfillPlanReport, outputPath?: string): string => {
-  const resolvedPath =
-    outputPath ||
-    process.env.ORGANIZATION_BACKFILL_PLAN_PATH ||
-    path.resolve(process.cwd(), 'reports', 'organization-backfill-plan.json');
+  const defaultPath = path.resolve(process.cwd(), 'reports', 'organization-backfill-plan.json');
+  const rawPath = outputPath || process.env.ORGANIZATION_BACKFILL_PLAN_PATH || defaultPath;
 
+  // Prevent null-byte injection
+  if (rawPath.includes('\0')) {
+    throw new Error('Invalid output path: contains null byte');
+  }
+
+  const resolvedPath = path.resolve(rawPath);
   const dir = path.dirname(resolvedPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -1045,6 +1413,11 @@ export const savePlanToFile = (plan: BackfillPlanReport, outputPath?: string): s
 
   // Restrictive file permissions (0o600: read/write by owner only)
   fs.writeFileSync(resolvedPath, JSON.stringify(plan, null, 2), { encoding: 'utf-8', mode: 0o600 });
+  try {
+    fs.chmodSync(resolvedPath, 0o600);
+  } catch {
+    // Graceful handling on platforms or filesystems that do not support POSIX chmod
+  }
   return resolvedPath;
 };
 
