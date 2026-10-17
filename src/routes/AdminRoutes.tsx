@@ -23,6 +23,7 @@ import {
 } from '../pages/AdminDetailPages';
 import { AdminAppointmentsPage } from '../pages/admin/AdminAppointmentsPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
+import { AdminAuditLogsPage } from '../pages/admin/AdminAuditLogsPage';
 
 export const adminRoutes = (
   <Route path="/admin" element={<RequireAuth />}>
@@ -45,7 +46,7 @@ export const adminRoutes = (
         <Route path="appointments" element={<AdminAppointmentsPage />} />
         <Route path="analytics" element={<AdminAnalyticsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
-        <Route path="audit-logs" element={<AdminReportsPage />} />
+        <Route path="audit-logs" element={<AdminAuditLogsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
     </Route>

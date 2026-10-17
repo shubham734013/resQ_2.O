@@ -26,11 +26,13 @@ export const HospitalAnalyticsPage = () => {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex justify-between items-center text-slate-500 text-xs font-semibold uppercase">
-            <span>Average Triage Intake</span>
+            <span>Resolved Emergencies</span>
             <Clock className="h-4 w-4 text-teal-600" />
           </div>
-          <p className="mt-2 text-3xl font-black text-slate-950">4.2 min</p>
-          <p className="mt-1 text-[11px] text-emerald-700 font-semibold">18% faster than regional SLA</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">
+            {(emergencies.data?.items ?? []).filter((e) => e.status === 'RESOLVED').length}
+          </p>
+          <p className="mt-1 text-[11px] text-emerald-700 font-semibold">Successfully coordinated cases</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -53,11 +55,13 @@ export const HospitalAnalyticsPage = () => {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex justify-between items-center text-slate-500 text-xs font-semibold uppercase">
-            <span>Clinical SLA Score</span>
+            <span>Active Coordination</span>
             <TrendingUp className="h-4 w-4 text-emerald-600" />
           </div>
-          <p className="mt-2 text-3xl font-black text-slate-950">99.8%</p>
-          <p className="mt-1 text-[11px] text-emerald-700 font-semibold">Verified trauma readiness</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">
+            {(emergencies.data?.items ?? []).filter((e) => ['RECEIVED', 'REVIEWING', 'PREPARING', 'AMBULANCE_COORDINATION'].includes(e.status)).length}
+          </p>
+          <p className="mt-1 text-[11px] text-amber-700 font-semibold">In-flight cases requiring attention</p>
         </div>
       </div>
 
