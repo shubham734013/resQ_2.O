@@ -12,9 +12,26 @@ import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { verifySocialCredential, type VerifiedSocialIdentity } from '../providers/socialIdentity.js';
 import { defaultMailSender, sendPasswordResetEmail, type MailSender } from './mailer.js';
+import {
+  generateBase32Secret,
+  verifyTotpCode,
+  buildOtpauthUri,
+  generateRecoveryCodes,
+  hashRecoveryCode,
+} from '../utils/totp.js';
 import type { AuthenticatedIdentity, SocialProvider, JwtClaims } from '../types/auth.js';
 import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js';
-import type { AmbulanceDriverRegistrationInput, AmbulanceProviderRegistrationInput, HospitalRegistrationInput, LoginInput, UserRegistrationInput, DriverProfileInput, ProviderProfileInput, UserProfileUpdateInput } from '../schemas/auth.js';
+import type {
+  AmbulanceDriverRegistrationInput,
+  AmbulanceProviderRegistrationInput,
+  HospitalRegistrationInput,
+  LoginInput,
+  UserRegistrationInput,
+  DriverProfileInput,
+  ProviderProfileInput,
+  UserProfileUpdateInput,
+  AdminMfaDisableInput,
+} from '../schemas/auth.js';
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
@@ -324,7 +341,219 @@ export const login=async(input:LoginInput)=>{
   assertLoginAllowed(a.accountStatus);
   return createAuthResult(a);
 };
-export const adminLogin=async(input:LoginInput)=>{if(normalizeEmail(input.email)!==normalizeEmail(env.RESQ_ADMIN_EMAIL))throw INVALID_CREDENTIALS;const a=await findUserAccountByEmail(input.email);if(!a||a.role!=='ADMIN'||!a.passwordHash)throw INVALID_CREDENTIALS;if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;assertLoginAllowed(a.accountStatus);return createAuthResult(a);};
+/**
+ * AUTH-02: AdminLoginResult — three mutually exclusive shapes:
+ *  1. mfaRequired=true  — MFA enrolled; client must complete TOTP challenge.
+ *  2. mfaRequired=false, mfaSetupRequired=true  — MFA not yet enrolled;
+ *     client receives a restricted mfaSetupToken (NOT access/refresh tokens)
+ *     that may only call POST /auth/admin/mfa/setup and POST /auth/admin/mfa/confirm.
+ *  3. mfaRequired=false, mfaSetupRequired=false  — (unreachable in production;
+ *     present only for type-completeness.)
+ */
+export type AdminLoginResult =
+  | { mfaRequired: true; mfaToken: string; user: { email: string; name: string; role: 'ADMIN' } }
+  | { mfaRequired: false; mfaSetupRequired: true; mfaSetupToken: string; user: { email: string; name: string; role: 'ADMIN' } }
+  | (AuthResult & { mfaRequired: false; mfaSetupRequired: false });
+
+export const adminLogin = async (input: LoginInput): Promise<AdminLoginResult> => {
+  if (normalizeEmail(input.email) !== normalizeEmail(env.RESQ_ADMIN_EMAIL)) throw INVALID_CREDENTIALS;
+  const userDoc = await UserModel.findOne({ email: normalizeEmail(input.email) })
+    .select('+passwordHash +mfaEnabled +mfaSecret')
+    .exec();
+  if (!userDoc || userDoc.role !== 'ADMIN' || !userDoc.passwordHash) throw INVALID_CREDENTIALS;
+  if (!(await bcrypt.compare(input.password, userDoc.passwordHash))) throw INVALID_CREDENTIALS;
+  assertLoginAllowed(userDoc.accountStatus);
+
+  if (userDoc.mfaEnabled) {
+    // MFA enrolled — issue a short-lived challenge token; no session created yet.
+    const mfaToken = jwt.sign(
+      { sub: userDoc._id.toString(), email: userDoc.email, role: 'ADMIN', type: 'mfa_pending' },
+      env.JWT_SECRET,
+      { expiresIn: 300 }, // 5 minutes
+    );
+    return {
+      mfaRequired: true,
+      mfaToken,
+      user: { email: userDoc.email, name: userDoc.name, role: 'ADMIN' },
+    };
+  }
+
+  // AUTH-02: MFA NOT enrolled — return a restricted setup token only.
+  // The caller MUST NOT treat this as an authenticated session.
+  // This token is accepted exclusively by the MFA setup endpoints.
+  const mfaSetupToken = jwt.sign(
+    { sub: userDoc._id.toString(), email: userDoc.email, role: 'ADMIN', type: 'mfa_setup_pending' },
+    env.JWT_SECRET,
+    { expiresIn: 600 }, // 10 minutes to complete enrollment
+  );
+  return {
+    mfaRequired: false,
+    mfaSetupRequired: true,
+    mfaSetupToken,
+    user: { email: userDoc.email, name: userDoc.name, role: 'ADMIN' },
+  };
+};
+
+export const verifyAdminMfaLogin = async (input: { mfaToken: string; code: string }): Promise<AuthResult> => {
+  let payload: jwt.JwtPayload;
+  try {
+    const verified = jwt.verify(input.mfaToken, env.JWT_SECRET);
+    if (typeof verified === 'string' || verified.type !== 'mfa_pending' || verified.role !== 'ADMIN') {
+      throw new Error('Invalid MFA token payload');
+    }
+    payload = verified;
+  } catch {
+    throw new AppError('INVALID_MFA_TOKEN', 'MFA challenge session is invalid or has expired. Please sign in again.', 401);
+  }
+
+  const admin = await UserModel.findById(payload.sub)
+    .select('+mfaEnabled +mfaSecret +mfaRecoveryCodeHashes +mfaLastUsedWindow +passwordHash')
+    .exec();
+  if (!admin || admin.role !== 'ADMIN' || !admin.mfaEnabled || !admin.mfaSecret) {
+    throw new AppError('MFA_NOT_CONFIGURED', 'MFA is not enabled for this administrator.', 400);
+  }
+
+  const cleanCode = input.code.trim();
+
+  if (/^\d{6}$/.test(cleanCode)) {
+    // AUTH-03: Verify the code against the stored secret first.
+    const verification = verifyTotpCode(admin.mfaSecret, cleanCode, 1);
+    if (!verification.valid || typeof verification.step !== 'number') {
+      throw new AppError('INVALID_MFA_CODE', 'Invalid 6-digit verification code.', 400);
+    }
+    // AUTH-03: Atomically claim the time-step. The condition ensures only one concurrent
+    // request with the same step can succeed (whether mfaLastUsedWindow is unset or older).
+    const claimed = await UserModel.findOneAndUpdate(
+      {
+        _id: admin._id,
+        $or: [
+          { mfaLastUsedWindow: { $lt: verification.step } },
+          { mfaLastUsedWindow: { $exists: false } },
+          { mfaLastUsedWindow: null },
+        ],
+      },
+      { $set: { mfaLastUsedWindow: verification.step } },
+      { returnDocument: 'after' },
+    ).exec();
+    if (!claimed) {
+      throw new AppError('MFA_CODE_REPLAYED', 'Verification code has already been used. Please wait for the next 30-second code.', 400);
+    }
+  } else {
+    // AUTH-03: Atomically $pull the recovery code hash — concurrent redemptions of the same
+    // code will only succeed for the first caller; subsequent calls find the hash gone.
+    const hashedInput = hashRecoveryCode(cleanCode);
+    const consumed = await UserModel.findOneAndUpdate(
+      { _id: admin._id, mfaRecoveryCodeHashes: hashedInput },
+      { $pull: { mfaRecoveryCodeHashes: hashedInput } },
+      { returnDocument: 'after' },
+    ).exec();
+    if (!consumed) {
+      throw new AppError('INVALID_MFA_CODE', 'Invalid verification code or recovery code.', 400);
+    }
+  }
+
+  assertLoginAllowed(admin.accountStatus);
+  const account = accountFrom(admin._id.toString(), admin.email, admin.name, 'ADMIN', admin.accountStatus, admin.passwordHash);
+  return createAuthResult(account);
+};
+
+export const setupAdminMfa = async (
+  identity: AuthenticatedIdentity
+): Promise<{ secret: string; otpauthUri: string; recoveryCodes: string[] }> => {
+  if (identity.role !== 'ADMIN') throw new AppError('FORBIDDEN', 'MFA enrollment is restricted to administrators', 403);
+  const admin = await UserModel.findById(identity.id).exec();
+  if (!admin) throw new AppError('UNAUTHORIZED', 'Administrator account not found', 401);
+
+  const secret = generateBase32Secret();
+  const recoveryCodes = generateRecoveryCodes(8);
+  const recoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
+  const otpauthUri = buildOtpauthUri(secret, identity.email, 'ResQ');
+
+  admin.mfaPendingSecret = secret;
+  admin.mfaPendingRecoveryCodeHashes = recoveryCodeHashes;
+  await admin.save();
+
+  return { secret, otpauthUri, recoveryCodes };
+};
+
+export const confirmAdminMfaSetup = async (
+  identity: AuthenticatedIdentity,
+  code: string
+): Promise<{ success: boolean; recoveryCodesCount: number }> => {
+  if (identity.role !== 'ADMIN') throw new AppError('FORBIDDEN', 'MFA enrollment is restricted to administrators', 403);
+  const admin = await UserModel.findById(identity.id).select('+mfaPendingSecret +mfaPendingRecoveryCodeHashes').exec();
+  if (!admin || !admin.mfaPendingSecret) {
+    throw new AppError('MFA_SETUP_NOT_INITIATED', 'MFA setup has not been initiated. Please request a new setup token.', 400);
+  }
+
+  const verification = verifyTotpCode(admin.mfaPendingSecret, code, 1);
+  if (!verification.valid || typeof verification.step !== 'number') {
+    throw new AppError('INVALID_MFA_CODE', 'Verification code does not match the generated TOTP secret.', 400);
+  }
+
+  admin.mfaEnabled = true;
+  admin.mfaSecret = admin.mfaPendingSecret;
+  admin.mfaRecoveryCodeHashes = admin.mfaPendingRecoveryCodeHashes ?? [];
+  admin.mfaPendingSecret = undefined;
+  admin.mfaPendingRecoveryCodeHashes = undefined;
+  admin.mfaLastUsedWindow = undefined;
+  await admin.save();
+
+  // AUTH-05: Invalidate all existing sessions so previously issued tokens cannot
+  // be used with a different MFA state.
+  await AuthSessionModel.deleteMany({ accountId: admin._id.toString() }).exec();
+
+  return { success: true, recoveryCodesCount: admin.mfaRecoveryCodeHashes.length };
+};
+
+export const disableAdminMfa = async (
+  identity: AuthenticatedIdentity,
+  input: AdminMfaDisableInput
+): Promise<{ disabled: boolean }> => {
+  if (identity.role !== 'ADMIN') throw new AppError('FORBIDDEN', 'MFA management is restricted to administrators', 403);
+  const admin = await UserModel.findById(identity.id).select('+passwordHash +mfaSecret +mfaRecoveryCodeHashes').exec();
+  if (!admin || !admin.passwordHash) throw new AppError('UNAUTHORIZED', 'Administrator account not found', 401);
+
+  if (!(await bcrypt.compare(input.password, admin.passwordHash))) {
+    throw new AppError('INVALID_CREDENTIALS', 'Incorrect password.', 401);
+  }
+
+  let codeValid = false;
+  if (admin.mfaSecret && /^\d{6}$/.test(input.code.trim())) {
+    codeValid = verifyTotpCode(admin.mfaSecret, input.code.trim(), 1).valid;
+  } else if (admin.mfaRecoveryCodeHashes) {
+    const hashed = hashRecoveryCode(input.code.trim());
+    codeValid = admin.mfaRecoveryCodeHashes.includes(hashed);
+  }
+
+  if (!codeValid) {
+    throw new AppError('INVALID_MFA_CODE', 'Invalid verification code or recovery code.', 400);
+  }
+
+  admin.mfaEnabled = false;
+  admin.mfaSecret = undefined;
+  admin.mfaRecoveryCodeHashes = undefined;
+  admin.mfaPendingSecret = undefined;
+  admin.mfaPendingRecoveryCodeHashes = undefined;
+  admin.mfaLastUsedWindow = undefined;
+  await admin.save();
+
+  // AUTH-05: Revoke all existing sessions so previously issued tokens are invalidated.
+  await AuthSessionModel.deleteMany({ accountId: admin._id.toString() }).exec();
+
+  return { disabled: true };
+};
+
+export const getAdminMfaStatus = async (
+  identity: AuthenticatedIdentity
+): Promise<{ mfaEnabled: boolean; recoveryCodesRemaining: number }> => {
+  if (identity.role !== 'ADMIN') throw new AppError('FORBIDDEN', 'Forbidden', 403);
+  const admin = await UserModel.findById(identity.id).select('+mfaEnabled +mfaRecoveryCodeHashes').exec();
+  return {
+    mfaEnabled: Boolean(admin?.mfaEnabled),
+    recoveryCodesRemaining: admin?.mfaRecoveryCodeHashes?.length ?? 0,
+  };
+};
 
 const createSocialAccount = async (identity: VerifiedSocialIdentity, role: 'USER' | 'AMBULANCE_PROVIDER'): Promise<AccountWithPassword> => {
   const normalized = normalizeEmail(identity.email);

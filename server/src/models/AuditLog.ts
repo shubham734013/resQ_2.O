@@ -3,7 +3,18 @@ import { Schema, model, Types } from 'mongoose';
 export const AUDIT_ACTOR_ROLES = ['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER', 'ADMIN', 'SYSTEM'] as const;
 export type AuditActorRole = (typeof AUDIT_ACTOR_ROLES)[number];
 
-export const AUDIT_ENTITY_TYPES = ['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE', 'AMBULANCE_DRIVER', 'EMERGENCY', 'TRIP', 'HOSPITAL_PATIENT'] as const;
+export const AUDIT_ENTITY_TYPES = [
+  'USER',
+  'HOSPITAL',
+  'AMBULANCE_PROVIDER',
+  'AMBULANCE',
+  'AMBULANCE_DRIVER',
+  'EMERGENCY',
+  'TRIP',
+  'HOSPITAL_PATIENT',
+  'ORGANIZATION',
+  'ORGANIZATION_MEMBERSHIP',
+] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 
 export interface AuditLogDocument {

@@ -13,6 +13,8 @@
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "seed:demo": "tsx src/scripts/seedDemoData.ts",
     "audit:db": "tsx src/scripts/auditDatabase.ts",
+    "inventory:tenancy": "tsx src/scripts/inventoryTenancy.ts",
+    "plan:backfill": "tsx src/scripts/planOrganizationBackfill.ts",
     "repair:test-data": "tsx src/scripts/repairTestData.ts",
     "enrich:hospital-coords": "tsx src/scripts/enrichHospitalCoordinates.ts",
     "diagnose:hospitals": "tsx src/scripts/diagnoseHospitalDirectory.ts",

@@ -159,3 +159,23 @@ export type SocialAuthInput = z.infer<typeof socialAuthSchema>;
 export type DriverProfileInput = z.infer<typeof driverProfileSchema>;
 export type ProviderProfileInput = z.infer<typeof providerProfileSchema>;
 export type UserProfileUpdateInput = z.infer<typeof userProfileUpdateSchema>;
+
+// Admin MFA Schemas
+export const adminMfaVerifyLoginSchema = z.object({
+  mfaToken: z.string().min(10, 'MFA challenge token is required'),
+  code: z.string().trim().min(6, 'Verification code is required').max(12),
+});
+
+export const adminMfaConfirmSetupSchema = z.object({
+  code: z.string().trim().length(6, '6-digit verification code is required'),
+});
+
+export const adminMfaDisableSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+  code: z.string().trim().min(6, 'Verification code or recovery code is required').max(12),
+});
+
+export type AdminMfaVerifyLoginInput = z.infer<typeof adminMfaVerifyLoginSchema>;
+export type AdminMfaConfirmSetupInput = z.infer<typeof adminMfaConfirmSetupSchema>;
+export type AdminMfaDisableInput = z.infer<typeof adminMfaDisableSchema>;
+
