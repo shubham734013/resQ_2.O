@@ -142,10 +142,11 @@ export interface ParsedCliConfig {
   outputPath?: string;
   isJson: boolean;
   includeDetailedIdentifiers: boolean;
+  showHelp: boolean;
 }
 
 export const validateIntegerArg = (flagName: string, rawVal: string, min: number, max: number): number => {
-  const trimmed = rawVal.trim();
+  const trimmed = String(rawVal).trim();
   if (!/^\d+$/.test(trimmed)) {
     throw new PlannerConfigurationError(
       `Invalid ${flagName}: expected a positive integer between ${min} and ${max}, received '${rawVal}'.`
@@ -165,24 +166,99 @@ export const parseCliOptions = (args: string[]): ParsedCliConfig => {
   let maxEntities = 100000;
   let maxLedgerEntries = 100000;
   let outputPath: string | undefined;
-  const isJson = args.includes('--json');
-  const includeDetailedIdentifiers = args.includes('--include-identifiers');
+  let isJson = false;
+  let includeDetailedIdentifiers = false;
+  let showHelp = false;
 
-  for (const arg of args) {
-    if (arg.startsWith('--batch-size=')) {
-      const raw = arg.split('=')[1] ?? '';
-      batchSize = validateIntegerArg('--batch-size', raw, 1, 10000);
-    } else if (arg.startsWith('--max-entities=')) {
-      const raw = arg.split('=')[1] ?? '';
-      maxEntities = validateIntegerArg('--max-entities', raw, 1, 1000000);
-    } else if (arg.startsWith('--max-ledger-entries=')) {
-      const raw = arg.split('=')[1] ?? '';
-      maxLedgerEntries = validateIntegerArg('--max-ledger-entries', raw, 1, 1000000);
-    } else if (arg.startsWith('--output=')) {
-      outputPath = arg.split('=')[1];
-      if (!outputPath || outputPath.trim() === '') {
-        throw new PlannerConfigurationError('Invalid --output: expected a non-empty file path.');
+  const seenFlags = new Set<string>();
+
+  for (let i = 0; i < args.length; i++) {
+    const rawArg = args[i]!;
+
+    if (rawArg === '--help' || rawArg === '-h') {
+      if (seenFlags.has('help')) {
+        throw new PlannerConfigurationError('Duplicate option: --help / -h specified more than once.');
       }
+      seenFlags.add('help');
+      showHelp = true;
+      continue;
+    }
+
+    if (rawArg === '--json') {
+      if (seenFlags.has('json')) {
+        throw new PlannerConfigurationError('Duplicate option: --json specified more than once.');
+      }
+      seenFlags.add('json');
+      isJson = true;
+      continue;
+    }
+
+    if (rawArg === '--include-identifiers') {
+      if (seenFlags.has('include-identifiers')) {
+        throw new PlannerConfigurationError('Duplicate option: --include-identifiers specified more than once.');
+      }
+      seenFlags.add('include-identifiers');
+      includeDetailedIdentifiers = true;
+      continue;
+    }
+
+    let flagName: string;
+    let flagValue: string;
+
+    const knownValuedFlags = new Set(['--batch-size', '--max-entities', '--max-ledger-entries', '--output']);
+
+    if (rawArg.startsWith('--')) {
+      const eqIdx = rawArg.indexOf('=');
+      if (eqIdx !== -1) {
+        flagName = rawArg.substring(0, eqIdx);
+        flagValue = rawArg.substring(eqIdx + 1);
+      } else {
+        flagName = rawArg;
+        if (!knownValuedFlags.has(flagName)) {
+          throw new PlannerConfigurationError(`Unknown option: '${flagName}'.`);
+        }
+        if (i + 1 >= args.length || args[i + 1]!.startsWith('-')) {
+          throw new PlannerConfigurationError(`Missing value for option '${flagName}'.`);
+        }
+        i++;
+        flagValue = args[i]!;
+      }
+    } else {
+      throw new PlannerConfigurationError(`Unexpected positional argument or unknown option: '${rawArg}'.`);
+    }
+
+    if (!knownValuedFlags.has(flagName)) {
+      throw new PlannerConfigurationError(`Unknown option: '${flagName}'.`);
+    }
+
+    if (flagName === '--batch-size') {
+      if (seenFlags.has('batch-size')) {
+        throw new PlannerConfigurationError('Duplicate option: --batch-size specified more than once.');
+      }
+      seenFlags.add('batch-size');
+      batchSize = validateIntegerArg('--batch-size', flagValue, 1, 10000);
+    } else if (flagName === '--max-entities') {
+      if (seenFlags.has('max-entities')) {
+        throw new PlannerConfigurationError('Duplicate option: --max-entities specified more than once.');
+      }
+      seenFlags.add('max-entities');
+      maxEntities = validateIntegerArg('--max-entities', flagValue, 1, 1000000);
+    } else if (flagName === '--max-ledger-entries') {
+      if (seenFlags.has('max-ledger-entries')) {
+        throw new PlannerConfigurationError('Duplicate option: --max-ledger-entries specified more than once.');
+      }
+      seenFlags.add('max-ledger-entries');
+      maxLedgerEntries = validateIntegerArg('--max-ledger-entries', flagValue, 1, 1000000);
+    } else if (flagName === '--output') {
+      if (seenFlags.has('output')) {
+        throw new PlannerConfigurationError('Duplicate option: --output specified more than once.');
+      }
+      seenFlags.add('output');
+      const trimmed = flagValue.trim();
+      if (!trimmed || trimmed.includes('\0')) {
+        throw new PlannerConfigurationError('Invalid --output: expected a non-empty file path without null bytes.');
+      }
+      outputPath = trimmed;
     }
   }
 
@@ -193,6 +269,90 @@ export const parseCliOptions = (args: string[]): ParsedCliConfig => {
     outputPath,
     isJson,
     includeDetailedIdentifiers,
+    showHelp,
+  };
+};
+
+export interface PrincipalRoleCompatibilityRule {
+  principalType: 'HOSPITAL' | 'AMBULANCE_PROVIDER' | 'AMBULANCE_DRIVER';
+  expectedOrgType: OrganizationType;
+  allowedAdministrativeRoles: readonly MembershipRole[];
+  allowedOperationalRoles: readonly MembershipRole[];
+}
+
+export const MEMBERSHIP_ROLE_COMPATIBILITY_MATRIX: Record<
+  'HOSPITAL' | 'AMBULANCE_PROVIDER' | 'AMBULANCE_DRIVER',
+  PrincipalRoleCompatibilityRule
+> = {
+  HOSPITAL: {
+    principalType: 'HOSPITAL',
+    expectedOrgType: 'HOSPITAL_NETWORK',
+    allowedAdministrativeRoles: ['HOSPITAL_ADMIN', 'ORG_ADMIN'],
+    allowedOperationalRoles: ['HOSPITAL_ADMIN', 'ORG_ADMIN'],
+  },
+  AMBULANCE_PROVIDER: {
+    principalType: 'AMBULANCE_PROVIDER',
+    expectedOrgType: 'AMBULANCE_OPERATOR',
+    allowedAdministrativeRoles: ['PROVIDER_ADMIN', 'ORG_ADMIN'],
+    allowedOperationalRoles: ['PROVIDER_ADMIN', 'ORG_ADMIN'],
+  },
+  AMBULANCE_DRIVER: {
+    principalType: 'AMBULANCE_DRIVER',
+    expectedOrgType: 'AMBULANCE_OPERATOR',
+    allowedAdministrativeRoles: [],
+    allowedOperationalRoles: ['DRIVER'],
+  },
+};
+
+export const isRoleCompatibleForInheritance = (
+  principalType: 'HOSPITAL' | 'AMBULANCE_PROVIDER' | 'AMBULANCE_DRIVER',
+  role: MembershipRole,
+  orgType: OrganizationType
+): { compatible: boolean; reason?: string } => {
+  const rule = MEMBERSHIP_ROLE_COMPATIBILITY_MATRIX[principalType];
+  if (!rule) {
+    return { compatible: false, reason: `Unknown principal type '${principalType}'.` };
+  }
+  if (orgType !== rule.expectedOrgType) {
+    return {
+      compatible: false,
+      reason: `Principal type '${principalType}' cannot belong to organization type '${orgType}' (expected '${rule.expectedOrgType}').`,
+    };
+  }
+  const allAllowed = [...rule.allowedAdministrativeRoles, ...rule.allowedOperationalRoles];
+  if (!allAllowed.includes(role)) {
+    return {
+      compatible: false,
+      reason: `Role '${role}' is not compatible with principal type '${principalType}' in '${orgType}'. Expected one of: ${allAllowed.join(', ')}.`,
+    };
+  }
+  return { compatible: true };
+};
+
+export const validatePlannerOptions = (options: PlannerOptions): Required<Omit<PlannerOptions, 'outputPath'>> => {
+  const batchSize = options.batchSize !== undefined
+    ? validateIntegerArg('batchSize', String(options.batchSize), 1, 10000)
+    : 500;
+
+  const maxEntities = options.maxEntities !== undefined
+    ? validateIntegerArg('maxEntities', String(options.maxEntities), 1, 1000000)
+    : 100000;
+
+  const maxLedgerEntries = options.maxLedgerEntries !== undefined
+    ? validateIntegerArg('maxLedgerEntries', String(options.maxLedgerEntries), 1, 1000000)
+    : 100000;
+
+  const includeDetailedIdentifiers = Boolean(options.includeDetailedIdentifiers);
+  const migrationVersion = options.migrationVersion !== undefined
+    ? (options.migrationVersion.trim() || 'DATA-01C-V1')
+    : 'DATA-01C-V1';
+
+  return {
+    batchSize,
+    maxEntities,
+    maxLedgerEntries,
+    includeDetailedIdentifiers,
+    migrationVersion,
   };
 };
 
@@ -205,11 +365,8 @@ export const generateDeterministicId = (seed: string): string => {
 };
 
 export const planOrganizationBackfill = async (options: PlannerOptions = {}): Promise<BackfillPlanReport> => {
-  const batchSize = Math.max(1, options.batchSize ?? 500);
-  const maxEntities = options.maxEntities ?? 100000;
-  const maxLedgerEntries = options.maxLedgerEntries ?? 100000;
-  const includeDetailedIdentifiers = options.includeDetailedIdentifiers ?? false;
-  const migrationVersion = options.migrationVersion ?? 'DATA-01C-V1';
+  const validatedOptions = validatePlannerOptions(options);
+  const { batchSize, maxEntities, maxLedgerEntries, includeDetailedIdentifiers, migrationVersion } = validatedOptions;
 
   const timestamp = new Date().toISOString();
   const databaseName = mongoose.connection.name || 'unknown';
@@ -622,23 +779,42 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
               ...(identifier ? { identifier } : {}),
             });
           } else {
-            // Verified active HOSPITAL_NETWORK organization
-            hospitalCounts.plannedUpdates++;
-            addEntry({
-              migrationVersion,
-              idempotencyKey: `hosp:update-from-mem:${hospId}`,
-              sourceEntity: 'HOSPITAL',
-              sourceId: hospId,
-              action: 'UPDATE_ENTITY_ORGANIZATION',
-              proposedOrganizationId: memOrgId,
-              proposedOrganizationType: 'HOSPITAL_NETWORK',
-              confidence: 'DETERMINISTIC',
-              status: 'PLANNED',
-              requiresManualReview: false,
-              mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
-              reason: `Inherit organization from verified existing active membership in '${memOrgId}'.`,
-              ...(identifier ? { identifier } : {}),
-            });
+            // Check explicit role compatibility before inferring organization
+            const roleCheck = isRoleCompatibleForInheritance('HOSPITAL', mem.role, memOrg.type);
+            if (!roleCheck.compatible) {
+              hospitalCounts.manualReview++;
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `hosp:mem-incompatible-role:${hospId}`,
+                sourceEntity: 'HOSPITAL',
+                sourceId: hospId,
+                action: 'MANUAL_REVIEW',
+                confidence: 'INVALID',
+                status: 'MANUAL_REVIEW',
+                requiresManualReview: true,
+                mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+                reason: `Hospital has active membership in organization '${memOrgId}' but role '${mem.role}' is incompatible. ${roleCheck.reason}`,
+                ...(identifier ? { identifier } : {}),
+              });
+            } else {
+              // Verified active HOSPITAL_NETWORK organization and compatible role
+              hospitalCounts.plannedUpdates++;
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `hosp:update-from-mem:${hospId}`,
+                sourceEntity: 'HOSPITAL',
+                sourceId: hospId,
+                action: 'UPDATE_ENTITY_ORGANIZATION',
+                proposedOrganizationId: memOrgId,
+                proposedOrganizationType: 'HOSPITAL_NETWORK',
+                confidence: 'DETERMINISTIC',
+                status: 'PLANNED',
+                requiresManualReview: false,
+                mappingRule: 'RULE_1_HOSPITAL_NETWORK_AUTHORITY',
+                reason: `Inherit organization from verified existing active membership in '${memOrgId}' with compatible role '${mem.role}'.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            }
           }
         } else {
           // Zero memberships exist and no direct organizationId: pure standalone hospital
@@ -1102,24 +1278,44 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
               ...(identifier ? { identifier } : {}),
             });
           } else {
-            // Verified active AMBULANCE_OPERATOR organization
-            providerCounts.plannedUpdates++;
-            plannedOrganizations.set(provId, { orgId: memOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
-            addEntry({
-              migrationVersion,
-              idempotencyKey: `prov:update-from-mem:${provId}`,
-              sourceEntity: 'AMBULANCE_PROVIDER',
-              sourceId: provId,
-              action: 'UPDATE_ENTITY_ORGANIZATION',
-              proposedOrganizationId: memOrgId,
-              proposedOrganizationType: 'AMBULANCE_OPERATOR',
-              confidence: 'DETERMINISTIC',
-              status: 'PLANNED',
-              requiresManualReview: false,
-              mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
-              reason: `Inherit organization from verified existing active membership in '${memOrgId}'.`,
-              ...(identifier ? { identifier } : {}),
-            });
+            // Check explicit role compatibility before inferring organization
+            const roleCheck = isRoleCompatibleForInheritance('AMBULANCE_PROVIDER', mem.role, memOrg.type);
+            if (!roleCheck.compatible) {
+              providerCounts.manualReview++;
+              plannedOrganizations.set(provId, { orgId: memOrgId, type: memOrg.type, isDeterministic: false });
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `prov:mem-incompatible-role:${provId}`,
+                sourceEntity: 'AMBULANCE_PROVIDER',
+                sourceId: provId,
+                action: 'MANUAL_REVIEW',
+                confidence: 'INVALID',
+                status: 'MANUAL_REVIEW',
+                requiresManualReview: true,
+                mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+                reason: `Provider has active membership in organization '${memOrgId}' but role '${mem.role}' is incompatible. ${roleCheck.reason}`,
+                ...(identifier ? { identifier } : {}),
+              });
+            } else {
+              // Verified active AMBULANCE_OPERATOR organization and compatible role
+              providerCounts.plannedUpdates++;
+              plannedOrganizations.set(provId, { orgId: memOrgId, type: 'AMBULANCE_OPERATOR', isDeterministic: true });
+              addEntry({
+                migrationVersion,
+                idempotencyKey: `prov:update-from-mem:${provId}`,
+                sourceEntity: 'AMBULANCE_PROVIDER',
+                sourceId: provId,
+                action: 'UPDATE_ENTITY_ORGANIZATION',
+                proposedOrganizationId: memOrgId,
+                proposedOrganizationType: 'AMBULANCE_OPERATOR',
+                confidence: 'DETERMINISTIC',
+                status: 'PLANNED',
+                requiresManualReview: false,
+                mappingRule: 'RULE_2_AMBULANCE_OPERATOR_AUTHORITY',
+                reason: `Inherit organization from verified existing active membership in '${memOrgId}' with compatible role '${mem.role}'.`,
+                ...(identifier ? { identifier } : {}),
+              });
+            }
           }
         } else {
           // Pure standalone provider: deterministically create dedicated AMBULANCE_OPERATOR
@@ -1591,14 +1787,27 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
   const citizenEmergenciesCount = await EmergencyRequestModel.countDocuments();
 
   // -------------------------------------------------------------
-  // Summary calculations
+  // Summary calculations (Single pass to eliminate duplicate throwaway array allocations)
   // -------------------------------------------------------------
-  const proposedOrgCreates = ledger.filter((e) => e.action === 'CREATE_ORGANIZATION').length;
-  const proposedMemCreates = ledger.filter((e) => e.action === 'CREATE_MEMBERSHIP').length;
-  const proposedUpdates = ledger.filter((e) => e.action === 'UPDATE_ENTITY_ORGANIZATION').length;
-  const proposedInherits = ledger.filter((e) => e.action === 'INHERIT_PROVIDER_ORGANIZATION').length;
-  const skips = ledger.filter((e) => e.action === 'SKIP_ALREADY_CONFIGURED').length;
-  const manualReviewEntries = ledger.filter((e) => e.requiresManualReview);
+  let proposedOrgCreates = 0;
+  let proposedMemCreates = 0;
+  let proposedUpdates = 0;
+  let proposedInherits = 0;
+  let skips = 0;
+  const manualReviewEntries: MigrationLedgerEntry[] = [];
+
+  for (let i = 0; i < ledger.length; i++) {
+    const e = ledger[i]!;
+    if (e.action === 'CREATE_ORGANIZATION') proposedOrgCreates++;
+    else if (e.action === 'CREATE_MEMBERSHIP') proposedMemCreates++;
+    else if (e.action === 'UPDATE_ENTITY_ORGANIZATION') proposedUpdates++;
+    else if (e.action === 'INHERIT_PROVIDER_ORGANIZATION') proposedInherits++;
+    else if (e.action === 'SKIP_ALREADY_CONFIGURED') skips++;
+
+    if (e.requiresManualReview) {
+      manualReviewEntries.push(e);
+    }
+  }
 
   const summary: BackfillPlanSummary = {
     totalEntitiesScanned,
@@ -1644,7 +1853,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
       databaseLevelEnforcementRecommendation:
         'Run planner using a dedicated MongoDB user configured with the least-privilege "read" role: db.createUser({ user: "resq_readonly", pwd: "<password>", roles: [{ role: "read", db: "resq" }] })',
       memoryComplexity:
-        'Documented Complexity: Query working memory per batch is O(batchSize). Cumulative in-memory ledger is O(M) and provider mapping is O(P), where M <= maxLedgerEntries (default 100,000) and P <= maxEntities (default 100,000). Total memory is strictly bounded by explicit configuration limits and enforced via PlannerThresholdExceededError and PlannerLedgerLimitExceededError.',
+        'Documented Complexity: Query working memory per batch is O(batchSize). Cumulative in-memory ledger is O(M) and provider mapping is O(P), where M <= maxLedgerEntries (configured maximum, default 100,000) and P <= maxEntities (configured maximum, default 100,000). Total memory is strictly bounded by explicit configuration limits and enforced via PlannerThresholdExceededError and PlannerLedgerLimitExceededError. Note: Memory is linear with respect to the configured maximum limits, not strictly constant O(1), because the migration ledger is retained in memory for report generation.',
     },
     configuration: {
       batchSize,
@@ -1748,6 +1957,7 @@ export const savePlanToFile = (plan: BackfillPlanReport, outputPath?: string): s
   // Write through a secure temporary file with restrictive permissions (0o600)
   const tempPath = path.join(dir, `.tmp-plan-${process.pid}-${crypto.randomBytes(8).toString('hex')}.json`);
   let fd: number | null = null;
+  let renamed = false;
 
   try {
     // Open exclusively with O_CREAT | O_EXCL to prevent symlink and race conditions
@@ -1766,6 +1976,7 @@ export const savePlanToFile = (plan: BackfillPlanReport, outputPath?: string): s
 
     // Atomically finalize report via rename
     fs.renameSync(tempPath, resolvedPath);
+    renamed = true;
 
     // Fail-closed enforcement on target file
     fs.chmodSync(resolvedPath, 0o600);
@@ -1784,16 +1995,51 @@ export const savePlanToFile = (plan: BackfillPlanReport, outputPath?: string): s
         // ignore
       }
     }
-    // Clean up partial temp file on failure
-    if (fs.existsSync(tempPath)) {
+    // Clean up partial temp file on failure before rename
+    if (!renamed && fs.existsSync(tempPath)) {
       try {
         fs.unlinkSync(tempPath);
       } catch {
         // ignore
       }
     }
+    // Fail-closed: If failure occurred AFTER rename (e.g. chmodSync or mode check failed on target file),
+    // remove the target file so no insecure or misleading artifact remains on disk.
+    if (renamed && fs.existsSync(resolvedPath)) {
+      try {
+        fs.unlinkSync(resolvedPath);
+      } catch {
+        // ignore
+      }
+    }
     throw err;
   }
+};
+
+export const printHelp = (): void => {
+  console.log(`
+ResQ 2.0 — Organization Backfill Migration Planner (DRY-RUN ONLY)
+
+Usage:
+  tsx src/scripts/planOrganizationBackfill.ts [options]
+  npm run plan:backfill -- [options]
+
+Options:
+  --batch-size <num>, --batch-size=<num>
+      Number of entities to query per batch (1 - 10000, default: 500).
+  --max-entities <num>, --max-entities=<num>
+      Safety threshold for total entities scanned (1 - 1000000, default: 100000).
+  --max-ledger-entries <num>, --max-ledger-entries=<num>
+      Safety threshold for total planned ledger actions (1 - 1000000, default: 100000).
+  --output <path>, --output=<path>
+      Path to write the JSON migration plan report.
+  --json
+      Output report JSON to stdout (suppresses human-readable summary).
+  --include-identifiers
+      Include non-sensitive entity identifiers (e.g. registration numbers, names) in report.
+  --help, -h
+      Show this help message.
+`);
 };
 
 const isMainModule = (): boolean => {
@@ -1817,10 +2063,18 @@ export const execute = async (): Promise<void> => {
     return;
   }
 
+  if (cliConfig.showHelp) {
+    printHelp();
+    return;
+  }
+
   const { batchSize, maxEntities, maxLedgerEntries, outputPath, isJson, includeDetailedIdentifiers } = cliConfig;
   const sanitizedUri = sanitizeMongoUri(env.MONGODB_URI);
 
   if (!isJson) {
+    console.log(`ResQ 2.0 — Organization Backfill Migration Planner (DRY-RUN ONLY)`);
+    console.log(`Configuration: batch-size=${batchSize}, max-entities=${maxEntities}, max-ledger-entries=${maxLedgerEntries}`);
+    if (outputPath) console.log(`Output Path: ${outputPath}`);
     console.log(`Connecting to database (${sanitizedUri})...`);
   }
 

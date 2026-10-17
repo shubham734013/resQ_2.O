@@ -62,5 +62,12 @@ jobs:
       - name: Run backend tests with SOS integration enabled
         run: npm test
         env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://127.0.0.1:27017/resq_automated_test?replicaSet=rs0&directConnection=true
+          TEST_MONGODB_URI: mongodb://127.0.0.1:27017/resq_automated_test?replicaSet=rs0&directConnection=true
           SOS_TEST_MONGODB_URI: mongodb://127.0.0.1:27017/resq_sos_test?replicaSet=rs0
+          JWT_SECRET: ci-test-only-jwt-secret-0123456789abcdef
+          JWT_REFRESH_SECRET: ci-test-only-jwt-refresh-0123456789abcdef
+          RESQ_ADMIN_EMAIL: admin@resq.test
+          RESQ_ADMIN_PASSWORD: ci-test-only-admin-password-123
       - run: npm run build

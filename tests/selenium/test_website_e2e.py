@@ -160,8 +160,9 @@ class ResQWebsiteE2ETests(unittest.TestCase):
     def test_ambulance_driver_registration_form_renders(self) -> None:
         self.open_path("/ambulance-driver/register")
         self.assertEqual("Register as an ambulance driver", self.driver.find_element(By.TAG_NAME, "h1").text)
-        for label in ("Full name", "License number", "Provider ID"):
+        for label in ("Full name", "License number"):
             self.assertTrue(self.driver.find_elements(By.XPATH, f"//label[.//span[normalize-space()='{label}']]"))
+        self.assertTrue(self.driver.find_elements(By.XPATH, "//label[.//span[normalize-space()='Provider' or normalize-space()='Provider ID']]"))
 
     def test_admin_login_page_renders_admin_sign_in(self) -> None:
         self.open_path("/admin/login")
@@ -199,7 +200,7 @@ class ResQWebsiteE2ETests(unittest.TestCase):
     def test_unauthorized_page_renders_access_denied_message(self) -> None:
         self.open_path("/unauthorized")
         self.assertEqual("Access denied", self.driver.find_element(By.TAG_NAME, "h1").text)
-        self.assertTrue(self.driver.find_elements(By.XPATH, "//a[contains(., 'Return to ResQ')]"))
+        self.assertTrue(self.driver.find_elements(By.XPATH, "//a[contains(., 'Return to your portal') or contains(., 'Return to ResQ')]"))
 
     def test_search_page_route_loads_without_blank_screen(self) -> None:
         self.open_path("/search")

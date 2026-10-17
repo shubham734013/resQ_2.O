@@ -19,6 +19,9 @@ import {
   generateDeterministicId,
   parseCliOptions,
   validateIntegerArg,
+  validatePlannerOptions,
+  isRoleCompatibleForInheritance,
+  MEMBERSHIP_ROLE_COMPATIBILITY_MATRIX,
   PlannerThresholdExceededError,
   PlannerLedgerLimitExceededError,
   PlannerConfigurationError,
@@ -1242,12 +1245,12 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
     assert.ok(mixedDriverEntry.reason.includes('mixed membership states'));
   });
 
-  it('20. CLI configuration validation: strictly rejects non-integer, negative, zero, and out-of-range parameters', () => {
+  it('20. CLI configuration validation: strictly accepts equals and space-separated syntax, rejects invalid, unknown, duplicate, and missing options', () => {
     // Direct validator assertions
     assert.equal(validateIntegerArg('--batch-size', '50', 1, 100), 50);
 
-    // Valid options parsing
-    const valid = parseCliOptions([
+    // Valid equals-separated options parsing
+    const validEquals = parseCliOptions([
       '--batch-size=250',
       '--max-entities=5000',
       '--max-ledger-entries=8000',
@@ -1255,12 +1258,99 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       '--json',
       '--include-identifiers',
     ]);
-    assert.equal(valid.batchSize, 250);
-    assert.equal(valid.maxEntities, 5000);
-    assert.equal(valid.maxLedgerEntries, 8000);
-    assert.equal(valid.outputPath, '/tmp/valid-plan.json');
-    assert.equal(valid.isJson, true);
-    assert.equal(valid.includeDetailedIdentifiers, true);
+    assert.equal(validEquals.batchSize, 250);
+    assert.equal(validEquals.maxEntities, 5000);
+    assert.equal(validEquals.maxLedgerEntries, 8000);
+    assert.equal(validEquals.outputPath, '/tmp/valid-plan.json');
+    assert.equal(validEquals.isJson, true);
+    assert.equal(validEquals.includeDetailedIdentifiers, true);
+    assert.equal(validEquals.showHelp, false);
+
+    // Valid space-separated options parsing
+    const validSpaces = parseCliOptions([
+      '--batch-size', '300',
+      '--max-entities', '6000',
+      '--max-ledger-entries', '9000',
+      '--output', '/tmp/space-plan.json',
+      '--include-identifiers',
+    ]);
+    assert.equal(validSpaces.batchSize, 300);
+    assert.equal(validSpaces.maxEntities, 6000);
+    assert.equal(validSpaces.maxLedgerEntries, 9000);
+    assert.equal(validSpaces.outputPath, '/tmp/space-plan.json');
+    assert.equal(validSpaces.isJson, false);
+    assert.equal(validSpaces.includeDetailedIdentifiers, true);
+    assert.equal(validSpaces.showHelp, false);
+
+    // Help option parsing (--help and -h)
+    const helpLong = parseCliOptions(['--help']);
+    assert.equal(helpLong.showHelp, true);
+    const helpShort = parseCliOptions(['-h']);
+    assert.equal(helpShort.showHelp, true);
+
+    // Reject unknown options
+    assert.throws(
+      () => parseCliOptions(['--unknown-flag']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes("Unknown option: '--unknown-flag'"));
+        return true;
+      }
+    );
+
+    // Reject positional arguments
+    assert.throws(
+      () => parseCliOptions(['extraPositionalArg']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes("Unexpected positional argument or unknown option: 'extraPositionalArg'"));
+        return true;
+      }
+    );
+
+    // Reject duplicate options
+    assert.throws(
+      () => parseCliOptions(['--batch-size=100', '--batch-size=200']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Duplicate option: --batch-size'));
+        return true;
+      }
+    );
+    assert.throws(
+      () => parseCliOptions(['--json', '--json']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Duplicate option: --json'));
+        return true;
+      }
+    );
+    assert.throws(
+      () => parseCliOptions(['--output', '/tmp/a.json', '--output=/tmp/b.json']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Duplicate option: --output'));
+        return true;
+      }
+    );
+
+    // Reject missing option values
+    assert.throws(
+      () => parseCliOptions(['--batch-size']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes("Missing value for option '--batch-size'"));
+        return true;
+      }
+    );
+    assert.throws(
+      () => parseCliOptions(['--batch-size', '--output', '/tmp/out.json']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes("Missing value for option '--batch-size'"));
+        return true;
+      }
+    );
 
     // Reject non-integer batch size
     assert.throws(
@@ -1331,6 +1421,16 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
         return true;
       }
     );
+
+    // Reject whitespace-only output path
+    assert.throws(
+      () => parseCliOptions(['--output', '   ']),
+      (err: unknown) => {
+        assert.ok(err instanceof PlannerConfigurationError);
+        assert.ok(err.message.includes('Invalid --output'));
+        return true;
+      }
+    );
   });
 
   it('21. ledger limit enforcement: maxLedgerEntries limit throws PlannerLedgerLimitExceededError', async () => {
@@ -1377,6 +1477,143 @@ describe('DATA-01C Organization Backfill Planning and Dry-Run (TASK 03 & HARDENI
       if (fs.existsSync(symlinkTarget)) fs.unlinkSync(symlinkTarget);
       if (fs.existsSync(realTarget)) fs.unlinkSync(realTarget);
       if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
+    }
+  });
+
+  it('23. programmatic options validation: enforces constraints before connecting or processing data', () => {
+    // Valid options
+    const valid = validatePlannerOptions({
+      batchSize: 200,
+      maxEntities: 50000,
+      maxLedgerEntries: 50000,
+      includeDetailedIdentifiers: true,
+      migrationVersion: 'TEST-V1',
+    });
+    assert.equal(valid.batchSize, 200);
+    assert.equal(valid.maxEntities, 50000);
+    assert.equal(valid.maxLedgerEntries, 50000);
+    assert.equal(valid.includeDetailedIdentifiers, true);
+    assert.equal(valid.migrationVersion, 'TEST-V1');
+
+    // Reject non-integer / negative / zero / out-of-range via programmatic API
+    assert.throws(
+      () => validatePlannerOptions({ batchSize: 0 }),
+      /Invalid batchSize: expected a positive integer between 1 and 10000/
+    );
+    assert.throws(
+      () => validatePlannerOptions({ batchSize: -5 }),
+      /Invalid batchSize: expected a positive integer between 1 and 10000/
+    );
+    assert.throws(
+      () => validatePlannerOptions({ batchSize: 50000 }),
+      /Invalid batchSize: expected a positive integer between 1 and 10000/
+    );
+    assert.throws(
+      () => validatePlannerOptions({ maxEntities: 0 }),
+      /Invalid maxEntities: expected a positive integer between 1 and 1000000/
+    );
+    assert.throws(
+      () => validatePlannerOptions({ maxLedgerEntries: 0 }),
+      /Invalid maxLedgerEntries: expected a positive integer between 1 and 1000000/
+    );
+    assert.throws(
+      () => validatePlannerOptions({ maxEntities: 5000000 }),
+      /Invalid maxEntities: expected a positive integer between 1 and 1000000/
+    );
+  });
+
+  it('24. membership role compatibility matrix: verifies supported and unsupported combinations across principal types', () => {
+    // Verify matrix structure
+    assert.equal(MEMBERSHIP_ROLE_COMPATIBILITY_MATRIX.HOSPITAL.expectedOrgType, 'HOSPITAL_NETWORK');
+    assert.equal(MEMBERSHIP_ROLE_COMPATIBILITY_MATRIX.AMBULANCE_PROVIDER.expectedOrgType, 'AMBULANCE_OPERATOR');
+    assert.equal(MEMBERSHIP_ROLE_COMPATIBILITY_MATRIX.AMBULANCE_DRIVER.expectedOrgType, 'AMBULANCE_OPERATOR');
+
+    // 1. HOSPITAL principal type
+    assert.deepEqual(
+      isRoleCompatibleForInheritance('HOSPITAL', 'HOSPITAL_ADMIN', 'HOSPITAL_NETWORK'),
+      { compatible: true }
+    );
+    assert.deepEqual(
+      isRoleCompatibleForInheritance('HOSPITAL', 'ORG_ADMIN', 'HOSPITAL_NETWORK'),
+      { compatible: true }
+    );
+    const hospWrongRole = isRoleCompatibleForInheritance('HOSPITAL', 'DRIVER', 'HOSPITAL_NETWORK');
+    assert.equal(hospWrongRole.compatible, false);
+    assert.ok(hospWrongRole.reason?.includes("Role 'DRIVER' is not compatible with principal type 'HOSPITAL'"));
+
+    const hospMemberRole = isRoleCompatibleForInheritance('HOSPITAL', 'ORG_MEMBER', 'HOSPITAL_NETWORK');
+    assert.equal(hospMemberRole.compatible, false);
+
+    const hospWrongOrg = isRoleCompatibleForInheritance('HOSPITAL', 'HOSPITAL_ADMIN', 'AMBULANCE_OPERATOR');
+    assert.equal(hospWrongOrg.compatible, false);
+    assert.ok(hospWrongOrg.reason?.includes("cannot belong to organization type 'AMBULANCE_OPERATOR'"));
+
+    // 2. AMBULANCE_PROVIDER principal type
+    assert.deepEqual(
+      isRoleCompatibleForInheritance('AMBULANCE_PROVIDER', 'PROVIDER_ADMIN', 'AMBULANCE_OPERATOR'),
+      { compatible: true }
+    );
+    assert.deepEqual(
+      isRoleCompatibleForInheritance('AMBULANCE_PROVIDER', 'ORG_ADMIN', 'AMBULANCE_OPERATOR'),
+      { compatible: true }
+    );
+    const provWrongRole = isRoleCompatibleForInheritance('AMBULANCE_PROVIDER', 'DRIVER', 'AMBULANCE_OPERATOR');
+    assert.equal(provWrongRole.compatible, false);
+    assert.ok(provWrongRole.reason?.includes("Role 'DRIVER' is not compatible with principal type 'AMBULANCE_PROVIDER'"));
+
+    const provHospAdmin = isRoleCompatibleForInheritance('AMBULANCE_PROVIDER', 'HOSPITAL_ADMIN', 'AMBULANCE_OPERATOR');
+    assert.equal(provHospAdmin.compatible, false);
+
+    const provWrongOrg = isRoleCompatibleForInheritance('AMBULANCE_PROVIDER', 'PROVIDER_ADMIN', 'HOSPITAL_NETWORK');
+    assert.equal(provWrongOrg.compatible, false);
+
+    // 3. AMBULANCE_DRIVER principal type
+    assert.deepEqual(
+      isRoleCompatibleForInheritance('AMBULANCE_DRIVER', 'DRIVER', 'AMBULANCE_OPERATOR'),
+      { compatible: true }
+    );
+    const drvAdmin = isRoleCompatibleForInheritance('AMBULANCE_DRIVER', 'ORG_ADMIN', 'AMBULANCE_OPERATOR');
+    assert.equal(drvAdmin.compatible, false);
+    assert.ok(drvAdmin.reason?.includes("Role 'ORG_ADMIN' is not compatible with principal type 'AMBULANCE_DRIVER'"));
+
+    const drvWrongOrg = isRoleCompatibleForInheritance('AMBULANCE_DRIVER', 'DRIVER', 'HOSPITAL_NETWORK');
+    assert.equal(drvWrongOrg.compatible, false);
+  });
+
+  it('25. secure report output failure recovery: post-rename failure cleans up target file without leaving partial artifact', async () => {
+    const plan = await planOrganizationBackfill();
+    const targetFile = path.resolve(process.cwd(), 'reports', `test-recovery-${Date.now()}.json`);
+
+    // Spy/stub on fs.chmodSync to simulate post-rename failure when chmodding the target file
+    const originalChmodSync = fs.chmodSync;
+    let chmodInvocationCount = 0;
+
+    try {
+      fs.chmodSync = (filePath: fs.PathLike, mode: fs.Mode) => {
+        chmodInvocationCount++;
+        // Allow the first chmod on the temp file, but fail the second chmod on the renamed target file
+        if (chmodInvocationCount === 2) {
+          throw new Error('Simulated disk/permission failure during target file chmodSync');
+        }
+        return originalChmodSync(filePath, mode);
+      };
+
+      assert.throws(
+        () => savePlanToFile(plan, targetFile),
+        /Simulated disk\/permission failure during target file chmodSync/
+      );
+
+      // Verify fail-closed cleanup: targetFile must NOT exist on disk!
+      assert.equal(
+        fs.existsSync(targetFile),
+        false,
+        'Target report file must be unlinked and cleaned up if post-rename steps fail'
+      );
+    } finally {
+      fs.chmodSync = originalChmodSync;
+      if (fs.existsSync(targetFile)) {
+        fs.unlinkSync(targetFile);
+      }
     }
   });
 });
