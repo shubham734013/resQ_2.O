@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Types } from 'mongoose';
 import { ACCOUNT_STATUSES, VERIFICATION_STATUSES, type AccountStatus, type VerificationStatus } from '../types/roles.js';
 
 export const HOSPITAL_EMERGENCY_AVAILABILITY = ['AVAILABLE', 'LIMITED', 'UNAVAILABLE', 'UNKNOWN'] as const;
@@ -28,6 +28,7 @@ export interface HospitalDocument {
   operationalDescription?: string;
   verificationStatus: VerificationStatus;
   accountStatus: AccountStatus;
+  organizationId?: Types.ObjectId;
   passwordResetTokenHash?: string;
   passwordResetExpiresAt?: Date;
   createdAt: Date;
@@ -59,6 +60,7 @@ const hospitalSchema = new Schema<HospitalDocument>({
   operationalDescription: { type: String, trim: true },
   verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING', index: true },
   accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
+  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: false, index: true },
   passwordResetTokenHash: { type: String, select: false },
   passwordResetExpiresAt: { type: Date, select: false },
 }, { timestamps: true });

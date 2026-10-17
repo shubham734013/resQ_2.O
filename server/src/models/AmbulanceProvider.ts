@@ -1,10 +1,10 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Types } from 'mongoose';
 import { ACCOUNT_STATUSES, VERIFICATION_STATUSES, type AccountStatus, type VerificationStatus } from '../types/roles.js';
 import type { AuthProvider } from './User.js';
 export interface AmbulanceProviderDocument {
   name: string; registrationNumber: string; email: string; phone: string; passwordHash?: string; authProvider: AuthProvider; providerSubject?: string;
   profileCompletionStatus: 'INCOMPLETE'|'COMPLETE'; address?: string; city?: string; state?: string; country?: string; latitude?: number; longitude?: number;
-  serviceType: string; verificationStatus: VerificationStatus; accountStatus: AccountStatus; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; createdAt: Date; updatedAt: Date;
+  serviceType: string; verificationStatus: VerificationStatus; accountStatus: AccountStatus; organizationId?: Types.ObjectId; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceProviderDocument>({
   name: { type: String, required: true, trim: true }, registrationNumber: { type: String, required: true, unique: true, trim: true },
@@ -13,6 +13,7 @@ const schema = new Schema<AmbulanceProviderDocument>({
   providerSubject: { type: String }, profileCompletionStatus: { type: String, enum: ['INCOMPLETE','COMPLETE'], default: 'COMPLETE', index: true },
   address: String, city: String, state: String, country: String, latitude: Number, longitude: Number, serviceType: { type: String, required: true, default: '' },
   verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' }, accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: 'PENDING', index: true },
+  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: false, index: true },
   passwordResetTokenHash: { type: String, select: false },
   passwordResetExpiresAt: { type: Date, select: false },
 }, { timestamps: true });
