@@ -1,4 +1,4 @@
-import { Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Lock, ArrowLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
@@ -10,6 +10,8 @@ export const ResetPasswordPage = () => {
   const token = searchParams.get('token') ?? '';
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -83,28 +85,48 @@ export const ResetPasswordPage = () => {
 
             <label className="block text-xs font-semibold text-slate-700">
               New Password
-              <input
-                required
-                type="password"
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-teal-600 outline-none"
-              />
+              <div className="relative mt-1">
+                <input
+                  required
+                  type={showPassword ? 'text' : 'password'}
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="h-10 w-full rounded-xl border border-slate-200 pl-3 pr-10 text-sm focus:border-teal-600 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
 
             <label className="block text-xs font-semibold text-slate-700">
               Confirm New Password
-              <input
-                required
-                type="password"
-                minLength={8}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat new password"
-                className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm focus:border-teal-600 outline-none"
-              />
+              <div className="relative mt-1">
+                <input
+                  required
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat new password"
+                  className="h-10 w-full rounded-xl border border-slate-200 pl-3 pr-10 text-sm focus:border-teal-600 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
 
             <Button type="submit" variant="primary" className="w-full" disabled={submitting || !token}>

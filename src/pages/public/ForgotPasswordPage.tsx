@@ -1,12 +1,13 @@
-import { KeyRound, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import { KeyRound, ArrowLeft, Mail, CheckCircle2, Building2, User, Navigation, Ambulance } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { ROUTES } from '../../routes/routePaths';
 import { authApi } from '../../services/authApi';
 
 export const ForgotPasswordPage = () => {
-  const [email, setEmail] = useState('');
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get('email') ?? '');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -51,7 +52,7 @@ export const ForgotPasswordPage = () => {
             <div className="mt-6">
               <Link
                 to={ROUTES.PUBLIC.LOGIN}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white"
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white shadow-xs"
               >
                 Return to sign in
               </Link>
@@ -60,8 +61,27 @@ export const ForgotPasswordPage = () => {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <p className="text-xs text-slate-600 leading-relaxed">
-              Enter your registered ResQ email address. We will verify your account and transmit a secure recovery link.
+              Enter your registered email address. Password recovery is supported for all ResQ account types:
             </p>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium">
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                <User className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                <span>Citizen / User</span>
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                <Building2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+                <span>Hospital</span>
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                <Navigation className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                <span>Ambulance Driver</span>
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                <Ambulance className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                <span>Ambulance Provider</span>
+              </div>
+            </div>
 
             {error && (
               <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
