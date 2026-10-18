@@ -133,7 +133,7 @@ export const UserDashboardPage = () => {
     (item: HospitalAppointment) => item.status === 'CONFIRMED' || item.status === 'PENDING'
   );
 
-  const hospitals = nearbyHospitalsQ.data?.items ?? [];
+  const hospitals = useMemo(() => nearbyHospitalsQ.data?.items ?? [], [nearbyHospitalsQ.data?.items]);
 
   // ── Map markers ──────────────────────────────────────────────────────────
   const hospitalMarkers = useMemo(
@@ -234,9 +234,9 @@ export const UserDashboardPage = () => {
         {[
           {
             icon: '🚑',
-            label: 'Book Ambulance',
-            sub: 'Get nearest ambulance in minutes',
-            to: ROUTES.USER.AMBULANCES,
+            label: 'Emergency Ambulance',
+            sub: 'Instant 1-tap emergency dispatch',
+            to: ROUTES.USER.EMERGENCY,
             color: 'border-red-200 hover:border-red-300',
           },
           {
@@ -248,16 +248,16 @@ export const UserDashboardPage = () => {
           },
           {
             icon: '📅',
-            label: 'Book Appointment',
+            label: 'Doctor Appointments',
             sub: 'Schedule OPD & specialist visits',
             to: ROUTES.USER.APPOINTMENTS,
             color: 'border-emerald-200 hover:border-emerald-300',
           },
           {
-            icon: '❤️',
-            label: 'Health Services',
-            sub: 'Lab tests, pharmacy and more',
-            to: ROUTES.USER.HOSPITALS,
+            icon: '🩺',
+            label: 'Care Inquiries',
+            sub: 'Direct hospital care requests',
+            to: ROUTES.USER.REQUESTS,
             color: 'border-purple-200 hover:border-purple-300',
           },
         ].map((svc) => (
@@ -387,14 +387,14 @@ export const UserDashboardPage = () => {
                       <button
                         type="button"
                         disabled={!amb.available}
-                        onClick={() => navigate(ROUTES.USER.AMBULANCES)}
+                        onClick={() => navigate(ROUTES.USER.EMERGENCY)}
                         className={`rounded-xl py-1.5 text-xs font-bold transition-colors ${
                           amb.available
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-rose-600 text-white hover:bg-rose-700'
                             : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                         }`}
                       >
-                        {amb.available ? 'Book Now' : 'Unavailable'}
+                        {amb.available ? 'Request Dispatch' : 'Unavailable'}
                       </button>
                     </div>
                   ))}
@@ -554,7 +554,7 @@ export const UserDashboardPage = () => {
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <h3 className="text-xs font-bold text-slate-800">Recent Requests</h3>
-              <Link to={ROUTES.USER.HISTORY} className="text-[11px] font-bold text-blue-600 hover:underline">
+              <Link to={ROUTES.USER.REQUESTS} className="text-[11px] font-bold text-blue-600 hover:underline">
                 View All
               </Link>
             </div>

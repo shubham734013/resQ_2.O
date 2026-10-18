@@ -96,7 +96,11 @@ const DispatchCountdownCard = ({
   );
 };
 
-export const AmbulancePage=()=>{
+export interface AmbulancePageProps {
+  mode?: 'navigation' | 'request' | 'trips' | 'trip' | 'profile' | 'dashboard';
+}
+
+export const AmbulancePage=({ mode }: AmbulancePageProps = {})=>{
  const navigate=useNavigate();
  const {pathname}=useLocation();
  const qc=useQueryClient();
@@ -108,7 +112,7 @@ export const AmbulancePage=()=>{
  const refreshLocation = outletContext?.refreshLocation ?? fallbackLocationState.refreshLocation;
  const isDriverNamespace = pathname.startsWith('/driver');
  const basePrefix = isDriverNamespace ? '/driver' : '/ambulance';
- const routeMode=pathname
+ const routeMode=mode ?? pathname
    .replace('/driver/assignments', 'request')
    .replace('/driver/navigation', 'navigation')
    .replace('/driver/trips', 'trips')

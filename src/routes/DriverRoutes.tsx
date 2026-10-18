@@ -14,12 +14,12 @@ export const driverRoutes = (
         <Route element={<DriverLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DriverDashboardPage />} />
-          <Route path="assignments" element={<AmbulancePage />} />
-          <Route path="assignments/:assignmentId" element={<AmbulancePage />} />
-          <Route path="navigation" element={<AmbulancePage />} />
-          <Route path="navigation/:assignmentId" element={<AmbulancePage />} />
-          <Route path="trips" element={<AmbulancePage />} />
-          <Route path="trips/:tripId" element={<AmbulancePage />} />
+          <Route path="assignments" element={<AmbulancePage mode="request" />} />
+          <Route path="assignments/:assignmentId" element={<AmbulancePage mode="request" />} />
+          <Route path="navigation" element={<AmbulancePage mode="navigation" />} />
+          <Route path="navigation/:assignmentId" element={<AmbulancePage mode="navigation" />} />
+          <Route path="trips" element={<AmbulancePage mode="trips" />} />
+          <Route path="trips/:tripId" element={<AmbulancePage mode="trips" />} />
           <Route path="notifications" element={<DriverNotificationsPage />} />
           <Route path="profile" element={<DriverProfilePage />} />
           <Route path="settings" element={<DriverSettingsPage />} />

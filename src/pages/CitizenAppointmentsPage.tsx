@@ -16,11 +16,21 @@ import { Button } from '../components/common/Button';
 import type { AppointmentStatus } from '../services/hospitalAppointmentApi';
 import type { CareRequestStatus } from '../services/hospitalCareRequestApi';
 
-export const CitizenAppointmentsPage = () => {
+export interface CitizenAppointmentsPageProps {
+  initialTab?: 'appointments' | 'requests' | 'notifications';
+}
+
+export const CitizenAppointmentsPage = ({ initialTab = 'appointments' }: CitizenAppointmentsPageProps = {}) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'appointments' | 'requests' | 'notifications'>('appointments');
+  const [prevInitialTab, setPrevInitialTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState<'appointments' | 'requests' | 'notifications'>(initialTab);
+
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab);
+    setActiveTab(initialTab);
+  }
   const [appointmentStatusFilter, setAppointmentStatusFilter] = useState<AppointmentStatus | 'ALL'>('ALL');
   const [requestStatusFilter, setRequestStatusFilter] = useState<CareRequestStatus | 'ALL'>('ALL');
 

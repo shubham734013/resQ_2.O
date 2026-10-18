@@ -16,17 +16,19 @@ export const hospitalRoutes = (
           <Route path="dashboard" element={<HospitalDashboardPage />} />
           <Route path="requests" element={<HospitalPage tab="requests" />} />
           <Route path="requests/:requestId" element={<HospitalPage tab="requests" />} />
-          <Route path="emergencies" element={<HospitalPage tab="requests" />} />
-          <Route path="appointments" element={<HospitalAppointmentsPage />} />
-          <Route path="appointments/:appointmentId" element={<HospitalAppointmentsPage />} />
+          <Route path="care-requests" element={<HospitalAppointmentsPage initialSubTab="requests" />} />
+          <Route path="care-requests/:requestId" element={<HospitalAppointmentsPage initialSubTab="requests" />} />
+          <Route path="emergencies" element={<Navigate to="/hospital/requests" replace />} />
+          <Route path="appointments" element={<HospitalAppointmentsPage initialSubTab="appointments" />} />
+          <Route path="appointments/:appointmentId" element={<HospitalAppointmentsPage initialSubTab="appointments" />} />
           <Route path="emergency" element={<HospitalPage tab="emergency" />} />
           <Route path="patients" element={<HospitalPage tab="patients" />} />
           <Route path="services" element={<HospitalPage tab="services" />} />
           <Route path="availability" element={<HospitalPage tab="availability" />} />
-          <Route path="resources" element={<HospitalPage tab="services" />} />
+          <Route path="resources" element={<Navigate to="/hospital/availability" replace />} />
           <Route path="ambulances" element={<HospitalPage tab="ambulances" />} />
           <Route path="analytics" element={<HospitalAnalyticsPage />} />
-          <Route path="notifications" element={<HospitalPage tab="requests" />} />
+          <Route path="notifications" element={<Navigate to="/hospital/requests" replace />} />
           <Route path="profile" element={<HospitalPage tab="profile" />} />
           <Route path="settings" element={<HospitalSettingsPage />} />
         </Route>
