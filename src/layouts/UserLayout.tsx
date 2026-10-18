@@ -6,7 +6,6 @@ import {
   Calendar,
   AlertTriangle,
   Ambulance,
-  History,
   Bell,
   User,
   LogOut,
@@ -24,17 +23,24 @@ import { useAuth } from '../context/AuthContext';
 import { useLocationState } from '../hooks/useLocationState';
 import { ROUTES } from '../routes/routePaths';
 
+interface UserNavItem {
+  label: string;
+  path: string;
+  icon: React.ElementType;
+  isEmergency?: boolean;
+  badge?: number;
+}
+
 // ─── Nav items matching the reference image ────────────────────────────────
-const userNavItems = [
+const userNavItems: UserNavItem[] = [
   { label: 'Home', path: ROUTES.USER.DASHBOARD, icon: LayoutDashboard },
   { label: 'SOS Emergency', path: ROUTES.USER.EMERGENCY, icon: AlertTriangle, isEmergency: true },
   { label: 'Find Ambulance', path: ROUTES.USER.AMBULANCES, icon: Ambulance },
   { label: 'Nearby Hospitals', path: ROUTES.USER.HOSPITALS, icon: Building2 },
-  { label: 'Book Appointment', path: ROUTES.USER.APPOINTMENTS, icon: Calendar },
-  { label: 'Health Services', path: ROUTES.USER.HOSPITALS, icon: Heart },
-  { label: 'My Requests', path: ROUTES.USER.HISTORY, icon: History },
+  { label: 'Doctor Appointments', path: ROUTES.USER.APPOINTMENTS, icon: Calendar },
+  { label: 'Care Inquiries', path: ROUTES.USER.REQUESTS, icon: Heart },
   { label: 'Saved Locations', path: ROUTES.USER.SAVED, icon: Bookmark },
-  { label: 'Notifications', path: ROUTES.USER.NOTIFICATIONS, icon: Bell, badge: 3 },
+  { label: 'Notifications', path: ROUTES.USER.NOTIFICATIONS, icon: Bell },
   { label: 'Profile', path: ROUTES.USER.PROFILE, icon: User },
 ];
 

@@ -23,8 +23,18 @@ import { Button } from '../components/common/Button';
 import type { AppointmentStatus, DaySchedule } from '../services/hospitalAppointmentApi';
 import type { CareRequestStatus } from '../services/hospitalCareRequestApi';
 
-export const HospitalAppointmentsPage = () => {
-  const [subTab, setSubTab] = useState<'requests' | 'appointments' | 'availability'>('requests');
+export interface HospitalAppointmentsPageProps {
+  initialSubTab?: 'requests' | 'appointments' | 'availability';
+}
+
+export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: HospitalAppointmentsPageProps = {}) => {
+  const [prevInitialSubTab, setPrevInitialSubTab] = useState(initialSubTab);
+  const [subTab, setSubTab] = useState<'requests' | 'appointments' | 'availability'>(initialSubTab);
+
+  if (initialSubTab !== prevInitialSubTab) {
+    setPrevInitialSubTab(initialSubTab);
+    setSubTab(initialSubTab);
+  }
 
   // Request State
   const [requestStatusFilter, setRequestStatusFilter] = useState<CareRequestStatus | 'ALL'>('ALL');

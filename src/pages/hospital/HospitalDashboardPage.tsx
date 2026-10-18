@@ -107,9 +107,10 @@ export const HospitalDashboardPage = () => {
   const hospitalLat = profile.data?.latitude;
   const hospitalLng = profile.data?.longitude;
 
-  const allEmergencies = emergencies.data?.items ?? [];
-  const activeEmergencies = allEmergencies.filter(
-    (e) => !['RESOLVED', 'CANCELLED'].includes(e.status),
+  const allEmergencies = useMemo(() => emergencies.data?.items ?? [], [emergencies.data?.items]);
+  const activeEmergencies = useMemo(
+    () => allEmergencies.filter((e) => !['RESOLVED', 'CANCELLED'].includes(e.status)),
+    [allEmergencies]
   );
   const totalPatients = patients.data?.pagination.total ?? 0;
   const resources = profile.data?.resourceSummary ?? {};

@@ -26,13 +26,15 @@ export const userRoutes = (
           <Route path="saved" element={<SavedPage />} />
           <Route path="route" element={<RouteNavigationPage />} />
           <Route path="route/:facilityId" element={<RouteNavigationPage />} />
-          <Route path="appointments" element={<CitizenAppointmentsPage />} />
-          <Route path="appointments/:appointmentId" element={<CitizenAppointmentsPage />} />
+          <Route path="appointments" element={<CitizenAppointmentsPage initialTab="appointments" />} />
+          <Route path="appointments/:appointmentId" element={<CitizenAppointmentsPage initialTab="appointments" />} />
+          <Route path="requests" element={<CitizenAppointmentsPage initialTab="requests" />} />
+          <Route path="requests/:requestId" element={<CitizenAppointmentsPage initialTab="requests" />} />
           <Route path="emergency" element={<EmergencyPage />} />
           <Route path="emergency/:requestId" element={<EmergencyPage />} />
           <Route path="ambulances" element={<UserAmbulancesPage />} />
           <Route path="tracking/:requestId" element={<UserTrackingPage />} />
-          <Route path="history" element={<CitizenAppointmentsPage />} />
+          <Route path="history" element={<Navigate to="/user/requests" replace />} />
           <Route path="notifications" element={<UserNotificationsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<UserSettingsPage />} />
