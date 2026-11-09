@@ -1,0 +1,249 @@
+import { useEffect, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { AuthApiError } from '../../services/authApi';
+import type { AuthUser } from '../../types/auth';
+import { isMsalConfigured, msalInstance, loginRequest, ensureMsalInitialized } from '../../config/msalConfig';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            error_callback?: (error: unknown) => void;
+            ux_mode?: 'popup' | 'redirect';
+          }) => void;
+          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
+          prompt?: (momentListener?: (promptMomentNotification: unknown) => void) => void;
+        };
+      };
+    };
+  }
+}
+
+const loadScript = (src: string): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+    if (existing) {
+      if (existing.dataset.loaded === 'true') resolve();
+      else {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Authentication library failed to load')), {
+          once: true,
+        });
+      }
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
+    script.onerror = () => reject(new Error('Authentication library failed to load'));
+    document.head.appendChild(script);
+  });
+
+interface Props {
+  roleHint: 'USER' | 'AMBULANCE_PROVIDER';
+  onSuccess: (user: AuthUser) => void;
+  onError: (message: string) => void;
+}
+
+const messageFor = (error: unknown) => {
+  if (error instanceof AuthApiError) {
+    if (error.code === 'ROLE_MISMATCH') return 'This social account is already linked to another ResQ role.';
+    if (error.code === 'ACCOUNT_PENDING') return 'Your ResQ account is awaiting operational approval.';
+    if (error.code === 'ACCOUNT_SUSPENDED') return 'Your account has been suspended. Please contact ResQ support.';
+    if (error.code === 'ACCOUNT_REJECTED') return 'Your account registration was not approved.';
+    if (error.code === 'SOCIAL_AUTH_NOT_CONFIGURED') return 'Social login is not configured on the server.';
+    if (error.code === 'INVALID_SOCIAL_CREDENTIAL') return 'Social credential could not be verified. Please try again.';
+    if (error.code === 'SOCIAL_PROVIDER_UNAVAILABLE') return 'Authentication service is temporarily unavailable. Please try again.';
+    if (error.status >= 500) return 'ResQ is temporarily unavailable. Please try again.';
+  }
+  return error instanceof Error ? error.message : 'Social sign-in failed. Please try again.';
+};
+
+// Module-level idempotent guard to prevent duplicate Google Identity Services initialize warnings
+let initializedGoogleClientId: string | null = null;
+
+export const SocialAuthButtons = ({ roleHint, onSuccess, onError }: Props) => {
+  const { socialLogin } = useAuth();
+  const googleContainer = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState<'google' | 'microsoft' | null>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+  // Keep callback data fresh without re-initializing Google Identity Services on
+  // every role or callback change. GSI's initialize() should be called once.
+  const latestGoogleConfig = useRef({ roleHint, onSuccess, onError, socialLogin });
+  useEffect(() => {
+    latestGoogleConfig.current = { roleHint, onSuccess, onError, socialLogin };
+  }, [roleHint, onSuccess, onError, socialLogin]);
+
+  useEffect(() => {
+    if (!googleClientId || !googleContainer.current) return;
+    let active = true;
+    void loadScript('https://accounts.google.com/gsi/client')
+      .then(() => {
+        if (!active || !googleContainer.current || !window.google) return;
+
+        // Idempotently initialize Google Identity Services once per client_id
+        if (initializedGoogleClientId !== googleClientId) {
+          window.google.accounts.id.initialize({
+            client_id: googleClientId,
+            ux_mode: 'popup',
+            error_callback: (error) => {
+              console.warn('[GSI] Google Sign-In notice:', error);
+            },
+            callback: async ({ credential }) => {
+              const latest = latestGoogleConfig.current;
+              setLoading('google');
+              try {
+                latest.onSuccess(await latest.socialLogin('google', { credential, roleHint: latest.roleHint }));
+              } catch (error) {
+                latest.onError(messageFor(error));
+              } finally {
+                setLoading(null);
+              }
+            },
+          });
+          initializedGoogleClientId = googleClientId;
+        }
+
+        // Re-render button cleanly inside the container element
+        googleContainer.current.innerHTML = '';
+        window.google.accounts.id.renderButton(googleContainer.current, {
+          theme: 'outline',
+          size: 'large',
+          width: 360,
+          text: 'continue_with',
+          shape: 'rectangular',
+        });
+      })
+      .catch((error) => {
+        if (active) latestGoogleConfig.current.onError(messageFor(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, [googleClientId]);
+
+  // Handle Microsoft Entra / MSA Login via official @azure/msal-browser
+  const handleMicrosoft = async () => {
+    if (!isMsalConfigured) {
+      onError('Microsoft sign-in requires VITE_MICROSOFT_CLIENT_ID in your environment.');
+      return;
+    }
+    setLoading('microsoft');
+    try {
+      await ensureMsalInitialized();
+      const result = await msalInstance.loginPopup(loginRequest);
+      if (!result.idToken) {
+        throw new Error('Microsoft did not return an identity token.');
+      }
+      const user = await socialLogin('microsoft', { credential: result.idToken, roleHint });
+      onSuccess(user);
+    } catch (error: unknown) {
+      // Gracefully handle user cancellation / window close without error alert
+      if (
+        error instanceof Error &&
+        (error.message.includes('user_cancelled') ||
+          error.message.includes('User cancelled') ||
+          error.name === 'BrowserAuthError')
+      ) {
+        return;
+      }
+      onError(messageFor(error));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleGoogleClick = () => {
+    if (!googleClientId) {
+      onError('Google sign-in requires VITE_GOOGLE_CLIENT_ID in your environment.');
+      return;
+    }
+    // Programmatically click the initialized hidden Google button or prompt
+    const hiddenBtn = googleContainer.current?.querySelector('div[role="button"]') as HTMLElement | null;
+    if (hiddenBtn) {
+      hiddenBtn.click();
+    } else if (window.google?.accounts?.id?.prompt) {
+      window.google.accounts.id.prompt();
+    } else {
+      onError('Google authentication is initializing. Please try again in a moment.');
+    }
+  };
+
+  return (
+    <div className="mt-8 space-y-3.5">
+      <div className="relative my-6 flex items-center">
+        <div className="flex-1 border-t border-white/10" />
+        <span className="px-3 text-[10px] font-mono tracking-widest text-zinc-500 uppercase">
+          Or continue with
+        </span>
+        <div className="flex-1 border-t border-white/10" />
+      </div>
+
+      {/* Hidden Google Identity Services container to avoid white iframe injection */}
+      <div ref={googleContainer} className="hidden pointer-events-none" aria-hidden="true" />
+
+      {/* Unified Dark Glass Button for Google */}
+      <button
+        type="button"
+        onClick={handleGoogleClick}
+        disabled={loading !== null}
+        className="w-full h-12 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 text-zinc-100 font-medium text-xs disabled:opacity-60 inline-flex items-center justify-center gap-2.5 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-sm"
+      >
+        {loading === 'google' ? (
+          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+        ) : (
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+            />
+          </svg>
+        )}
+        <span>Continue with Google</span>
+      </button>
+
+      {/* Unified Dark Glass Button for Microsoft */}
+      <button
+        type="button"
+        onClick={() => void handleMicrosoft()}
+        disabled={loading !== null}
+        className="w-full h-12 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 text-zinc-100 font-medium text-xs disabled:opacity-60 inline-flex items-center justify-center gap-2.5 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-sm"
+      >
+        {loading === 'microsoft' ? (
+          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+        ) : (
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 23 23">
+            <path fill="#f35325" d="M1 1h10v10H1z" />
+            <path fill="#81bc06" d="M12 1h10v10H12z" />
+            <path fill="#05a6f0" d="M1 12h10v10H1z" />
+            <path fill="#ffba08" d="M12 12h10v10H12z" />
+          </svg>
+        )}
+        <span>Continue with Microsoft</span>
+      </button>
+    </div>
+  );
+};
