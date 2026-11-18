@@ -1,0 +1,11 @@
+export interface GoogleLatLngLiteral { lat: number; lng: number; }
+export interface GoogleMapOptions { center: GoogleLatLngLiteral; zoom: number; mapId?: string; styles?: any[]; streetViewControl?: boolean; mapTypeControl?: boolean; fullscreenControl?: boolean; clickableIcons?: boolean; heading?: number; tilt?: number; }
+export interface GoogleMapInstance { setCenter(center: GoogleLatLngLiteral): void; setZoom(zoom: number): void; fitBounds(bounds: GoogleLatLngBounds): void; setHeading?(heading: number): void; setTilt?(tilt: number): void; panTo?(latLng: GoogleLatLngLiteral): void; getHeading?(): number; getTilt?(): number; getZoom?(): number; getCenter?(): GoogleLatLngLiteral; }
+export interface GoogleLatLngBounds { extend(point: GoogleLatLngLiteral): void; }
+export interface GooglePolylineOptions { map?: GoogleMapInstance; path: GoogleLatLngLiteral[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number; clickable?: boolean; zIndex?: number; }
+export interface GooglePolyline { setMap(map: GoogleMapInstance | null): void; }
+export interface GoogleAdvancedMarker { map: GoogleMapInstance | null; addListener(event: string, handler: () => void): { remove: () => void }; }
+export interface GoogleMarkerOverlay { setMap?(map: GoogleMapInstance | null): void; map?: GoogleMapInstance | null; addListener?(event: string, handler: () => void): { remove: () => void }; }
+export interface GoogleOverlayView extends GoogleMarkerOverlay { getPanes?(): { overlayMouseTarget?: HTMLElement }; getProjection?(): { fromLatLngToDivPixel(latLng: unknown): { x: number; y: number } }; onAdd?(): void; draw?(): void; onRemove?(): void; setMap(map: GoogleMapInstance | null): void; }
+export interface GoogleTrafficLayer { setMap(map: GoogleMapInstance | null): void; }
+export interface GoogleMapsApi { maps: { importLibrary(name: 'maps' | 'marker' | 'places' | 'geometry'): Promise<Record<string, unknown>>; Map: new (element: HTMLElement, options: GoogleMapOptions) => GoogleMapInstance; LatLngBounds: new () => GoogleLatLngBounds; Polyline: new (options: GooglePolylineOptions) => GooglePolyline; TrafficLayer?: new () => GoogleTrafficLayer; Marker?: new (options: Record<string, unknown>) => GoogleMarkerOverlay; OverlayView?: new () => GoogleOverlayView; LatLng?: new (lat: number, lng: number) => unknown; }; }
