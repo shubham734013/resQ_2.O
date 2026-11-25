@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../types/auth.js';
 import { sendSuccess } from '../utils/apiResponse.js';
+import { AppError } from '../utils/AppError.js';
 import * as service from '../services/hospitalService.js';
 import * as coordination from '../services/hospitalCoordinationService.js';
 
@@ -46,6 +47,25 @@ export const acknowledgeCoordinationNotificationController = async (req: Request
   const auth = (req as AuthenticatedRequest).auth;
   if (!auth || auth.role !== 'HOSPITAL') throw new Error('Hospital authentication required');
   sendSuccess(res, await coordination.acknowledgeHospitalCoordinationNotification(hospitalId(req), id(req), auth.id));
+};
+export const acceptCoordinationNotificationController = async (req: Request, res: Response): Promise<void> => {
+  const auth = (req as AuthenticatedRequest).auth;
+  if (!auth || auth.role !== 'HOSPITAL') throw new Error('Hospital authentication required');
+  const currentHospitalId = hospitalId(req);
+  const notification = await coordination.getHospitalCoordinationNotification(currentHospitalId, id(req));
+  if (notification.type !== 'EMERGENCY_RECEIVED') {
+    throw new AppError('INVALID_NOTIFICATION_ACTION', 'Only new emergency alerts can be accepted.', 409);
+  }
+
+  const emergency = await service.getEmergency(currentHospitalId, notification.emergencyId);
+  if (emergency.status === 'CANCELLED') {
+    throw new AppError('EMERGENCY_CANCELLED', 'A cancelled emergency cannot be accepted.', 409);
+  }
+  if (emergency.status === 'RECEIVED') {
+    await service.updateEmergencyStatus(currentHospitalId, emergency.id, 'REVIEWING', { id: auth.id, role: 'HOSPITAL' });
+  }
+
+  sendSuccess(res, await coordination.acknowledgeHospitalCoordinationNotification(currentHospitalId, notification.id, auth.id));
 };
 export const getCoordinationDetailController = async (req: Request, res: Response): Promise<void> =>
   sendSuccess(res, await coordination.getHospitalCoordinationDetail(hospitalId(req), id(req)));

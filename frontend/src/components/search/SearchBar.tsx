@@ -70,7 +70,7 @@ export const SearchBar = ({
           <button
             type="button"
             onClick={handleClear}
-            aria-label="Clear search query"
+            aria-label="Clear search"
             className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 cursor-pointer"
           >
             <X className="w-4 h-4" aria-hidden="true" />
@@ -112,7 +112,7 @@ export const SearchBar = ({
         <button
           type="button"
           onClick={handleClear}
-          aria-label="Clear search query"
+          aria-label="Clear search"
           className="absolute right-3 p-1.5 text-zinc-400 hover:text-zinc-200 rounded-lg hover:bg-white/[0.06] transition-all cursor-pointer"
         >
           <X className="w-4 h-4" aria-hidden="true" />

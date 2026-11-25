@@ -28,106 +28,106 @@ const FAQ_DATA: FAQItem[] = [
   {
     id: 'faq-1',
     category: 'Citizen SOS Setup',
-    question: 'How does the 1-click Emergency SOS dispatch work?',
+    question: 'What happens when I tap Emergency SOS?',
     answer:
-      'When you trigger Emergency SOS from your citizen portal, ResQ immediately acquires your high-accuracy GPS coordinates and packages your pre-configured medical profile (blood group, critical allergies, medical conditions). Our spatial dispatch engine locks the closest certified Advanced Life Support (ALS) or Basic Life Support (BLS) ambulance within 45 seconds while pre-alerting the nearest trauma-ready hospital.',
+      'When you ask for help in ResQ, we send your location and saved health details, like your blood type and allergies, to the response team. ResQ looks for the nearest ambulance that can help and alerts a nearby hospital. If someone is in danger, call 112 too.',
   },
   {
     id: 'faq-2',
     category: 'Citizen SOS Setup',
-    question: 'What happens if I lose internet or cellular data during an emergency?',
+    question: 'What if I lose internet or phone service during an emergency?',
     answer:
-      'ResQ incorporates an offline-first resilient service worker architecture. If cellular data drops, your emergency beacon falls back automatically to municipal IoT mesh relays and high-priority SMS coordinate packets to ensure the dispatch center receives your location without packet loss.',
+      'ResQ may try other ways to send your location, such as a text message. These ways may not work everywhere. If someone is in danger, call 112 as soon as you can.',
   },
   {
     id: 'faq-3',
     category: 'Hospital Command',
-    question: 'How do hospitals receive incoming patient vitals before arrival?',
+    question: 'How does a hospital know someone is coming?',
     answer:
-      'Ambulance crews log and stream real-time telemetry (ECG rhythm, heart rate, blood pressure, oxygen saturation) through the ResQ Driver Telematics console. The receiving hospital’s trauma command inbox displays live pre-arrival telemetry, calculated ETA, and bed reservation cues so trauma squads are scrubbed in prior to physical arrival.',
+      'The ambulance team can share health signs, such as heart rate, blood pressure, and oxygen level, with the hospital. The hospital can also see when the ambulance may arrive and get ready to help.',
   },
   {
     id: 'faq-4',
     category: 'Responder Integration',
-    question: 'How are ambulance fleet providers and drivers verified?',
+    question: 'How does ResQ check ambulance teams and drivers?',
     answer:
-      'All commercial ambulance providers and paramedic drivers must submit state registration certifications and commercial driver licenses during onboarding. ResQ State Administrators verify these credentials against official transport and health registries before operational access is approved.',
+      'Ambulance services and drivers must send their work papers and driver licenses to ResQ. The ResQ team checks them before they can use work tools.',
   },
   {
     id: 'faq-5',
     category: 'Account & Privacy',
-    question: 'Is my real-time GPS location and medical history private?',
+    question: 'Is my location and health information private?',
     answer:
-      'Yes. ResQ utilizes zero-trust architecture compliant with ISO 27001, HIPAA, and Ayushman Bharat Digital Mission (ABDM) standards. Geolocation data is only transmitted during an active SOS incident or active navigation session, and all clinical data corridors are secured with end-to-end AES-256 encryption.',
+      'ResQ protects your health information. Your location is shared only when you ask for emergency help or use directions. We use safety steps to keep your information private. ResQ follows ISO 27001, HIPAA, and Ayushman Bharat Digital Mission (ABDM) rules.',
   },
   {
     id: 'faq-6',
     category: 'Responder Integration',
-    question: 'Can ambulance drivers toggle their duty status?',
+    question: 'Can ambulance drivers say when they are working?',
     answer:
-      'Yes. Certified drivers can toggle between "On Duty" and "Off Duty" directly from their Paramedic Console. Only drivers with active "On Duty" status and fresh GPS heartbeat signals receive algorithmic dispatch job offers.',
+      'Yes. Approved drivers can choose “Working” or “Not working” in ResQ. Only drivers who are working and have a working location signal can get a new trip.',
   },
   {
     id: 'faq-7',
     category: 'Live GPS Telemetry',
-    question: 'How accurate is the vehicle tracking and ETA calculation?',
+    question: 'How does ResQ track an ambulance and guess its arrival time?',
     answer:
-      'ResQ uses sub-meter geospatial telemetry paired with vector traffic feeds. ETAs are recalculated every 2 seconds taking into account current municipal traffic congestion, green corridor priority routes, and real-time road closures.',
+      'ResQ uses the ambulance’s location and traffic updates to guess when it may arrive. The time can change if there is traffic or a road is closed.',
   },
   {
     id: 'faq-8',
     category: 'Compliance & Governance',
-    question: 'Does ResQ replace official 112 / 108 emergency telephone services?',
+    question: 'Does ResQ replace emergency phone numbers 112 or 108?',
     answer:
-      'ResQ works in tandem with national emergency hotlines (112 and 108) by providing digital telemetry, automated coordination, and hospital hand-off infrastructure. For immediate voice dispatch, citizens can always dial 112 simultaneously.',
+      'No. ResQ works with emergency phone services 112 and 108. If someone is in danger, call 112 now. You can also ask for help in ResQ.',
   },
 ];
 
 const CATEGORIES = [
   {
     id: 'Citizen SOS Setup',
-    title: 'Citizen SOS Setup',
-    description: 'Geolocation permissions, offline emergency beaconing, and automated contact alerts.',
+    title: 'Ask for emergency help',
+    description: 'Share your location and let trusted people know when you need help.',
     icon: ShieldAlert,
     color: 'text-rose-400',
     bg: 'bg-rose-500/10 border-rose-500/20',
   },
   {
     id: 'Responder Integration',
-    title: 'Responder Integration',
-    description: 'Paramedic turn-by-turn navigation, duty toggles, fleet dispatch API, and vehicle logging.',
+    title: 'Ambulance teams',
+    description: 'Learn about driver directions, work times, and ambulance trips.',
     icon: Ambulance,
     color: 'text-amber-400',
     bg: 'bg-amber-500/10 border-amber-500/20',
   },
   {
     id: 'Hospital Command',
-    title: 'Hospital Command',
-    description: 'Pre-arrival vitals streaming, trauma bay prep, and ICU bed availability sync.',
+    title: 'Hospitals',
+    description: 'Learn how hospitals get ready and check for open beds.',
     icon: Building2,
     color: 'text-blue-400',
     bg: 'bg-blue-500/10 border-blue-500/20',
   },
   {
     id: 'Account & Privacy',
-    title: 'Account & Privacy',
-    description: 'Role-based credentials, ISO 27001 data isolation, and session encryption.',
+    title: 'Your account and privacy',
+    description: 'Learn how ResQ keeps your account and health details safe.',
     icon: Lock,
     color: 'text-emerald-400',
     bg: 'bg-emerald-500/10 border-emerald-500/20',
   },
   {
     id: 'Live GPS Telemetry',
-    title: 'Live GPS Telemetry',
-    description: 'Low-latency WebSocket streams, dead-zone caching, and green-corridor priority.',
+    title: 'Location and trip updates',
+    description: 'Learn how ResQ shares ambulance locations and trip updates.',
     icon: Radio,
     color: 'text-rose-400',
     bg: 'bg-rose-500/10 border-rose-500/20',
   },
   {
     id: 'Compliance & Governance',
-    title: 'Compliance & Governance',
-    description: 'Ayushman Bharat (ABDM) standards, audit trails, and driver licensing verification.',
+    title: 'Health and safety rules',
+    description: 'Learn how ResQ checks work papers and follows health rules.',
     icon: ShieldCheck,
     color: 'text-amber-400',
     bg: 'bg-amber-500/10 border-amber-500/20',
@@ -182,7 +182,7 @@ export const HelpPage = () => {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] backdrop-blur-xl border border-white/10 text-xs text-rose-300 font-mono mb-6"
           >
             <HelpCircle className="h-4 w-4 text-rose-500" />
-            <span>ResQ Operational Knowledge Base & Documentation</span>
+            <span>ResQ help</span>
           </motion.div>
 
           <motion.h1
@@ -191,9 +191,9 @@ export const HelpPage = () => {
             transition={{ duration: 0.7, delay: 0.1 }}
             className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-white mb-6 leading-tight"
           >
-            How Can Operations{' '}
+            Need help?{' '}
             <span className="font-semibold text-gradient-crimson">
-              Assist You Today?
+              We are here for you.
             </span>
           </motion.h1>
 
@@ -203,7 +203,7 @@ export const HelpPage = () => {
             transition={{ duration: 0.7, delay: 0.2 }}
             className="text-base sm:text-lg text-zinc-400 font-light max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            Find immediate answers on emergency signal handling, responder navigation integration, and hospital trauma telemetry pipelines.
+            Find answers about asking for help, ambulance trips, hospitals, and your account.
           </motion.p>
 
           {/* Centered Command Search Bar with Cmd+K Shortcut */}
@@ -220,7 +220,8 @@ export const HelpPage = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search procedures, SOS setup, dispatch rules, or clinical APIs…"
+                placeholder="Search for help..."
+                aria-label="Search help"
                 className="w-full h-14 pl-12 pr-28 rounded-2xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-500 shadow-2xl shadow-black/80"
               />
               <div className="absolute right-3.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[11px] font-mono text-zinc-400 pointer-events-none">
@@ -231,7 +232,7 @@ export const HelpPage = () => {
 
             {/* Quick Filter Tag Chips */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs font-mono">
-              <span className="text-zinc-500 mr-1">Popular:</span>
+              <span className="text-zinc-500 mr-1">Topics:</span>
               {['All', 'Citizen SOS Setup', 'Responder Integration', 'Hospital Command'].map((cat) => (
                 <button
                   key={cat}
@@ -243,7 +244,7 @@ export const HelpPage = () => {
                       : 'bg-white/[0.03] text-zinc-400 hover:text-white border border-white/[0.06]'
                   }`}
                 >
-                  {cat}
+                  {cat === 'All' ? 'All' : CATEGORIES.find((item) => item.id === cat)?.title ?? cat}
                 </button>
               ))}
             </div>
@@ -257,9 +258,9 @@ export const HelpPage = () => {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="overline text-rose-400 mb-2">Knowledge Domains</p>
+            <p className="overline text-rose-400 mb-2">Help topics</p>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white">
-              Explore by Operational Category
+              Choose a topic
             </h2>
           </div>
 
@@ -292,7 +293,7 @@ export const HelpPage = () => {
                   </div>
 
                   <div className="mt-8 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-500 group-hover:text-zinc-300 transition-colors">
-                    <span>{isSelected ? 'Viewing topic' : 'View articles'}</span>
+                    <span>{isSelected ? 'Showing topic' : 'See help'}</span>
                     <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </button>
@@ -308,13 +309,13 @@ export const HelpPage = () => {
         <div className="max-w-4xl mx-auto px-6 lg:px-12">
           
           <div className="text-center mb-16">
-            <p className="overline text-rose-400 mb-2">Direct Answers</p>
+            <p className="overline text-rose-400 mb-2">Answers</p>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-3">
-              Frequently Addressed Inquiries
+              Common questions
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400 font-light">
-              Showing {filteredFaqs.length} verified operational guidance entries
-              {activeCategory !== 'All' ? ` for "${activeCategory}"` : ''}.
+              {filteredFaqs.length} {filteredFaqs.length === 1 ? 'answer' : 'answers'}
+              {activeCategory !== 'All' ? ` about "${CATEGORIES.find((item) => item.id === activeCategory)?.title ?? activeCategory}"` : ''}.
             </p>
           </div>
 
@@ -357,9 +358,11 @@ export const HelpPage = () => {
                           <div className="px-6 sm:px-8 pb-6 pt-1 text-sm text-zinc-300 font-light leading-relaxed border-t border-white/[0.04]">
                             {faq.answer}
                             <div className="mt-4 flex items-center gap-2 text-[11px] font-mono text-zinc-500">
-                              <span>Verified Operational Guidance</span>
+                              <span>ResQ help</span>
                               <span>•</span>
-                              <span className="text-zinc-400">{faq.category}</span>
+                              <span className="text-zinc-400">
+                                {CATEGORIES.find((item) => item.id === faq.category)?.title ?? faq.category}
+                              </span>
                             </div>
                           </div>
                         </motion.div>
@@ -370,7 +373,7 @@ export const HelpPage = () => {
               })
             ) : (
               <div className="p-12 text-center rounded-2xl bg-white/[0.02] border border-white/[0.08]">
-                <p className="text-sm text-zinc-400">No questions match your query.</p>
+                <p className="text-sm text-zinc-400">No answers found. Try another word.</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -379,7 +382,7 @@ export const HelpPage = () => {
                   }}
                   className="mt-3 text-xs font-mono text-rose-400 underline cursor-pointer"
                 >
-                  Reset search filters
+                  Clear search
                 </button>
               </div>
             )}
@@ -398,12 +401,12 @@ export const HelpPage = () => {
             <div className="pointer-events-none absolute -left-20 top-0 h-48 w-48 rounded-full bg-rose-500/10 blur-[80px]" />
 
             <div className="relative z-10 max-w-lg text-center md:text-left">
-              <span className="overline text-rose-400 mb-2 inline-block">Direct Support Escalation</span>
+              <span className="overline text-rose-400 mb-2 inline-block">More help</span>
               <h3 className="text-2xl sm:text-3xl font-light text-white tracking-tight mb-2">
-                Still Need Operational Assistance?
+                Still need help?
               </h3>
               <p className="text-xs sm:text-sm text-zinc-400 font-light leading-relaxed">
-                Our 24/7 technical dispatch engineering team is on standby to assist with hospital integrations, fleet telematics, or urgent incident inquiries.
+                Our team can help with hospitals, ambulance teams, or urgent problems any time.
               </p>
             </div>
 
@@ -413,7 +416,7 @@ export const HelpPage = () => {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-lg shadow-rose-600/30 btn-shimmer transition-all"
               >
                 <MessageSquare className="h-4 w-4" />
-                <span>Talk to Operations Team</span>
+                <span>Talk to our team</span>
               </Link>
 
               <Link
@@ -421,7 +424,7 @@ export const HelpPage = () => {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all"
               >
                 <Bug className="h-4 w-4 text-amber-400" />
-                <span>Report System Incident</span>
+                <span>Report a problem</span>
               </Link>
             </div>
 

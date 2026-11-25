@@ -21,7 +21,8 @@
     "ensure:emergency-idempotency-index": "tsx src/scripts/ensureEmergencyIdempotencyIndex.ts",
     "ensure:dispatch-indexes": "tsx src/scripts/ensureDispatchIndexes.ts",
     "ensure:trip-reassignment-index": "tsx src/scripts/ensureTripReassignmentIndex.ts",
-    "test:e2e": "tsx src/scripts/verifyE2EWorkflow.ts"
+    "test:e2e": "tsx src/scripts/verifyE2EWorkflow.ts",
+    "reset:test": "tsx src/scripts/resetTestingState.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

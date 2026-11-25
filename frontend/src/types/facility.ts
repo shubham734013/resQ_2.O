@@ -38,6 +38,7 @@ export interface Facility {
   isOpen: boolean;
   isAvailable?: boolean;
   isStale?: boolean;
+  isTestHospital?: boolean;
   operatingStatus?: string;
   capabilities: string[];
   departments?: string[];

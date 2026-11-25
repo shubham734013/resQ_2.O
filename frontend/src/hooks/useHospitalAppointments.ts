@@ -16,7 +16,7 @@ export const useAppointmentAvailability = (
   return useQuery({
     queryKey: ['appointment-availability', hospitalId, department, date],
     queryFn: () => {
-      if (!hospitalId || !department || !date) throw new Error('Missing parameters');
+      if (!hospitalId || !department || !date) throw new Error('Choose a hospital, department, and date.');
       return hospitalAppointmentApi.queryAvailability(hospitalId, department, date);
     },
     enabled: Boolean(enabled && hospitalId && department && date),

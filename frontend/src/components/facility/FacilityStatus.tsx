@@ -30,9 +30,9 @@ export const FacilityStatus = ({
         >
           <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="space-y-0.5">
-            <span className="font-semibold block text-zinc-100">Facility Currently Unavailable</span>
+            <span className="font-semibold block text-zinc-100">Hospital not open now</span>
             <p className="text-zinc-400 leading-relaxed">
-              This facility is currently not accepting emergency intake or walk-ins ({facility.openStatus}). Please select an alternative facility for immediate care.
+              This hospital is not taking emergency patients or walk-ins now ({facility.openStatus}). Choose another hospital. For a serious emergency, call 112.
             </p>
           </div>
         </div>
@@ -46,7 +46,7 @@ export const FacilityStatus = ({
         >
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />
           <span>
-            Operating capacity was last verified <strong className="font-mono text-zinc-200">{facility.lastUpdated}</strong>. Verify directly before navigating.
+            Last checked: <strong className="font-mono text-zinc-200">{facility.lastUpdated}</strong>. Call the hospital before you go.
           </span>
         </div>
       )}
@@ -57,11 +57,11 @@ export const FacilityStatus = ({
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-rose-400" />
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
-              Operating Status
+              Open status
             </span>
           </div>
           <span className="text-[11px] font-mono text-zinc-500">
-            Telemetry Updated {facility.lastUpdated}
+            Last checked {facility.lastUpdated}
           </span>
         </div>
 
@@ -75,7 +75,7 @@ export const FacilityStatus = ({
             )}
             <div>
               <span className="font-semibold text-zinc-100 block">
-                {facility.operatingStatus ?? (isAvailable ? 'Live 24/7 Operational' : 'Closed')}
+                {facility.operatingStatus ?? (isAvailable ? 'Open now' : 'Closed')}
               </span>
               <span className="text-zinc-400 text-[11px] mt-0.5 block">{facility.openStatus}</span>
             </div>
@@ -86,7 +86,7 @@ export const FacilityStatus = ({
             <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
               <Clock className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <span className="font-semibold text-zinc-100 block">Estimated Triage</span>
+                <span className="font-semibold text-zinc-100 block">Estimated wait to see a doctor</span>
                 <span className="text-zinc-400 font-mono text-[11px] mt-0.5 block">{facility.triageWaitTime}</span>
               </div>
             </div>
@@ -97,7 +97,7 @@ export const FacilityStatus = ({
             <div className="flex items-start gap-3 col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
               <Ambulance className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" aria-hidden="true" />
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="font-medium text-zinc-300">Ambulance Coordination:</span>
+                <span className="font-medium text-zinc-300">Ambulance help:</span>
                 <span
                   className={`font-mono font-semibold px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1.5 ${
                     facility.ambulanceAvailability === 'Available'

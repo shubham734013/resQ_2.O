@@ -36,12 +36,12 @@ interface UserNavItem {
 // ─── Nav items matching the reference architecture ─────────────────────────
 const userNavItems: UserNavItem[] = [
   { label: 'Home', path: ROUTES.USER.DASHBOARD, icon: LayoutDashboard },
-  { label: 'SOS Emergency', path: ROUTES.USER.EMERGENCY, icon: AlertTriangle, isEmergency: true },
-  { label: 'Find Ambulance', path: ROUTES.USER.AMBULANCES, icon: Ambulance },
-  { label: 'Nearby Hospitals', path: ROUTES.USER.HOSPITALS, icon: Building2 },
-  { label: 'Doctor Appointments', path: ROUTES.USER.APPOINTMENTS, icon: Calendar },
-  { label: 'Care Inquiries', path: ROUTES.USER.REQUESTS, icon: Heart },
-  { label: 'Saved Locations', path: ROUTES.USER.SAVED, icon: Bookmark },
+  { label: 'Emergency help', path: ROUTES.USER.EMERGENCY, icon: AlertTriangle, isEmergency: true },
+  { label: 'Find an ambulance', path: ROUTES.USER.AMBULANCES, icon: Ambulance },
+  { label: 'Find hospitals', path: ROUTES.USER.HOSPITALS, icon: Building2 },
+  { label: 'Appointments', path: ROUTES.USER.APPOINTMENTS, icon: Calendar },
+  { label: 'Care requests', path: ROUTES.USER.REQUESTS, icon: Heart },
+  { label: 'Saved places', path: ROUTES.USER.SAVED, icon: Bookmark },
   { label: 'Notifications', path: ROUTES.USER.NOTIFICATIONS, icon: Bell },
   { label: 'Profile', path: ROUTES.USER.PROFILE, icon: User },
 ];
@@ -102,12 +102,12 @@ export const UserLayout = () => {
               2.O
             </span> */}
           </div>
-          <p className="text-[10px] font-medium text-zinc-400 mt-1">Faster Help. Safer Tomorrow.</p>
+          <p className="text-[10px] font-medium text-zinc-400 mt-1">Find care. Ask for help.</p>
         </div>
       </div>
 
       {/* Navigation links */}
-      <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1" aria-label="Citizen Navigation">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 py-4 space-y-1" aria-label="Main menu">
         {userNavItems.map(({ label, path, icon: Icon, isEmergency, badge }) => (
           <NavLink
             key={`${path}-${label}`}
@@ -133,28 +133,17 @@ export const UserLayout = () => {
         ))}
       </nav>
 
-      {/* Quick SOS Trigger & Emergency Card */}
+      {/* Quick SOS Trigger */}
       <div className="border-t border-white/10 p-4 space-y-3 bg-zinc-950/60 shrink-0">
-        <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-            </span>
-            <p className="text-xs font-bold text-zinc-200">Emergency Protocol</p>
-          </div>
-          <p className="text-[11px] text-zinc-400 mt-1">Tap SOS for immediate paramedic dispatch</p>
-        </div>
-
         <Link
           to={ROUTES.USER.EMERGENCY}
           className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white font-semibold py-3.5 text-sm shadow-lg shadow-rose-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all group cursor-pointer"
           onClick={() => setMobileOpen(false)}
         >
           <PhoneIcon className="h-4 w-4 animate-pulse" />
-          <span>TRIGGER SOS</span>
+          <span>Get emergency help</span>
         </Link>
-        <p className="text-center text-[10px] text-zinc-500 font-medium">Instant 24×7 Emergency Dispatch</p>
+        <p className="text-center text-[10px] text-zinc-500 font-medium">For an emergency, call 112.</p>
 
         {/* Sign Out */}
         <button
@@ -187,7 +176,7 @@ export const UserLayout = () => {
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
               className="lg:hidden p-2 rounded-xl text-zinc-300 hover:bg-white/[0.06] transition cursor-pointer"
-              aria-label="Toggle menu"
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -206,7 +195,7 @@ export const UserLayout = () => {
               onClick={refreshLocation}
               disabled={isUpdating}
               className="hidden sm:flex items-center gap-2 bg-white/[0.04] border border-white/10 text-zinc-200 text-sm rounded-xl px-4 py-2 hover:bg-white/[0.08] transition-all min-w-0 cursor-pointer"
-              title="Click to refresh live GPS location"
+              title="Tap to update your location"
             >
               <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
               <span className="truncate max-w-[140px] font-medium">{cityLabel}, {stateLabel}</span>
@@ -222,7 +211,7 @@ export const UserLayout = () => {
               <Search className="h-4 w-4 text-zinc-400 shrink-0" />
               <input
                 type="text"
-                placeholder="Search hospitals, ambulances, services..."
+                placeholder="Search hospitals, ambulances, or care…"
                 className="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 outline-none min-w-0"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') navigate(ROUTES.USER.HOSPITALS);
@@ -237,7 +226,7 @@ export const UserLayout = () => {
               <NavLink
                 to={ROUTES.USER.NOTIFICATIONS}
                 className="relative p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/[0.06] transition"
-                aria-label="View notifications"
+                aria-label="View alerts"
               >
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 shadow-sm shadow-rose-500" />
@@ -256,7 +245,7 @@ export const UserLayout = () => {
                   </div>
                   <div className="hidden md:block text-left">
                     <p className="text-xs font-bold text-zinc-100 leading-none">{user?.name || user?.email || 'Citizen'}</p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">Citizen</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">User</p>
                   </div>
                   <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
                 </button>
@@ -269,7 +258,7 @@ export const UserLayout = () => {
                       <p className="text-[11px] text-zinc-400 truncate mt-0.5">{user?.email || 'user@resq.internal'}</p>
                       <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-[10px] font-bold text-rose-300">
                         <Shield className="h-3 w-3" />
-                        <span>Verified Citizen Account</span>
+                        <span>Verified account</span>
                       </div>
                     </div>
 
@@ -280,7 +269,7 @@ export const UserLayout = () => {
                         className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.05] transition"
                       >
                         <User className="h-3.5 w-3.5 text-zinc-400" />
-                        <span>My Profile</span>
+                        <span>My account</span>
                       </Link>
                       <Link
                         to={ROUTES.USER.SAVED}
@@ -288,7 +277,7 @@ export const UserLayout = () => {
                         className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.05] transition"
                       >
                         <Bookmark className="h-3.5 w-3.5 text-zinc-400" />
-                        <span>Saved Locations</span>
+                        <span>Saved places</span>
                       </Link>
                       <Link
                         to={ROUTES.USER.SETTINGS}
@@ -296,7 +285,7 @@ export const UserLayout = () => {
                         className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.05] transition"
                       >
                         <Settings className="h-3.5 w-3.5 text-zinc-400" />
-                        <span>Preferences</span>
+                        <span>Settings</span>
                       </Link>
                     </div>
 
@@ -321,7 +310,7 @@ export const UserLayout = () => {
 
           {/* Mobile Navigation Drawer: Dark Glass */}
           {mobileOpen && (
-            <div className="lg:hidden border-t border-white/10 bg-zinc-950/95 backdrop-blur-xl flex flex-col max-h-[85vh] overflow-y-auto mt-4 rounded-2xl p-2 shadow-2xl">
+            <div className="lg:hidden border-t border-white/10 bg-zinc-950/95 backdrop-blur-xl flex flex-col max-h-[85vh] overflow-hidden mt-4 rounded-2xl p-2 shadow-2xl">
               {sidebarContent}
             </div>
           )}

@@ -43,9 +43,9 @@ describe('DATA-01 Multi-Tenant Organization Isolation and Access Policy', () => 
 
   const providerCPrincipal: AuthenticatedIdentity = {
     id: new Types.ObjectId().toString(),
-    email: 'dispatch@provider-c.com',
-    name: 'Provider C Dispatcher',
-    role: 'AMBULANCE_PROVIDER',
+    email: 'driver@resq.local',
+    name: 'Driver Dispatcher',
+    role: 'AMBULANCE_DRIVER',
     accountStatus: 'ACTIVE',
   };
 
@@ -490,12 +490,11 @@ describe('DATA-01 Multi-Tenant Organization Isolation and Access Policy', () => 
   });
 
   // Test 14: Legitimate emergency coordination continues to work for authorized participants
-  it('14. allows legitimate emergency coordination for patient, assigned hospital, provider, and driver', () => {
+  it('14. allows legitimate emergency coordination for patient, assigned hospital, and assigned driver', () => {
     const emergencyContext = {
       patientId: citizenPrincipal.id,
       assignedHospitalId: hospitalAPrincipal.id,
-      assignedProviderId: providerCPrincipal.id,
-      assignedDriverId: 'driver-123',
+      assignedDriverId: providerCPrincipal.id,
     };
 
     // Patient: Allowed
@@ -508,7 +507,7 @@ describe('DATA-01 Multi-Tenant Organization Isolation and Access Policy', () => 
       assertEmergencyCoordinationAccess(hospitalAPrincipal, emergencyContext);
     });
 
-    // Assigned Provider: Allowed
+    // Assigned Driver: Allowed
     assert.doesNotThrow(() => {
       assertEmergencyCoordinationAccess(providerCPrincipal, emergencyContext);
     });

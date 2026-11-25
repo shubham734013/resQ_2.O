@@ -4,8 +4,8 @@ import { API_BASE_URL, authenticatedFetch } from './apiConfig';
 async function request<T>(path: string): Promise<T> {
   const response = await authenticatedFetch(API_BASE_URL + path);
   const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String((payload as { error?: { message?: string } }).error?.message ?? 'Facility request failed') : 'Facility request failed');
-  if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new Error('Invalid facility response');
+  if (!response.ok) throw new Error('Could not load hospital details. Please try again.');
+  if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new Error('Hospital details could not be read. Please try again.');
   return (payload as { data: T }).data;
 }
 

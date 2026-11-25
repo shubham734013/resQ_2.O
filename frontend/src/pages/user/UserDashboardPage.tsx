@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Building2,
@@ -21,6 +21,7 @@ import {
   Activity,
   ArrowUpRight,
   PhoneCall,
+  XCircle,
 } from 'lucide-react';
 import { emergencyApi } from '../../services/emergencyApi';
 import { hospitalAppointmentApi, type HospitalAppointment } from '../../services/hospitalAppointmentApi';
@@ -35,10 +36,10 @@ import { useLocationState } from '../../hooks/useLocationState';
 
 // ─── Nearby Ambulances Telemetry ─────────────────────────────────────────────
 const MOCK_AMBULANCES = [
-  { id: 'a1', regNo: 'RJ14 AB 1234', type: 'Basic Life Support (BLS)', distance: '2 min away', status: 'Available', rating: 4.8, available: true },
-  { id: 'a2', regNo: 'RJ14 CD 5678', type: 'Advanced Life Support (ALS)', distance: '4 min away', status: 'Available', rating: 4.7, available: true },
-  { id: 'a3', regNo: 'RJ14 EF 9012', type: 'Basic Life Support (BLS)', distance: '6 min away', status: 'Busy', rating: 4.5, available: false },
-  { id: 'a4', regNo: 'RJ14 GH 3456', type: 'ICU Ambulance', distance: '8 min away', status: 'Available', rating: 4.8, available: true },
+  { id: 'a1', regNo: 'RJ14 AB 1234', type: 'Basic ambulance care', distance: '2 min away', status: 'Available', rating: 4.8, available: true },
+  { id: 'a2', regNo: 'RJ14 CD 5678', type: 'Advanced ambulance care', distance: '4 min away', status: 'Available', rating: 4.7, available: true },
+  { id: 'a3', regNo: 'RJ14 EF 9012', type: 'Basic ambulance care', distance: '6 min away', status: 'Busy', rating: 4.5, available: false },
+  { id: 'a4', regNo: 'RJ14 GH 3456', type: 'Advanced hospital care', distance: '8 min away', status: 'Available', rating: 4.8, available: true },
 ];
 
 type TabKey = 'ambulances' | 'hospitals' | 'appointments';
@@ -53,17 +54,17 @@ const requestStatusStyle = (status: string): string => {
 
 const requestStatusLabel = (status: string): string => {
   const map: Record<string, string> = {
-    RESOLVED: 'Resolved',
-    CONFIRMED: 'Scheduled',
-    COMPLETED: 'Completed',
-    CANCELLED: 'Cancelled',
-    PENDING: 'Pending',
-    RECEIVED: 'Active',
-    REVIEWING: 'Active',
-    PREPARING: 'Active',
-    AMBULANCE_COORDINATION: 'Active',
+    RESOLVED: 'Done',
+    CONFIRMED: 'Booked',
+    COMPLETED: 'Done',
+    CANCELLED: 'Canceled',
+    PENDING: 'Waiting',
+    RECEIVED: 'In progress',
+    REVIEWING: 'In progress',
+    PREPARING: 'In progress',
+    AMBULANCE_COORDINATION: 'Ambulance request open',
   };
-  return map[status] ?? status;
+  return map[status] ?? status.replaceAll('_', ' ').toLowerCase();
 };
 
 // ─── Obsidian Dark Glass Container ──────────────────────────────────────────
@@ -114,6 +115,25 @@ export const UserDashboardPage = () => {
   const upcomingAppointment = (appointmentsQ.data?.items ?? []).find(
     (item: HospitalAppointment) => item.status === 'CONFIRMED' || item.status === 'PENDING'
   );
+  const queryClient = useQueryClient();
+  const [isCancellingEmergency, setIsCancellingEmergency] = useState(false);
+  const handleCancelEmergency = async () => {
+    if (!activeEmergency) return;
+    if (!window.confirm(`Cancel this open emergency request (${activeEmergency.requestCode})?`)) return;
+    setIsCancellingEmergency(true);
+    try {
+      await emergencyApi.cancel(activeEmergency.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['emergency-requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['user', 'emergencies'] }),
+        queryClient.invalidateQueries({ queryKey: ['emergency-requests', 'dashboard'] }),
+      ]);
+    } catch {
+      alert('We could not cancel the emergency request. Try again.');
+    } finally {
+      setIsCancellingEmergency(false);
+    }
+  };
   const hospitals = useMemo(() => nearbyHospitalsQ.data?.items ?? [], [nearbyHospitalsQ.data?.items]);
 
   const hospitalMarkers = useMemo(
@@ -168,20 +188,31 @@ export const UserDashboardPage = () => {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                 </span>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-rose-400">
-                  Critical Emergency Active
+                  Emergency request is open
                 </p>
               </div>
               <p className="text-sm font-bold text-white mt-0.5">{activeEmergency.situationType}</p>
-              <p className="text-xs text-zinc-400">Paramedic dispatch in progress · Telemetry relay open</p>
+              <p className="text-xs text-zinc-400">Track this emergency request for updates.</p>
             </div>
           </div>
-          <Link
-            to={ROUTES.USER.TRACKING(activeEmergency.id)}
-            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black text-white bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-lg shadow-rose-950/60 transition-all cursor-pointer active:scale-95 shrink-0"
-          >
-            <Navigation className="h-4 w-4" />
-            <span>Track Live Dispatch</span>
-          </Link>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              disabled={isCancellingEmergency}
+              onClick={handleCancelEmergency}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold text-rose-300 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <XCircle className="h-4 w-4" />
+              <span>{isCancellingEmergency ? 'Canceling…' : 'Cancel request'}</span>
+            </button>
+            <Link
+              to={ROUTES.USER.TRACKING(activeEmergency.id)}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black text-white bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-lg shadow-rose-950/60 transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <Navigation className="h-4 w-4" />
+              <span>Track ambulance request</span>
+            </Link>
+          </div>
         </div>
       )}
 
@@ -200,7 +231,7 @@ export const UserDashboardPage = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs font-medium text-zinc-300 mb-4 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-            <span>resQ 2.O · Jaipur Metropolitan Healthcare Grid</span>
+            <span>ResQ · Jaipur care map</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight text-white leading-tight mb-3">
@@ -210,17 +241,13 @@ export const UserDashboardPage = () => {
             </span>
           </h1>
 
-          <p className="text-sm sm:text-base text-zinc-400 leading-relaxed mb-6 max-w-xl">
-            Sub-second paramedic dispatch, verified emergency hospitals, and 24×7 rapid care response across Jaipur jurisdiction.
-          </p>
-
           <div className="flex flex-wrap items-center gap-3">
             <Link
               to={ROUTES.USER.EMERGENCY}
               className="flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-black text-white bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-xl shadow-rose-950/60 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
               <AlertTriangle className="h-4 w-4" />
-              <span>SOS Emergency Dispatch</span>
+              <span>Emergency help</span>
             </Link>
 
             <Link
@@ -228,7 +255,7 @@ export const UserDashboardPage = () => {
               className="flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 backdrop-blur-md transition-all cursor-pointer"
             >
               <Ambulance className="h-4 w-4 text-rose-400" />
-              <span>Find Nearby Ambulance</span>
+              <span>Find an ambulance</span>
             </Link>
           </div>
         </div>
@@ -239,30 +266,30 @@ export const UserDashboardPage = () => {
         {[
           {
             icon: Ambulance,
-            label: 'Emergency Ambulance',
-            sub: 'Instant 1-tap dispatch with live GPS telemetry',
-            badge: 'Instant Dispatch',
+            label: 'Emergency ambulance',
+            sub: 'Ask for help and share your location',
+            badge: 'Request help',
             to: ROUTES.USER.EMERGENCY,
           },
           {
             icon: Building2,
-            label: 'Nearby Hospitals',
-            sub: 'Verified 24/7 emergency & trauma facilities',
-            badge: `${hospitals.length || 28} Verified`,
+            label: 'Nearby hospitals',
+            sub: 'Hospitals that may offer emergency care',
+            badge: hospitals.length ? `${hospitals.length} found` : 'Example list',
             to: ROUTES.USER.HOSPITALS,
           },
           {
             icon: Calendar,
-            label: 'Doctor Appointments',
-            sub: 'Schedule OPD, specialist & consult visits',
-            badge: 'Online Booking',
+            label: 'Appointments',
+            sub: 'Choose a doctor and book a visit',
+            badge: 'Book a visit',
             to: ROUTES.USER.APPOINTMENTS,
           },
           {
             icon: HeartPulse,
-            label: 'Care Inquiries',
-            sub: 'Direct hospital support & patient triage',
-            badge: 'Direct Connect',
+            label: 'Care requests',
+            sub: 'Ask a hospital for care',
+            badge: 'Contact hospital',
             to: ROUTES.USER.REQUESTS,
           },
         ].map((svc) => {
@@ -292,7 +319,7 @@ export const UserDashboardPage = () => {
               </div>
 
               <div className="mt-5 flex items-center gap-1 text-xs font-semibold text-rose-400 group-hover:text-rose-300 pt-3 border-t border-white/[0.06]">
-                <span>Launch Service</span>
+                <span>Open</span>
                 <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
@@ -321,7 +348,7 @@ export const UserDashboardPage = () => {
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-xs text-zinc-400 bg-zinc-950">
                 <MapPin className="h-6 w-6 text-rose-500 animate-bounce" />
-                <p>Initializing native dark mode navigation map…</p>
+                <p>Loading the map…</p>
               </div>
             )}
 
@@ -333,7 +360,7 @@ export const UserDashboardPage = () => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                 </span>
-                <span className="font-semibold text-zinc-200">Ambulances</span>
+                <span className="font-semibold text-zinc-200">Example ambulances</span>
                 <span className="font-mono text-[11px] text-blue-400 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded-md border border-blue-500/20">
                   {MOCK_AMBULANCES.filter((a) => a.available).length}
                 </span>
@@ -345,16 +372,16 @@ export const UserDashboardPage = () => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                 </span>
-                <span className="font-semibold text-zinc-200">Hospitals</span>
+                <span className="font-semibold text-zinc-200">{hospitals.length ? 'Hospitals' : 'Example hospitals'}</span>
                 <span className="font-mono text-[11px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20">
-                  {hospitals.length || 28}
+                  {hospitals.length || 'Example'}
                 </span>
               </div>
 
               {/* Pharmacies Badge */}
               <div className="hidden sm:flex items-center gap-2 bg-zinc-950/80 border border-white/10 backdrop-blur-md text-xs text-zinc-300 rounded-xl px-3 py-1.5 shadow-xl">
                 <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                <span className="font-semibold text-zinc-200">Pharmacies</span>
+                <span className="font-semibold text-zinc-200">Example medicine shops</span>
                 <span className="font-mono text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
                   12
                 </span>
@@ -363,7 +390,7 @@ export const UserDashboardPage = () => {
               {/* Labs Badge */}
               <div className="hidden sm:flex items-center gap-2 bg-zinc-950/80 border border-white/10 backdrop-blur-md text-xs text-zinc-300 rounded-xl px-3 py-1.5 shadow-xl">
                 <span className="h-2 w-2 rounded-full bg-purple-400"></span>
-                <span className="font-semibold text-zinc-200">Labs</span>
+                <span className="font-semibold text-zinc-200">Example test centers</span>
                 <span className="font-mono text-[11px] text-purple-400 font-bold bg-purple-500/10 px-1.5 py-0.5 rounded-md border border-purple-500/20">
                   8
                 </span>
@@ -374,7 +401,7 @@ export const UserDashboardPage = () => {
             <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 bg-zinc-950/80 border border-white/10 backdrop-blur-md p-1 rounded-xl shadow-xl">
               <span className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-rose-300 bg-rose-500/20 border border-rose-500/30 rounded-lg">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"></span>
-                Native Dark Obsidian Map
+                Some map details are examples, not live.
               </span>
               <span className="px-2 py-1 text-[11px] text-zinc-400 font-medium hidden sm:inline">
                 Jaipur Sector 1-12
@@ -389,9 +416,9 @@ export const UserDashboardPage = () => {
               <div className="flex items-center gap-1 bg-white/[0.04] border border-white/10 p-1 rounded-xl backdrop-blur-md">
                 {(
                   [
-                    { key: 'ambulances', label: 'Nearby Ambulances' },
-                    { key: 'hospitals', label: 'Nearby Hospitals' },
-                    { key: 'appointments', label: 'Book Appointment' },
+                    { key: 'ambulances', label: 'Example ambulances' },
+                    { key: 'hospitals', label: 'Nearby hospitals' },
+                    { key: 'appointments', label: 'Book a visit' },
                   ] as { key: TabKey; label: string }[]
                 ).map((tab) => {
                   const isActive = activeTab === tab.key;
@@ -414,7 +441,7 @@ export const UserDashboardPage = () => {
 
               <div className="flex items-center gap-2 text-xs text-zinc-400">
                 <Activity className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
-                <span>Live Feed Updates Active</span>
+                <span>Some details are examples</span>
               </div>
             </div>
 
@@ -483,7 +510,7 @@ export const UserDashboardPage = () => {
                   {nearbyHospitalsQ.isLoading ? (
                     <div className="py-12 text-center text-zinc-400">
                       <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-rose-400" />
-                      <p className="text-xs font-semibold">Scanning nearby healthcare facilities…</p>
+                      <p className="text-xs font-semibold">Looking for nearby care…</p>
                     </div>
                   ) : hospitals.length === 0 ? (
                     <p className="py-10 text-center text-xs text-zinc-400">
@@ -524,7 +551,7 @@ export const UserDashboardPage = () => {
                     to={ROUTES.USER.HOSPITALS}
                     className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-xs font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all mt-4"
                   >
-                    <span>View All Healthcare Facilities</span>
+                    <span>View nearby care</span>
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
@@ -540,7 +567,7 @@ export const UserDashboardPage = () => {
                           <div className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                             <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
-                              Confirmed Appointment
+                              Confirmed visit
                             </p>
                           </div>
                           <p className="text-sm font-bold text-white mt-1">
@@ -559,14 +586,14 @@ export const UserDashboardPage = () => {
 
                         <StatusBadge
                           variant={upcomingAppointment.status === 'CONFIRMED' ? 'verified' : 'waitTime'}
-                          label={upcomingAppointment.status}
+                          label={upcomingAppointment.status === 'CONFIRMED' ? 'Confirmed' : 'Waiting'}
                         />
                       </div>
                     </div>
                   ) : (
                     <div className="py-8 text-center text-xs text-zinc-400">
                       <Calendar className="h-8 w-8 text-zinc-600 mx-auto mb-2" />
-                      <p>No upcoming appointments found.</p>
+                      <p>You have no upcoming visits.</p>
                     </div>
                   )}
 
@@ -576,13 +603,13 @@ export const UserDashboardPage = () => {
                       className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-lg shadow-rose-950/50 transition-all"
                     >
                       <Calendar className="h-4 w-4" />
-                      <span>Book New Appointment</span>
+                      <span>Book a visit</span>
                     </Link>
                     <Link
                       to={ROUTES.USER.APPOINTMENTS}
                       className="flex items-center justify-center gap-1.5 rounded-xl px-5 py-3 text-xs font-semibold text-zinc-300 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition-all"
                     >
-                      <span>Appointment History</span>
+                      <span>Past visits</span>
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Link>
                   </div>
@@ -605,7 +632,7 @@ export const UserDashboardPage = () => {
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">GPS Live Telemetry</p>
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Your location</p>
                   </div>
                   <p className="text-xs font-semibold text-white truncate max-w-[180px] mt-0.5">
                     {currentLocation.label || 'Jaipur Metropolitan, Rajasthan'}
@@ -619,7 +646,7 @@ export const UserDashboardPage = () => {
                 disabled={isUpdating}
                 className="text-xs font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer shrink-0"
               >
-                {isUpdating ? 'Updating…' : 'Refresh'}
+                {isUpdating ? 'Updating…' : 'Update'}
               </button>
             </div>
           </DarkGlassCard>
@@ -631,13 +658,13 @@ export const UserDashboardPage = () => {
                 <AlertTriangle className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-base font-black text-white">Emergency SOS Protocol</p>
-                <p className="text-xs text-rose-300/80">Immediate ambulance & hospital alert</p>
+                <p className="text-base font-black text-white">Emergency help</p>
+                <p className="text-xs text-rose-300/80">Send a request for emergency help</p>
               </div>
             </div>
 
             <p className="text-xs text-zinc-400 leading-relaxed mb-5">
-              1-tap dispatches the nearest emergency response team with encrypted GPS coordinates to Jaipur control center.
+              Send a request for emergency help and share your location.
             </p>
 
             <Link
@@ -645,20 +672,20 @@ export const UserDashboardPage = () => {
               className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-black text-sm shadow-xl shadow-rose-950/80 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
               <PhoneCall className="h-4 w-4 animate-pulse" />
-              <span>DISPATCH EMERGENCY HELP</span>
+              <span>Ask for emergency help</span>
             </Link>
           </div>
 
           {/* Quick Actions Bento Grid */}
           <DarkGlassCard className="p-5">
             <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-4">
-              Rapid Quick Actions
+              Quick actions
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {[
                 {
                   icon: PhoneCall,
-                  label: 'Call 108 Emergency',
+                  label: 'Call 108 for an ambulance',
                   sub: 'Direct line',
                   action: () => {
                     window.location.href = 'tel:108';
@@ -666,25 +693,25 @@ export const UserDashboardPage = () => {
                 },
                 {
                   icon: Share2,
-                  label: 'Share Location',
-                  sub: 'Send GPS coordinates',
+                  label: 'Share location',
+                  sub: 'Share your location',
                   action: () => {
                     void navigator.share?.({
-                      title: 'My Location - resQ 2.O',
+                      title: 'My location - ResQ',
                       text: currentLocation.label || 'Jaipur Metropolitan',
                     });
                   },
                 },
                 {
                   icon: Users,
-                  label: 'SOS Contacts',
-                  sub: 'Manage family ties',
+                  label: 'Emergency contacts',
+                  sub: 'Manage your contacts',
                   to: ROUTES.USER.PROFILE,
                 },
                 {
                   icon: FileText,
-                  label: 'Health Records',
-                  sub: 'Blood type & allergies',
+                  label: 'Health details',
+                  sub: 'Blood type and allergies',
                   to: ROUTES.USER.PROFILE,
                 },
               ].map((qa, i) => {
@@ -716,7 +743,7 @@ export const UserDashboardPage = () => {
             <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
               <h3 className="text-xs font-bold text-white flex items-center gap-2">
                 <Zap className="h-3.5 w-3.5 text-rose-400" />
-                <span>Recent Requests</span>
+                <span>{recentRequests.length === 0 ? 'Example requests' : 'Recent requests'}</span>
               </h3>
               <Link to={ROUTES.USER.REQUESTS} className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition">
                 View All
@@ -727,13 +754,13 @@ export const UserDashboardPage = () => {
               {emergenciesQ.isLoading ? (
                 <div className="py-6 text-center text-zinc-400 text-xs">
                   <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1 text-rose-400" />
-                  <span>Loading recent telemetry…</span>
+                  <span>Loading recent updates…</span>
                 </div>
               ) : recentRequests.length === 0 ? (
                 [
-                  { icon: Ambulance, label: 'Ambulance Dispatch', date: 'Today, 14:15', status: 'RESOLVED' },
-                  { icon: Calendar, label: 'Cardiology Consult', date: '04 Nov 2026', status: 'CONFIRMED' },
-                  { icon: Beaker, label: 'Comprehensive Pathology', date: '28 Oct 2026', status: 'COMPLETED' },
+                  { icon: Ambulance, label: 'Ambulance request', date: 'Today, 14:15', status: 'RESOLVED' },
+                  { icon: Calendar, label: 'Heart doctor visit', date: '04 Nov 2026', status: 'CONFIRMED' },
+                  { icon: Beaker, label: 'Lab tests', date: '28 Oct 2026', status: 'COMPLETED' },
                 ].map((item, i) => {
                   const ItemIcon = item.icon;
                   return (
@@ -787,15 +814,15 @@ export const UserDashboardPage = () => {
           <DarkGlassCard className="p-5">
             <h3 className="text-xs font-bold text-white mb-3.5 flex items-center gap-2">
               <PhoneCall className="h-3.5 w-3.5 text-rose-400" />
-              <span>National & Regional Emergency Helplines</span>
+              <span>Emergency phone numbers</span>
             </h3>
             <div className="space-y-1.5">
               {[
-                { label: 'Central Ambulance Service', no: '108', color: '#f43f5e' },
-                { label: 'National Unified Emergency', no: '112', color: '#fb7185' },
-                { label: 'Police First Response', no: '100', color: '#60a5fa' },
-                { label: 'Fire Service Brigade', no: '101', color: '#fb923c' },
-                { label: 'Women Helpline Desk', no: '181', color: '#c084fc' },
+                { label: 'Ambulance', no: '108', color: '#f43f5e' },
+                { label: 'Emergency services', no: '112', color: '#fb7185' },
+                { label: 'Police', no: '100', color: '#60a5fa' },
+                { label: 'Fire service', no: '101', color: '#fb923c' },
+                { label: 'Women’s helpline', no: '181', color: '#c084fc' },
               ].map((n) => (
                 <a
                   key={n.no}

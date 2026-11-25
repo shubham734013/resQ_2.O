@@ -24,7 +24,7 @@ export const SituationSelector = ({
           {/* Category Badge: Translucent crimson tag */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-            <span>Emergency Triage</span>
+            <span>What is wrong?</span>
           </div>
 
           {/* Title: Crisp, bold header */}
@@ -34,7 +34,7 @@ export const SituationSelector = ({
 
           {/* Description: High-readability subtext */}
           <p className="text-zinc-400 text-sm leading-relaxed max-w-xl font-normal">
-            Select the situation so ResQ can identify verified facilities with matching clinical capabilities and open emergency intake.
+            Choose what is wrong so ResQ can look for trusted hospitals that offer the right care and are taking emergency patients.
           </p>
         </div>
 
@@ -61,7 +61,7 @@ export const SituationSelector = ({
           type="button"
           disabled={!selectedSituation}
           onClick={onContinue}
-          aria-label="Continue to location confirmation"
+          aria-label="Continue to confirm your place"
           className={`group relative overflow-hidden w-full flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-6 text-sm font-semibold text-white transition-all duration-300 shadow-xl cursor-pointer ${
             selectedSituation
               ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-rose-600 shadow-rose-950/60 hover:scale-[1.01] active:scale-[0.99] border border-rose-400/30'
@@ -72,7 +72,7 @@ export const SituationSelector = ({
           {selectedSituation && (
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
           )}
-          <span>Continue to Location</span>
+          <span>Continue to your place</span>
           <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
         </button>
       </div>

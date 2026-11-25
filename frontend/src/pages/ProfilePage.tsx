@@ -49,7 +49,7 @@ const ProfileForm = ({ profile, update }: { profile: UserProfile; update: Return
       <div className="grid gap-4 sm:grid-cols-2">
         {(['name', 'phone', 'address', 'city', 'state', 'country', 'latitude', 'longitude'] as const).map((field) => (
           <label key={field} className="text-xs font-semibold text-slate-700 capitalize block space-y-1">
-            <span>{field === 'latitude' ? 'Latitude (GPS)' : field === 'longitude' ? 'Longitude (GPS)' : field}</span>
+            <span>{field === 'latitude' ? 'North–south location' : field === 'longitude' ? 'East–west location' : field}</span>
             <input
               value={form[field]}
               onChange={(e) => set(field, e.target.value)}
@@ -63,12 +63,12 @@ const ProfileForm = ({ profile, update }: { profile: UserProfile; update: Return
 
       {update.isError && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 font-medium">
-          {update.error instanceof Error ? update.error.message : 'Profile update failed.'}
+          We could not save your profile. Try again.
         </div>
       )}
       {update.isSuccess && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 font-medium">
-          Profile updated successfully.
+          Profile saved.
         </div>
       )}
 
@@ -101,7 +101,7 @@ export const ProfilePage = () => {
     return (
       <div className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         <div className="p-5 rounded-2xl border border-rose-200 bg-rose-50 text-xs text-rose-800 space-y-2">
-          <p className="font-semibold">Unable to load profile.</p>
+          <p className="font-semibold">We could not load your profile.</p>
           <Button size="sm" variant="secondary" onClick={() => void q.refetch()}>
             Retry
           </Button>
@@ -127,7 +127,7 @@ export const ProfilePage = () => {
       <header className="space-y-1.5 pb-2 border-b border-slate-200">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200/60 text-teal-800 text-[11px] font-semibold">
           <User className="w-3.5 h-3.5 text-teal-600" />
-          <span>Patient Account</span>
+          <span>Your account</span>
         </div>
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950">
           User Profile & Emergency History
@@ -146,7 +146,7 @@ export const ProfilePage = () => {
           <div className="space-y-1">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-indigo-600" />
-              <span>Hospital Requests & Appointments</span>
+              <span>Hospital requests and visits</span>
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed">
               Track scheduled consultations, reserved hospital time slots, and non-emergency responses.
@@ -171,21 +171,21 @@ export const ProfilePage = () => {
           <div>
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <Activity className="w-4 h-4 text-rose-600" />
-              <span>Emergency Requests History</span>
+              <span>Past emergency requests</span>
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Authoritative history of all emergency coordination requests.</p>
+            <p className="text-xs text-slate-500 mt-0.5">A record of your emergency requests.</p>
           </div>
         </div>
 
         {emergencies.isLoading ? (
-          <div className="p-6 text-center text-xs text-slate-400">Loading emergency history…</div>
+          <div className="p-6 text-center text-xs text-slate-400">Loading past emergency requests…</div>
         ) : emergencies.isError ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 flex items-center justify-between">
-            <span>Unable to load emergency history.</span>
-            <Button size="sm" variant="secondary" onClick={() => void emergencies.refetch()}>Retry</Button>
+            <span>We could not load past requests.</span>
+            <Button size="sm" variant="secondary" onClick={() => void emergencies.refetch()}>Try again</Button>
           </div>
         ) : !emergencies.data?.items.length ? (
-          <div className="p-6 text-center text-xs text-slate-400">No emergency requests registered.</div>
+          <div className="p-6 text-center text-xs text-slate-400">You have no past emergency requests.</div>
         ) : (
           <div className="space-y-2.5">
             {emergencies.data.items.map((item) => {
@@ -222,7 +222,7 @@ export const ProfilePage = () => {
                         variant="secondary"
                         disabled={cancelEmergency.isPending}
                         onClick={() => {
-                          if (window.confirm('Cancel this active emergency request?')) {
+                          if (window.confirm('Cancel this open emergency request?')) {
                             cancelEmergency.mutate(item.id);
                           }
                         }}
@@ -243,7 +243,7 @@ export const ProfilePage = () => {
       <section className="rounded-2xl border border-slate-200/90 bg-white p-4 text-xs text-slate-600 shadow-xs flex items-start gap-2.5">
         <Shield className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
         <p className="leading-relaxed">
-          <strong>Coordination Notice:</strong> ResQ is a digital healthcare coordination platform. It does not diagnose medical conditions or replace emergency municipal dispatch (112).
+          <strong>Important:</strong> ResQ helps people reach health care. It cannot tell what is wrong or replace emergency services. Call 112 in an emergency.
         </p>
       </section>
     </div>

@@ -21,7 +21,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error('Failed to fetch notifications');
+    throw new Error('Could not load alerts. Please try again.');
   }
   return (payload as { data: T }).data;
 }

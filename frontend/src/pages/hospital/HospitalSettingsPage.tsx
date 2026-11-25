@@ -20,14 +20,14 @@ export const HospitalSettingsPage = () => {
   return (
     <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8 space-y-6 font-sans">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">Hospital Facility & Operational Settings</h1>
-        <p className="text-xs text-zinc-400 mt-1">Configure triage automation, pre-arrival emergency alert sounds, and bed thresholds</p>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">Hospital settings</h1>
+        <p className="text-xs text-zinc-400 mt-1">Set emergency alerts and bed warnings.</p>
       </div>
 
       {saved && (
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-xl p-4 flex items-center gap-3 text-xs text-emerald-300 font-mono shadow-lg shadow-emerald-950/20">
           <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-          <span>Facility configuration parameters updated successfully.</span>
+          <span>Your hospital settings were saved.</span>
         </div>
       )}
 
@@ -35,7 +35,7 @@ export const HospitalSettingsPage = () => {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 sm:p-8 shadow-xl space-y-6">
           <div className="flex items-center gap-2 border-b border-white/5 pb-4">
             <BellRing className="w-4 h-4 text-rose-400" />
-            <h2 className="text-base font-semibold text-zinc-100 tracking-tight">Emergency Intake Protocol</h2>
+            <h2 className="text-base font-semibold text-zinc-100 tracking-tight">Emergency alerts</h2>
           </div>
 
           <div className="space-y-3">
@@ -48,10 +48,10 @@ export const HospitalSettingsPage = () => {
               />
               <div>
                 <p className="text-xs font-semibold text-zinc-200 group-hover:text-rose-300 transition-colors">
-                  Audible Sirens on High-Acuity Incoming Ambulances
+                  Play an alert when an ambulance is coming
                 </p>
                 <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                  Plays an audio alert tone on the clinical coordination dashboard when an ambulance enters the 5-kilometer trauma radius.
+                  Play a sound on this page when an ambulance is within 5 kilometers of the hospital.
                 </p>
               </div>
             </label>
@@ -65,10 +65,10 @@ export const HospitalSettingsPage = () => {
               />
               <div>
                 <p className="text-xs font-semibold text-zinc-200 group-hover:text-rose-300 transition-colors">
-                  SMS Pre-Alerts to On-Call Chief Medical Officer
+                  Text the on-call medical lead before arrival
                 </p>
                 <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                  Sends automated SMS summaries for cardiac arrest, severe trauma, and stroke requests.
+                  Send a text summary for cardiac arrest, serious injuries, and stroke requests.
                 </p>
               </div>
             </label>
@@ -82,10 +82,10 @@ export const HospitalSettingsPage = () => {
               />
               <div>
                 <p className="text-xs font-semibold text-zinc-200 group-hover:text-rose-300 transition-colors">
-                  Auto-Accept Level 1 Trauma Dispatches When Capacity &gt; 20%
+                  Accept urgent injury alerts when over 20% of beds are free
                 </p>
                 <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                  Automatically transitions incoming life-threat cases to PREPARING stage without manual physician queue acceptance.
+                  Move life-threatening cases to the preparation step without waiting for a doctor to accept them.
                 </p>
               </div>
             </label>
@@ -95,10 +95,10 @@ export const HospitalSettingsPage = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-rose-400" />
-                <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Bed Saturation Alert Threshold</span>
+                <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Bed warning level</span>
               </div>
               <span className="text-xs font-mono font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded-lg">
-                {settings.capacityThreshold}% Occupancy
+                {settings.capacityThreshold}% full
               </span>
             </div>
             <input
@@ -110,7 +110,7 @@ export const HospitalSettingsPage = () => {
               className="w-full accent-rose-500"
             />
             <p className="text-[11px] text-zinc-400">
-              Triggers automatic surge diversion warnings to the city dispatch center when occupancy exceeds this threshold.
+              Warn the city dispatch center when more than this share of beds are in use.
             </p>
           </div>
         </div>
@@ -120,7 +120,7 @@ export const HospitalSettingsPage = () => {
             type="submit"
             className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-500 shadow-lg shadow-rose-950/50 hover:from-rose-500 hover:to-rose-400 transition-all"
           >
-            Save Facility Configuration
+            Save settings
           </button>
         </div>
       </form>

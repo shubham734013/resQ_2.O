@@ -44,13 +44,13 @@ export const FacilityCard = ({
             {facility.emergencyAvailable && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20 shadow-xs">
                 <Flame className="w-3.5 h-3.5 text-rose-500 shrink-0" aria-hidden="true" />
-                <span>24/7 Emergency</span>
+                <span>Emergency care</span>
               </span>
             )}
             {facility.verified && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-xs">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" aria-hidden="true" />
-                <span>Verified</span>
+                <span>Checked</span>
               </span>
             )}
             {facility.openStatus && (
@@ -124,10 +124,10 @@ export const FacilityCard = ({
             e.stopPropagation();
             navigate(ROUTES.USER.HOSPITAL_DETAIL(facility.id));
           }}
-          aria-label={`View full details for ${facility.name}`}
+          aria-label={`View all details for ${facility.name}`}
           className="text-rose-400 hover:text-rose-300 text-sm font-medium tracking-wide flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 ml-2"
         >
-          <span>View Facility</span>
+          <span>View hospital</span>
           <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
         </button>
       </div>

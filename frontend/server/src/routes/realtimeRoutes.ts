@@ -4,7 +4,6 @@ import { Types } from 'mongoose';
 import { authenticate } from '../middlewares/authenticate.js';
 import type { AuthenticatedRequest } from '../types/auth.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
-import { AmbulanceModel } from '../models/Ambulance.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
 import { registerRealtimeClient, unregisterRealtimeClient } from '../services/realtimeService.js';
@@ -31,13 +30,6 @@ const maySubscribe = async (req: AuthenticatedRequest, channel: string): Promise
       if (emergency && String(emergency.driverId ?? '') === auth.id) return true;
       return Boolean(await TripModel.exists({ emergencyRequestId: new Types.ObjectId(resourceId), driverId: new Types.ObjectId(auth.id) }));
     }
-    return false;
-  }
-  if (auth.role === 'AMBULANCE_PROVIDER') {
-    if (kind === 'provider') return resourceId === auth.id;
-    if (kind === 'ambulance') return Boolean(await AmbulanceModel.exists({ _id: resourceId, providerId: auth.id }));
-    if (kind === 'driver') return Boolean(await AmbulanceDriverModel.exists({ _id: resourceId, providerId: auth.id }));
-    if (kind === 'emergency') return Boolean(await EmergencyRequestModel.exists({ _id: resourceId, ambulanceProviderId: auth.id }));
     return false;
   }
   if (auth.role === 'HOSPITAL') {

@@ -168,9 +168,9 @@ const MOCK_7_DAYS = [
 ];
 
 const MOCK_SOS = [
-  { id: '1', time: '2 min ago', type: 'Cardiac Arrest', location: 'Malviya Nagar, Jaipur', priority: 'HIGH' },
-  { id: '2', time: '5 min ago', type: 'Road Accident', location: 'Ajmer Road, Jaipur', priority: 'HIGH' },
-  { id: '3', time: '11 min ago', type: 'Breathing Issues', location: 'Mansarovar, Jaipur', priority: 'MEDIUM' },
+  { id: '1', time: '2 min ago', type: 'Cardiac arrest', location: 'Malviya Nagar, Jaipur', priority: 'HIGH' },
+  { id: '2', time: '5 min ago', type: 'Road crash', location: 'Ajmer Road, Jaipur', priority: 'HIGH' },
+  { id: '3', time: '11 min ago', type: 'Trouble breathing', location: 'Mansarovar, Jaipur', priority: 'MEDIUM' },
   { id: '4', time: '18 min ago', type: 'Stroke', location: 'C-Scheme, Jaipur', priority: 'HIGH' },
   { id: '5', time: '22 min ago', type: 'Burn Injury', location: 'Vaishali Nagar, Jaipur', priority: 'MEDIUM' },
 ];
@@ -192,13 +192,13 @@ const MOCK_PROVIDERS = [
 ];
 
 const MOCK_ACTIVITIES = [
-  { id: '1', icon: '🚨', msg: 'SOS dispatched → SMS Hospital (Cardiac)', time: '1 min ago', color: 'bg-red-100 text-red-700' },
-  { id: '2', icon: '✅', msg: 'Emergency resolved — Ajmer Road (Trauma)', time: '4 min ago', color: 'bg-emerald-100 text-emerald-700' },
-  { id: '3', icon: '🏥', msg: 'New hospital registered: Pratap Med Centre', time: '12 min ago', color: 'bg-blue-100 text-blue-700' },
+  { id: '1', icon: '🚨', msg: 'Emergency request sent to SMS Hospital (heart)', time: '1 min ago', color: 'bg-red-100 text-red-700' },
+  { id: '2', icon: '✅', msg: 'Emergency closed — Ajmer Road (injury)', time: '4 min ago', color: 'bg-emerald-100 text-emerald-700' },
+  { id: '3', icon: '🏥', msg: 'New hospital joined: Pratap Med Centre', time: '12 min ago', color: 'bg-blue-100 text-blue-700' },
   { id: '4', icon: '🚑', msg: 'Ambulance RJ-14-A-2211 went online', time: '18 min ago', color: 'bg-amber-100 text-amber-700' },
-  { id: '5', icon: '👤', msg: '3 new citizen accounts verified', time: '25 min ago', color: 'bg-purple-100 text-purple-700' },
-  { id: '6', icon: '⚡', msg: 'SOS escalated — no driver available', time: '31 min ago', color: 'bg-red-100 text-red-700' },
-  { id: '7', icon: '🔒', msg: 'Provider CityMed Ambulance suspended', time: '42 min ago', color: 'bg-slate-100 text-slate-700' },
+  { id: '5', icon: '👤', msg: '3 user accounts checked', time: '25 min ago', color: 'bg-purple-100 text-purple-700' },
+  { id: '6', icon: '⚡', msg: 'Help needed — no driver is free', time: '31 min ago', color: 'bg-red-100 text-red-700' },
+  { id: '7', icon: '🔒', msg: 'CityMed Ambulance account paused', time: '42 min ago', color: 'bg-slate-100 text-slate-700' },
 ];
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -341,23 +341,23 @@ export const AdminDashboardPage = () => {
                 <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                 LIVE
               </span>
-              <span className="text-[11px] text-slate-400 font-medium">ResQ 2.0 Command Centre</span>
+              <span className="text-[11px] text-slate-400 font-medium">ResQ admin</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white">
               Welcome back, {user?.name?.split(' ')[0] ?? 'Admin'}! 👋
             </h1>
             <p className="text-slate-400 text-sm mt-1">
-              Here's your live platform snapshot. {activeSOS > 0 && (
-                <span className="text-red-400 font-semibold">{activeSOS} active SOS in progress.</span>
+              Here are the latest numbers.               {activeSOS > 0 && (
+                <span className="text-red-400 font-semibold">{activeSOS} emergencies are open.</span>
               )}
             </p>
 
             {/* Indian emergency numbers */}
             <div className="flex flex-wrap gap-2 mt-3">
               {[
-                { label: '108 Ambulance', icon: '🚑' },
-                { label: '112 Emergency', icon: '🚨' },
-                { label: '102 Maternity', icon: '🏥' },
+                { label: 'Ambulance: 108', icon: '🚑' },
+                { label: 'Emergency: 112', icon: '🚨' },
+                { label: 'Maternity: 102', icon: '🏥' },
               ].map((e) => (
                 <span
                   key={e.label}
@@ -375,7 +375,7 @@ export const AdminDashboardPage = () => {
             <p className="text-slate-300 text-xs mt-1">{dateStr}</p>
             <div className="mt-3 flex items-center justify-center gap-1.5">
               <Bell className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-amber-300 text-[11px] font-semibold">{activeSOS} Active Alerts</span>
+              <span className="text-amber-300 text-[11px] font-semibold">{activeSOS} open alerts</span>
             </div>
           </div>
         </div>
@@ -385,7 +385,7 @@ export const AdminDashboardPage = () => {
         {/* ── Row 1: Entity stats ── */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Platform Overview</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Overview</h2>
             <Button
               size="sm"
               variant="secondary"
@@ -398,7 +398,7 @@ export const AdminDashboardPage = () => {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Citizens"
+              label="Users"
               value={d.totalUsers ?? 0}
               detail={`${d.activeUsers ?? 0} active`}
               icon={<Users className="h-5 w-5 text-blue-600" />}
@@ -418,7 +418,7 @@ export const AdminDashboardPage = () => {
               sparkColor="#10b981"
             />
             <StatCard
-              label="Ambulance Providers"
+              label="Ambulance companies"
               value={d.totalAmbulanceProviders ?? 0}
               detail={`${d.verifiedProviders ?? 0} verified`}
               icon={<UserRoundCog className="h-5 w-5 text-violet-600" />}
@@ -428,7 +428,7 @@ export const AdminDashboardPage = () => {
               sparkColor="#8b5cf6"
             />
             <StatCard
-              label="Ambulance Drivers"
+              label="Drivers"
               value={d.totalAmbulanceDrivers ?? 0}
               detail={`${d.onlineDrivers ?? 0} on duty`}
               icon={<Ambulance className="h-5 w-5 text-amber-600" />}
@@ -443,7 +443,7 @@ export const AdminDashboardPage = () => {
         {/* ── Row 2: SOS stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="Total SOS Requests"
+            label="Emergency requests"
             value={d.totalEmergencies ?? 0}
             detail="All time"
             icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
@@ -455,7 +455,7 @@ export const AdminDashboardPage = () => {
           <StatCard
             label="Completed"
             value={d.resolvedEmergencies ?? 0}
-            detail="Successfully resolved"
+            detail="Closed"
             icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
             iconBg="bg-emerald-50"
             trend={9.8}
@@ -465,7 +465,7 @@ export const AdminDashboardPage = () => {
           <StatCard
             label="Cancelled"
             value={d.cancelledEmergencies ?? 0}
-            detail="User / system cancelled"
+            detail="Cancelled"
             icon={<XCircle className="h-5 w-5 text-rose-500" />}
             iconBg="bg-rose-50"
             trend={-4.2}
@@ -473,9 +473,9 @@ export const AdminDashboardPage = () => {
             sparkColor="#f43f5e"
           />
           <StatCard
-            label="Active Now"
+            label="Open now"
             value={d.activeEmergencies ?? 0}
-            detail="Dispatches in progress"
+            detail="Being handled"
             icon={<Clock className="h-5 w-5 text-orange-600" />}
             iconBg="bg-orange-50"
             sparkData={[2, 3, 4, 3, 5, 4, d.activeEmergencies ?? 3]}
@@ -491,7 +491,7 @@ export const AdminDashboardPage = () => {
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Live Operations Map</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Live map</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {ambulanceMarkers.length} ambulances · {hospitalMarkers.length} hospitals
                   </p>
@@ -499,7 +499,7 @@ export const AdminDashboardPage = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   {[
                     { dot: 'bg-blue-500', label: `Ambulances (${ambulanceMarkers.length})` },
-                    { dot: 'bg-red-500', label: `SOS (${activeSOS})` },
+                    { dot: 'bg-red-500', label: `Open requests (${activeSOS})` },
                     { dot: 'bg-emerald-500', label: `Hospitals (${hospitalMarkers.length})` },
                   ].map((leg) => (
                     <span key={leg.label} className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
@@ -520,7 +520,7 @@ export const AdminDashboardPage = () => {
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                    <MapPin className="h-5 w-5 mr-2" /> No location data available yet
+                    <MapPin className="h-5 w-5 mr-2" /> No locations shared yet
                   </div>
                 )}
               </div>
@@ -532,7 +532,7 @@ export const AdminDashboardPage = () => {
               <div className="rounded-2xl border border-slate-200 bg-white shadow-xs p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Requests Overview</h3>
+                    <h3 className="text-sm font-bold text-slate-900">Requests</h3>
                     <p className="text-xs text-slate-500">Last 7 days</p>
                   </div>
                   <div className="flex gap-3 text-[10px] text-slate-500">
@@ -542,13 +542,13 @@ export const AdminDashboardPage = () => {
                   </div>
                 </div>
                 <BarChart7Days data={MOCK_7_DAYS} />
-                <p className="text-center text-[9px] text-slate-300 mt-2">* Based on platform trends</p>
+                <p className="text-center text-[9px] text-slate-300 mt-2">Sample numbers</p>
               </div>
 
               {/* Donut chart */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-xs p-5">
-                <h3 className="text-sm font-bold text-slate-900 mb-1">Requests by Type</h3>
-                <p className="text-xs text-slate-500 mb-4">Overall distribution</p>
+                <h3 className="text-sm font-bold text-slate-900 mb-1">Requests by type</h3>
+                <p className="text-xs text-slate-500 mb-4">All requests</p>
                 <div className="flex items-center gap-4">
                   <DonutChart
                     segments={donutSegments}
@@ -556,7 +556,7 @@ export const AdminDashboardPage = () => {
                   />
                   <div className="space-y-2 flex-1">
                     {[
-                      { label: 'Active SOS', val: activeSOS || 62, color: 'bg-blue-500' },
+                      { label: 'Open requests', val: activeSOS || 62, color: 'bg-blue-500' },
                       { label: 'Resolved', val: completedSOS || 18, color: 'bg-emerald-500' },
                       { label: 'Cancelled', val: cancelledSOS || 12, color: 'bg-amber-500' },
                       { label: 'Other', val: 8, color: 'bg-violet-500' },
@@ -576,13 +576,13 @@ export const AdminDashboardPage = () => {
 
             {/* Fleet readiness */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-4">Fleet & Driver Readiness</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-4">Ambulance and driver status</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
                   { label: 'Available', val: d.availableAmbulances ?? 0, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-                  { label: 'On Trip', val: d.busyAmbulances ?? 0, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+                  { label: 'On a trip', val: d.busyAmbulances ?? 0, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
                   { label: 'Offline', val: d.offlineAmbulances ?? 0, color: 'text-slate-600', bg: 'bg-slate-50 border-slate-200' },
-                  { label: 'Maintenance', val: d.maintenanceAmbulances ?? 0, color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
+                  { label: 'Being fixed', val: d.maintenanceAmbulances ?? 0, color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
                 ].map((s) => (
                   <div key={s.label} className={`rounded-xl border p-3 text-center ${s.bg}`}>
                     <p className={`text-xl font-black ${s.color}`}>{s.val}</p>
@@ -600,7 +600,7 @@ export const AdminDashboardPage = () => {
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-red-50/60">
                 <div className="flex items-center gap-2">
                   <Flame className="h-4 w-4 text-red-500" />
-                  <h3 className="text-sm font-bold text-red-900">Active SOS Requests</h3>
+                  <h3 className="text-sm font-bold text-red-900">Open emergency requests</h3>
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
                   {activeSOS || MOCK_SOS.length} LIVE
@@ -625,7 +625,7 @@ export const AdminDashboardPage = () => {
                               : 'bg-amber-100 text-amber-700'
                           }`}
                         >
-                          {sos.priority}
+                          {sos.priority === 'HIGH' ? 'High' : 'Medium'}
                         </span>
                         <span className="text-[10px] text-slate-400">{sos.time}</span>
                       </div>
@@ -636,15 +636,15 @@ export const AdminDashboardPage = () => {
               <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
                 <p className="text-[11px] text-slate-500 flex items-center gap-1">
                   <Phone className="h-3 w-3" />
-                  India Emergency: <span className="font-bold text-red-600 ml-1">112</span> ·
-                  <span className="font-bold text-blue-600 ml-1">108</span>
+                  India Emergency:                   <span className="font-bold text-red-600 ml-1">112</span> for emergencies ·
+                  <span className="font-bold text-blue-600 ml-1">108</span> for ambulances
                 </p>
               </div>
             </div>
 
             {/* Pending review */}
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 shadow-xs p-5">
-              <h3 className="text-sm font-bold text-amber-900 mb-3">⏳ Pending Review</h3>
+              <h3 className="text-sm font-bold text-amber-900 mb-3">⏳ Waiting for review</h3>
               <div className="space-y-2">
                 {[
                   { label: 'Hospitals', val: d.pendingHospitals ?? 0, icon: '🏥' },
@@ -656,7 +656,7 @@ export const AdminDashboardPage = () => {
                       {item.icon} {item.label}
                     </span>
                     <span className={`font-bold ${item.val > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
-                      {item.val > 0 ? `${item.val} pending` : '—'}
+                      {item.val > 0 ? `${item.val} waiting` : '—'}
                     </span>
                   </div>
                 ))}
@@ -667,7 +667,7 @@ export const AdminDashboardPage = () => {
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
                 <Activity className="h-4 w-4 text-slate-400" />
-                <h3 className="text-sm font-bold text-slate-900">Recent Activities</h3>
+                <h3 className="text-sm font-bold text-slate-900">Recent changes</h3>
               </div>
               <div className="divide-y divide-slate-100">
                 {MOCK_ACTIVITIES.map((act) => (
@@ -693,8 +693,8 @@ export const AdminDashboardPage = () => {
           {/* Top Performing Hospitals */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">Top Performing Hospitals</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Ranked by completed emergency trips</p>
+              <h3 className="text-sm font-bold text-slate-900">Hospital activity</h3>
+              <p className="text-xs text-slate-500 mt-0.5">By completed emergency trips</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
@@ -703,8 +703,8 @@ export const AdminDashboardPage = () => {
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Hospital</th>
                     <th className="px-4 py-3">Completed</th>
-                    <th className="px-4 py-3">Avg Response</th>
-                    <th className="px-4 py-3">Rating</th>
+                    <th className="px-4 py-3">Avg. time</th>
+                    <th className="px-4 py-3">Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -742,8 +742,8 @@ export const AdminDashboardPage = () => {
           {/* Ambulance Providers Performance */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">Ambulance Providers Performance</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Ranked by total trips</p>
+              <h3 className="text-sm font-bold text-slate-900">Ambulance companies</h3>
+              <p className="text-xs text-slate-500 mt-0.5">By number of trips</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
@@ -752,8 +752,8 @@ export const AdminDashboardPage = () => {
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Provider</th>
                     <th className="px-4 py-3">Trips</th>
-                    <th className="px-4 py-3">Completion %</th>
-                    <th className="px-4 py-3">Rating</th>
+                    <th className="px-4 py-3">Trips completed</th>
+                    <th className="px-4 py-3">Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -802,10 +802,10 @@ export const AdminDashboardPage = () => {
         {/* ── Appointments summary ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total Appointments', val: d.totalAppointments ?? 0, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-            { label: 'Pending', val: d.pendingAppointments ?? 0, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+            { label: 'Appointments', val: d.totalAppointments ?? 0, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+            { label: 'Waiting', val: d.pendingAppointments ?? 0, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
             { label: 'Confirmed', val: d.confirmedAppointments ?? 0, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-            { label: 'Completed', val: d.completedAppointments ?? 0, color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
+            { label: 'Done', val: d.completedAppointments ?? 0, color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
           ].map((c) => (
             <div key={c.label} className={`rounded-2xl border p-4 flex items-center gap-3 ${c.bg}`}>
               <TrendingUp className={`h-5 w-5 ${c.color} shrink-0`} />

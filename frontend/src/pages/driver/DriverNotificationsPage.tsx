@@ -7,12 +7,9 @@ export const DriverNotificationsPage = () => {
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono mb-2">
           <Radio className="h-3.5 w-3.5 animate-pulse" />
-          <span>Realtime Telemetry & Dispatch Pings</span>
+          <span>New request alerts</span>
         </div>
-        <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Driver Dispatch Notifications</h1>
-        <p className="text-xs md:text-sm text-zinc-400 mt-1">
-          Live emergency dispatch pings, destination hospital pre-alerts, and telemetry status logs.
-        </p>
+        <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Driver alerts</h1>
       </div>
 
       {/* Notifications Container */}
@@ -22,15 +19,12 @@ export const DriverNotificationsPage = () => {
         </div>
         
         <div>
-          <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">No New Dispatch Alerts</h2>
-          <p className="text-zinc-400 text-sm max-w-md mx-auto mt-2 leading-relaxed">
-            Keep your Duty toggle set to <span className="text-emerald-400 font-medium">ONLINE</span> to receive incoming emergency call offers and trauma hospital rendezvous alerts.
-          </p>
+          <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">No new alerts</h2>
         </div>
 
         <div className="pt-4 flex items-center justify-center gap-2 text-xs font-mono text-zinc-500">
           <ShieldCheck className="h-4 w-4 text-emerald-500" />
-          <span>Fleet Dispatch Socket Connected · 0 Pending Pings</span>
+          <span>Alerts are connected · 0 waiting</span>
         </div>
       </div>
     </div>

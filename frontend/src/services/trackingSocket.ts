@@ -33,6 +33,6 @@ export const createTrackingSocket = (): Socket => {
 export const subscribeTrackingRoom = (socket: Socket, room: TrackingRoom) => new Promise<void>((resolve, reject) => {
   socket.emit('tracking:subscribe', room, (result: { ok: boolean; error?: string }) => {
     if (result?.ok) resolve();
-    else reject(new Error(result?.error === 'FORBIDDEN' ? 'You are not authorized to view this tracking session.' : 'Could not subscribe to live tracking. Refresh to recover.'));
+    else reject(new Error(result?.error === 'FORBIDDEN' ? "You can't view this trip." : 'Live updates stopped. Refresh the page to try again.'));
   });
 });

@@ -54,7 +54,7 @@ const requestOut = (x: EmergencyRequestDocument & IdDoc, hosp?: HospitalSummary 
     etaMinutes: x.etaMinutes,
   };
 };
-const tripOut=(x:TripDocument&IdDoc):TripView=>({id:String(x._id),emergencyRequestId:String(x.emergencyRequestId),providerId:String(x.providerId),ambulanceId:String(x.ambulanceId),driverId:String(x.driverId),destinationHospitalId:String(x.destinationHospitalId),status:x.status,acceptedAt:x.acceptedAt,arrivedAtPickupAt:x.arrivedAtPickupAt,patientPickedUpAt:x.patientPickedUpAt,arrivedAtHospitalAt:x.arrivedAtHospitalAt,completedAt:x.completedAt,createdAt:x.createdAt,updatedAt:x.updatedAt});
+const tripOut=(x:TripDocument&IdDoc):TripView=>({id:String(x._id),emergencyRequestId:String(x.emergencyRequestId),providerId:String(x.providerId),ambulanceId:String(x.ambulanceId),driverId:String(x.driverId),destinationHospitalId:String(x.destinationHospitalId),status:x.status,pickupOtpVerified:x.pickupOtpVerified,pickupOverrideReason:x.pickupOverrideReason,acceptedAt:x.acceptedAt,arrivedAtPickupAt:x.arrivedAtPickupAt,patientPickedUpAt:x.patientPickedUpAt,arrivedAtHospitalAt:x.arrivedAtHospitalAt,completedAt:x.completedAt,createdAt:x.createdAt,updatedAt:x.updatedAt});
 async function provider(id:string){const x=await AmbulanceProviderModel.findById(oid(id,'provider')).select('-passwordHash').lean().exec();if(!x)throw new AppError('NOT_FOUND','Provider not found',404);return x;}
 async function operationalProvider(id:string){const x=await AmbulanceProviderModel.findById(oid(id,'provider')).lean().exec();if(!x)throw new AppError('NOT_FOUND','Provider not found',404);active(x.accountStatus);verified(x.verificationStatus);return x;}
 async function operationalDriver(id:string){const x=await AmbulanceDriverModel.findById(oid(id,'driver')).lean().exec();if(!x)throw new AppError('NOT_FOUND','Driver not found',404);active(x.accountStatus);verified(x.licenseVerificationStatus,'DRIVER_NOT_VERIFIED');return x;}
@@ -259,12 +259,46 @@ async function moveTrip(did:string,id:string,next:TripStatus){
 export const listDriverTrips=async(did:string,q:TripQuery)=>{await operationalDriver(did);const f:QueryFilter<TripDocument>={driverId:oid(did,'driver')};if(q.status)f.status=q.status;if(q.ambulance)f.ambulanceId=oid(q.ambulance,'ambulance');if(q.from||q.to)f.createdAt={...(q.from?{$gte:q.from}:{}),...(q.to?{$lte:q.to}:{})};const [items,total]=await Promise.all([TripModel.find(f).sort({createdAt:q.sortOrder==='asc'?1:-1}).skip((q.page-1)*q.limit).limit(q.limit).lean().exec(),TripModel.countDocuments(f).exec()]);return page(items.map(tripOut),total,q);};
 export const getDriverTrip=async(did:string,id:string)=>tripOut(await driverTrip(id,did));
 export const arrivedPickup=async(did:string,id:string)=>moveTrip(did,id,'AT_PICKUP');
-export const patientPickedUp=async(did:string,id:string)=>{
-  const current=await driverTrip(id,did);
-  if(current.status==='TO_HOSPITAL')return tripOut(current);
-  if(current.status==='PATIENT_ONBOARD')return moveTrip(did,id,'TO_HOSPITAL');
-  await moveTrip(did,id,'PATIENT_ONBOARD');
-  return moveTrip(did,id,'TO_HOSPITAL');
+export const patientPickedUp = async (did: string, id: string, payload?: { otp?: string; overrideReason?: string }) => {
+  const current = await driverTrip(id, did);
+  if (current.status === 'TO_HOSPITAL') return tripOut(current);
+
+  const expectedOtp = current.pickupOtp;
+  const providedOtp = payload?.otp?.trim();
+  const overrideReason = payload?.overrideReason?.trim();
+
+  let reason: string | undefined = undefined;
+
+  if (providedOtp) {
+    if (expectedOtp && providedOtp !== expectedOtp) {
+      throw new AppError('INVALID_PICKUP_OTP', 'The provided 6-digit pickup verification code is incorrect.', 400);
+    }
+  } else if (overrideReason) {
+    reason = overrideReason;
+  } else {
+    if (!current.pickupOtpVerified && expectedOtp) {
+      throw new AppError('PICKUP_VERIFICATION_REQUIRED', 'Patient pickup OTP or an authorized emergency override reason is required.', 400);
+    }
+  }
+
+  const updateFields: Partial<TripDocument> = {
+    pickupOtpVerified: true,
+  };
+  if (reason) {
+    updateFields.pickupOverrideReason = reason;
+  }
+
+  await Promise.all([
+    TripModel.updateOne({ _id: current._id }, { $set: updateFields }).exec(),
+    EmergencyRequestModel.updateOne(
+      { _id: current.emergencyRequestId },
+      { $set: { pickupOtpVerified: true, ...(reason ? { pickupOverrideReason: reason } : {}) } }
+    ).exec(),
+  ]);
+
+  if (current.status === 'PATIENT_ONBOARD') return moveTrip(did, id, 'TO_HOSPITAL');
+  await moveTrip(did, id, 'PATIENT_ONBOARD');
+  return moveTrip(did, id, 'TO_HOSPITAL');
 };
 export const arrivedHospital=async(did:string,id:string)=>moveTrip(did,id,'AT_HOSPITAL');
 export const completeTrip=async(did:string,id:string)=>moveTrip(did,id,'COMPLETED');
@@ -278,7 +312,7 @@ export const updateDriverLocation=async(did:string,input:z.infer<typeof S.ambula
   if(!d.assignedAmbulanceId) throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED','Driver has no assigned ambulance',409);
   if(d.availabilityStatus==='OFFLINE') throw new AppError('DRIVER_OFFLINE','Location updates are allowed only while the driver is on duty',409);
   const a=await AmbulanceModel.findOneAndUpdate(
-    {_id:d.assignedAmbulanceId,providerId:d.providerId,verificationStatus:'VERIFIED',accountStatus:'ACTIVE'},
+    {_id:d.assignedAmbulanceId,...(d.providerId ? {providerId:d.providerId} : {}),verificationStatus:'VERIFIED',accountStatus:'ACTIVE'},
     {$set:{currentLatitude:input.latitude,currentLongitude:input.longitude,location:{type:'Point',coordinates:[input.longitude,input.latitude]},locationUpdatedAt:new Date()}},
     {returnDocument: 'after'}
   ).lean().exec();

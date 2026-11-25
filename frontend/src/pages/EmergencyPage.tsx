@@ -5,8 +5,9 @@ import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Clock, MapPin, Phone
 import type { Facility, UserLocation } from '../types/facility';
 import type { EmergencyFlowStep, EmergencyRequestView, EmergencySituationId, FacilityRecommendationItem } from '../types/emergency';
 import { EMERGENCY_SITUATIONS, getRecommendedFacilities } from '../data/emergencySituations';
-import { emergencyApi, type EmergencyDiscoveryHospital } from '../services/emergencyApi';
+import { emergencyApi, EmergencyApiError, type EmergencyDiscoveryHospital } from '../services/emergencyApi';
 import { facilityApi } from '../services/facilityApi';
+import { useAuth } from '../context/AuthContext';
 import { EmergencyMode } from '../components/emergency/EmergencyMode';
 import { SituationSelector } from '../components/emergency/SituationSelector';
 import { LocationConfirmation } from '../components/emergency/LocationConfirmation';
@@ -62,6 +63,7 @@ const toFacility = (item: EmergencyDiscoveryHospital): Facility => ({
   openStatus: item.emergencyAvailability === 'LIMITED' ? 'Emergency intake reported as limited' : 'Emergency intake reported as available',
   isOpen: true,
   isAvailable: true,
+  isTestHospital: item.isTestHospital,
   capabilities: [...item.services, ...item.capabilities],
 });
 const situationIdForLabel = (label: string): EmergencySituationId =>
@@ -73,12 +75,20 @@ const fallbackFacility = (hospitalId: string): Facility => ({
   isOpen: false, isAvailable: false, capabilities: [],
 });
 const loadActiveEmergency = async (): Promise<EmergencyRequestView | null> => {
-  const response = await emergencyApi.list({ limit: 50 });
-  return response.items.find((item) => ACTIVE_STATUSES.includes(item.status)) ?? null;
+  try {
+    const response = await emergencyApi.list({ limit: 50 });
+    return response?.items?.find((item) => ACTIVE_STATUSES.includes(item.status)) ?? null;
+  } catch (error) {
+    if (error instanceof EmergencyApiError && (error.status === 401 || error.status === 403)) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 export const EmergencyPage = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const outletContext = useOutletContext<LayoutContext | undefined>();
@@ -88,7 +98,7 @@ export const EmergencyPage = () => {
   const refreshFallbackLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setFallbackPermission('unsupported');
-      setFallbackError('This browser does not support location services. Enter an address to continue.');
+      setFallbackError('Your browser cannot share your location. Enter an address instead.');
       return;
     }
     setFallbackError(null);
@@ -97,7 +107,7 @@ export const EmergencyPage = () => {
         setFallbackLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          label: 'Current GPS location',
+          label: 'Current location',
           accuracy: position.coords.accuracy <= 50 ? 'high' : 'approximate',
           accuracyMeters: position.coords.accuracy,
           timestamp: position.timestamp,
@@ -108,8 +118,8 @@ export const EmergencyPage = () => {
       (error) => {
         setFallbackPermission(error.code === error.PERMISSION_DENIED ? 'denied' : 'unknown');
         setFallbackError(error.code === error.PERMISSION_DENIED
-          ? 'Location permission was denied. You can retry permission or enter an address manually.'
-          : 'GPS is unavailable right now. Retry or enter an address manually.');
+          ? 'You did not let us use your location. Try again or enter an address.'
+          : 'We cannot find your location right now. Try again or enter an address.');
       },
       { enableHighAccuracy: true, maximumAge: 60000, timeout: 10000 },
     );
@@ -139,7 +149,9 @@ export const EmergencyPage = () => {
   const activeRequestQuery = useQuery({
     queryKey: activeEmergencyQueryKey,
     queryFn: loadActiveEmergency,
+    enabled: Boolean(isAuthenticated && (user?.role === 'USER' || user?.role === 'ADMIN')),
     staleTime: 15000,
+    retry: 1,
     refetchOnWindowFocus: true,
   });
 
@@ -206,7 +218,7 @@ export const EmergencyPage = () => {
     if (!Number.isFinite(location.latitude) || location.latitude < -90 || location.latitude > 90 ||
         !Number.isFinite(location.longitude) || location.longitude < -180 || location.longitude > 180 ||
         !selectedSituationId) {
-      setSearchError('Choose a valid pickup location and emergency type before searching.');
+      setSearchError('Choose a pickup place and what happened before searching.');
       return;
     }
     setConfirmedLocation(location);
@@ -224,8 +236,8 @@ export const EmergencyPage = () => {
       setRecommendations(getRecommendedFacilities(selectedSituationId, facilities));
       setCurrentStep('recommendations');
       if (facilities.length === 0) setSearchError(null);
-    } catch (error) {
-      setSearchError(error instanceof Error ? error.message : 'Could not load verified emergency hospitals.');
+    } catch {
+      setSearchError('We could not find hospitals. Try again.');
       setCurrentStep('recommendations');
     } finally {
       setIsSearching(false);
@@ -244,7 +256,12 @@ export const EmergencyPage = () => {
     setCoordinationError(null);
     try {
       // Recheck active requests at submit time to protect against stale tabs and repeat submissions.
-      const active = await queryClient.fetchQuery({ queryKey: activeEmergencyQueryKey, queryFn: loadActiveEmergency, staleTime: 0 });
+      let active: EmergencyRequestView | null = null;
+      try {
+        active = await queryClient.fetchQuery({ queryKey: activeEmergencyQueryKey, queryFn: loadActiveEmergency, staleTime: 0 });
+      } catch {
+        // Non-blocking fallback: allow fresh submission to proceed using idempotency key
+      }
       if (active) {
         setEmergencyRequestId(active.id);
         setSelectedSituationId(situationIdForLabel(active.situationType));
@@ -263,7 +280,7 @@ export const EmergencyPage = () => {
         setRecommendations(getRecommendedFacilities(selectedSituation.id, latest.items.map(toFacility)));
         setSelectedFacility(null);
         setCurrentStep('recommendations');
-        setCoordinationError('This hospital is no longer eligible for this emergency. Choose another verified destination.');
+        setCoordinationError('This hospital can no longer help with this emergency. Choose another trusted hospital.');
         return;
       }
       const refreshedFacility = {
@@ -298,10 +315,10 @@ export const EmergencyPage = () => {
       await queryClient.invalidateQueries({ queryKey: ['user', 'emergencies'] });
       setCurrentStep('coordination');
       if (typeof request.etaMinutes !== 'number') {
-        setCoordinationError('Your request was saved, but live driving ETA is unavailable. Keep 112 available and contact the hospital if needed.');
+        setCoordinationError('Your request was saved, but we cannot show a travel time. Keep 112 ready. Call the hospital if you need help.');
       }
-    } catch (error) {
-      setCoordinationError(error instanceof Error ? error.message : 'The emergency request could not be confirmed. Retry safely or call 112.');
+    } catch {
+      setCoordinationError('We could not send your emergency request. Try again or call 112.');
     } finally {
       setIsCreatingRequest(false);
     }
@@ -337,13 +354,13 @@ export const EmergencyPage = () => {
       {activeRequestQuery.isLoading && !emergencyRequestId && (
         <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-4 text-xs font-medium text-zinc-300 flex items-center gap-2.5 shadow-xl">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-          <span>Checking for an existing emergency request…</span>
+          <span>Checking for an open emergency request…</span>
         </div>
       )}
-      {activeRequestQuery.isError && !emergencyRequestId && (
+      {activeRequestQuery.isError && !emergencyRequestId && isAuthenticated && user?.role === 'USER' && (
         <div role="alert" className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 space-y-2 backdrop-blur-xl">
-          <p className="font-semibold">Could not check existing requests. Refresh this check before confirming SOS to avoid creating a duplicate.</p>
-          <Button variant="outline" size="sm" onClick={() => void activeRequestQuery.refetch()}>Retry check</Button>
+          <p className="font-semibold">We could not check for open requests. Try again before sending SOS so you do not send it twice.</p>
+          <Button variant="outline" size="sm" onClick={() => void activeRequestQuery.refetch()}>Try again</Button>
         </div>
       )}
       {currentStep === 'situation' && (
@@ -371,12 +388,12 @@ export const EmergencyPage = () => {
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white transition cursor-pointer"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Change location</span>
+            <span>Change place</span>
           </button>
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
               <Building2 className="w-3.5 h-3.5" />
-              <span>Verified Destination Triage</span>
+              <span>Trusted Hospital Choices</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">
               Hospitals for {selectedSituation?.label ?? 'your emergency'}
@@ -393,10 +410,10 @@ export const EmergencyPage = () => {
           {searchError && (
             <div role="alert" className="space-y-4 rounded-2xl border border-rose-500/30 bg-white/[0.03] backdrop-blur-xl p-6 text-center shadow-2xl">
               <AlertTriangle className="mx-auto h-8 w-8 text-rose-400" />
-              <h3 className="text-sm font-bold text-white">Hospital search needs attention</h3>
+              <h3 className="text-sm font-bold text-white">We could not find hospitals</h3>
               <p className="text-xs text-zinc-400 max-w-md mx-auto">{searchError}</p>
               <div className="flex flex-wrap justify-center gap-3 pt-2">
-                <Button variant="outline" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void handleLocationConfirm(flowLocation)}>Retry search</Button>
+                <Button variant="outline" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void handleLocationConfirm(flowLocation)}>Search again</Button>
                 <Button variant="emergency" size="sm" icon={<Phone className="h-3.5 w-3.5" />} onClick={() => { window.location.href = 'tel:112'; }}>Call 112</Button>
               </div>
             </div>
@@ -404,13 +421,13 @@ export const EmergencyPage = () => {
           {!searchError && recommendations.length === 0 && (
             <div role="status" className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-8 text-center shadow-2xl">
               <Building2 className="mx-auto h-9 w-9 text-zinc-500" />
-              <h3 className="text-base font-bold text-white">No eligible hospital found</h3>
+              <h3 className="text-base font-bold text-white">No matching hospital found</h3>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                No verified hospital with matching declared capabilities and open emergency intake was located within {Math.round(searchRadius / 1000)} km.
+                We could not find a trusted hospital with the right care and open emergency intake within {Math.round(searchRadius / 1000)} km.
               </p>
               <div className="flex flex-wrap justify-center gap-3 pt-2">
                 <Button variant="emergency" size="md" icon={<Phone className="h-4 w-4" />} onClick={() => { window.location.href = 'tel:112'; }}>Call 112</Button>
-                {searchRadius < 100000 && <Button variant="outline" size="md" onClick={() => { const next = Math.min(100000, searchRadius * 2); setSearchRadius(next); void handleLocationConfirm(flowLocation); }}>Search a wider radius</Button>}
+                {searchRadius < 100000 && <Button variant="outline" size="md" onClick={() => { const next = Math.min(100000, searchRadius * 2); setSearchRadius(next); void handleLocationConfirm(flowLocation); }}>Search farther away</Button>}
               </div>
             </div>
           )}
@@ -426,7 +443,7 @@ export const EmergencyPage = () => {
                   className="h-[260px] sm:h-[340px]"
                 />
               </div>
-              <div role="feed" aria-label="Verified emergency hospitals" className="space-y-4">
+              <div role="feed" aria-label="Trusted emergency hospitals" className="space-y-4">
                 {recommendations.map((item, index) => (
                   <FacilityRecommendation
                     key={item.facility.id}
@@ -449,14 +466,14 @@ export const EmergencyPage = () => {
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white transition cursor-pointer"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Choose another hospital</span>
+            <span>Pick another hospital</span>
           </button>
           <div className="space-y-2">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono uppercase tracking-wider">
               Step 4: Final Confirmation
             </span>
-            <h2 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Confirm Emergency Request</h2>
-            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">Review your situation, confirmed location and destination hospital. ResQ re-checks eligibility before persisting.</p>
+            <h2 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Check Emergency Request</h2>
+            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">Check what happened, your location, and the hospital. ResQ checks the hospital again before sending the request.</p>
           </div>
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/90 shadow-2xl">
             <MapView
@@ -472,16 +489,16 @@ export const EmergencyPage = () => {
             <div className="flex items-start gap-4">
               <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-2.5 text-rose-400"><ShieldCheck className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Emergency Type</p>
+                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">What happened</p>
                 <p className="mt-1 font-bold text-white text-base">{selectedSituation.label}</p>
               </div>
             </div>
             <div className="flex items-start gap-4 border-t border-white/10 pt-4">
               <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-2.5 text-rose-400"><MapPin className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Pickup Location</p>
+                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Pickup place</p>
                 <p className="mt-1 font-bold text-white text-base">{confirmedLocation.label}</p>
-                <p className="mt-1 font-mono text-[11px] text-zinc-400">GPS: {confirmedLocation.latitude.toFixed(5)}, {confirmedLocation.longitude.toFixed(5)}</p>
+                <p className="mt-1 font-mono text-[11px] text-zinc-400">Map location: {confirmedLocation.latitude.toFixed(5)}, {confirmedLocation.longitude.toFixed(5)}</p>
               </div>
             </div>
             <div className="flex items-start gap-4 border-t border-white/10 pt-4">
@@ -499,7 +516,7 @@ export const EmergencyPage = () => {
                   <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-400"><Clock className="h-3.5 w-3.5" />{selectedFacility.estimatedTime || 'Driving ETA unavailable'}</span>
                 </div>
                 {selectedFacility.phone && <p className="mt-2 text-xs text-zinc-400">Contact: <span className="text-zinc-200">{selectedFacility.phone}</span></p>}
-                {selectedFacility.capabilities.length > 0 && <p className="mt-1 text-xs text-zinc-500">Capabilities: {selectedFacility.capabilities.slice(0, 5).join(', ')}</p>}
+                {selectedFacility.capabilities.length > 0 && <p className="mt-1 text-xs text-zinc-500">Care offered: {selectedFacility.capabilities.slice(0, 5).join(', ')}</p>}
               </div>
             </div>
           </div>
@@ -518,8 +535,8 @@ export const EmergencyPage = () => {
             >
               {isCreatingRequest ? 'Validating hospital and saving request…' : 'Confirm SOS Request'}
             </button>
-            <p className="text-center text-[11px] text-zinc-500">This creates a hospital-coordination request. It does not dispatch an ambulance automatically.</p>
-            <button type="button" className="flex w-full items-center justify-center gap-2 py-1 text-xs font-semibold text-rose-400 hover:text-rose-300 cursor-pointer" onClick={() => { window.location.href = 'tel:112'; }}><Phone className="h-3.5 w-3.5" /> Call 112 instead</button>
+            <p className="text-center text-[11px] text-zinc-500">This sends a request to the hospital. It does not send an ambulance.</p>
+            <button type="button" className="flex w-full items-center justify-center gap-2 py-1 text-xs font-semibold text-rose-400 hover:text-rose-300 cursor-pointer" onClick={() => { window.location.href = 'tel:112'; }}><Phone className="h-3.5 w-3.5" /> Call 112 now</button>
           </div>
         </div>
       )}

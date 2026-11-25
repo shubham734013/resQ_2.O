@@ -14,6 +14,8 @@ interface NavigationPanelProps {
   route: RouteOptionItem;
   onAction: () => void;
   actionLabel: string;
+  actionPending?: boolean;
+  actionError?: string | null;
   onCall?: () => void;
 }
 
@@ -27,6 +29,8 @@ export const NavigationPanel = ({
   route,
   onAction,
   actionLabel,
+  actionPending = false,
+  actionError = null,
   onCall,
 }: NavigationPanelProps) => (
   <div className="flex flex-1 flex-col font-sans">
@@ -40,7 +44,7 @@ export const NavigationPanel = ({
             ...destinationCoordinates,
             name: destinationName,
             address: destinationAddress,
-            isEmergency: title === 'Navigate to Patient',
+            isEmergency: title === 'Going to patient',
           }}
           activeRoute={route}
           alternativeRoutes={[]}
@@ -61,7 +65,7 @@ export const NavigationPanel = ({
               </span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Turn-by-Turn
+                Directions are live
               </span>
             </div>
             <p className="text-base sm:text-lg font-semibold text-zinc-100 leading-snug">
@@ -78,7 +82,7 @@ export const NavigationPanel = ({
           <div className="space-y-1.5 border-b border-white/10 pb-5">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-rose-400" />
-              <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Target Waypoint</p>
+              <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Going to</p>
             </div>
             <h1 className="text-xl sm:text-2xl font-light text-zinc-100 tracking-tight leading-tight">
               {destinationName}
@@ -86,17 +90,17 @@ export const NavigationPanel = ({
             <p className="text-xs text-zinc-400 leading-relaxed">{destinationAddress}</p>
           </div>
 
-          {/* Dark Telemetry Metrics: ETA & Distance */}
+          {/* Time and distance */}
           <div className="grid grid-cols-2 gap-3.5">
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
-              <p className="text-[11px] font-mono text-zinc-400 uppercase">Estimated ETA</p>
+              <p className="text-[11px] font-mono text-zinc-400 uppercase">Time to arrive</p>
               <p className="mt-1 font-mono text-2xl font-semibold text-rose-300">{navigation.eta}</p>
-              <p className="text-[10px] text-zinc-500 mt-0.5">Realtime traffic routing</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">Based on traffic</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md">
-              <p className="text-[11px] font-mono text-zinc-400 uppercase">Remaining Distance</p>
+              <p className="text-[11px] font-mono text-zinc-400 uppercase">Distance to go</p>
               <p className="mt-1 font-mono text-2xl font-semibold text-zinc-100">{navigation.distance}</p>
-              <p className="text-[10px] text-zinc-500 mt-0.5">High-speed corridor</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">Road distance</p>
             </div>
           </div>
 
@@ -106,7 +110,7 @@ export const NavigationPanel = ({
               <ArrowRight className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-mono text-zinc-400 uppercase">Next Maneuver</p>
+              <p className="text-[11px] font-mono text-zinc-400 uppercase">Next step</p>
               <p className="mt-1 text-sm font-medium text-zinc-200 leading-snug">{navigation.instruction}</p>
             </div>
           </div>
@@ -119,20 +123,27 @@ export const NavigationPanel = ({
               className="flex items-center justify-center gap-2.5 w-full rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-200 font-semibold py-3 text-xs transition cursor-pointer"
             >
               <Phone className="h-4 w-4 text-emerald-400" />
-              <span>Contact Target Contact / Dispatch</span>
+              <span>Call for help</span>
             </button>
           )}
         </div>
 
         {/* Sticky Action Footer */}
         <div className="sticky bottom-0 border-t border-white/10 bg-zinc-950/95 p-5 backdrop-blur-md sm:p-6">
+          {actionError && (
+            <p role="alert" className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
+              {actionError}
+            </p>
+          )}
           <button
             type="button"
             onClick={onAction}
-            className="flex items-center justify-center gap-2.5 w-full min-h-14 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-sm shadow-xl shadow-rose-950/60 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+            disabled={actionPending}
+            aria-busy={actionPending}
+            className="flex items-center justify-center gap-2.5 w-full min-h-14 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-sm shadow-xl shadow-rose-950/60 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           >
             <NavigationIcon className="h-4 w-4" />
-            <span>{actionLabel}</span>
+            <span>{actionPending ? 'Updating trip…' : actionLabel}</span>
           </button>
         </div>
       </aside>

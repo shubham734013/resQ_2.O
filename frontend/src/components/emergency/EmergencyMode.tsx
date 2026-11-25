@@ -38,7 +38,7 @@ export const EmergencyMode = ({
       {/* ─── 1. TOP STEPPER BAR & EMERGENCY CONTROLS ─────────────────────── */}
       <header
         role="banner"
-        aria-label="Emergency mode header"
+        aria-label="Emergency help header"
         className="sticky top-0 z-40 bg-zinc-950/70 border-b border-white/10 backdrop-blur-md px-4 sm:px-8 py-4 shadow-2xl"
       >
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
@@ -47,7 +47,7 @@ export const EmergencyMode = ({
             <button
               type="button"
               onClick={onExit}
-              aria-label="Exit emergency mode"
+              aria-label="Leave emergency help"
               className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
@@ -84,7 +84,7 @@ export const EmergencyMode = ({
             <button
               type="button"
               onClick={handleCallEmergencyServices}
-              aria-label="Call emergency services at 112"
+              aria-label="Call emergency services on 112"
               className="inline-flex items-center gap-2 bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition-all shadow-lg shadow-rose-950/40 font-mono text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
             >
               <Phone className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -118,7 +118,7 @@ export const EmergencyMode = ({
         <div className="max-w-4xl mx-auto flex items-center justify-center gap-2">
           <ShieldAlert className="w-3.5 h-3.5 text-zinc-400 shrink-0" aria-hidden="true" />
           <span>
-            ResQ coordinates navigation & rapid clinical care access. Does not diagnose medical conditions. Always dial 112 for severe trauma.
+            ResQ can help you find care and directions. It cannot tell what is wrong. Call 112 for a serious injury or emergency.
           </span>
         </div>
       </footer>

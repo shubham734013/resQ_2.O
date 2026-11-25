@@ -10,16 +10,16 @@ export interface FilterChipsProps {
 }
 
 const CATEGORIES: { id: FacilityCategory; label: string }[] = [
-  { id: 'all', label: 'All Facilities' },
-  { id: 'emergency', label: 'Emergency & Trauma' },
-  { id: 'cardiology', label: 'Cardiology' },
-  { id: 'neurology', label: 'Neurology' },
-  { id: 'orthopaedics', label: 'Orthopaedics' },
-  { id: 'pediatric', label: 'Paediatrics' },
-  { id: 'maternity', label: 'Maternity' },
-  { id: 'multispeciality', label: 'Multispeciality' },
-  { id: 'urgent_care', label: 'Urgent Care' },
-  { id: 'general', label: 'General Hospital' },
+  { id: 'all', label: 'All care' },
+  { id: 'emergency', label: 'Emergency and injuries' },
+  { id: 'cardiology', label: 'Heart care' },
+  { id: 'neurology', label: 'Brain and nerves' },
+  { id: 'orthopaedics', label: 'Bones and joints' },
+  { id: 'pediatric', label: 'Child care' },
+  { id: 'maternity', label: 'Pregnancy and birth' },
+  { id: 'multispeciality', label: 'Many types of care' },
+  { id: 'urgent_care', label: 'Urgent care' },
+  { id: 'general', label: 'General hospital' },
 ];
 
 export const FacilityFilterChips = ({
@@ -34,7 +34,7 @@ export const FacilityFilterChips = ({
     return (
       <div
         role="group"
-        aria-label="Filter facilities"
+        aria-label="Filter care"
         className={`flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-xs select-none ${className}`}
       >
         <button
@@ -78,7 +78,7 @@ export const FacilityFilterChips = ({
   return (
     <div
       role="group"
-      aria-label="Filter facilities"
+      aria-label="Filter care"
       className={`flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-xs select-none ${className}`}
     >
       {/* 24/7 Emergency Only Toggle Pill */}
@@ -93,7 +93,7 @@ export const FacilityFilterChips = ({
         }`}
       >
         <span className={`h-1.5 w-1.5 rounded-full ${emergencyOnly ? 'bg-white animate-pulse' : 'bg-rose-500'}`} />
-        <span>24/7 Emergency Only</span>
+        <span>Emergency care only</span>
       </button>
 
       <div className="w-[1px] h-5 bg-white/10 shrink-0 mx-0.5" aria-hidden="true" />

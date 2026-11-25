@@ -75,9 +75,9 @@ export const ContactPage = () => {
             </span>
             <p className="text-zinc-200 font-light">
               <span className="font-bold text-rose-300 uppercase tracking-wide">
-                Urgent Notice:
+                Emergency:
               </span>{' '}
-              For active life-threatening emergencies, do not submit a form. Tap SOS on your dashboard or call 112 immediately.
+              If someone may die or is badly hurt, do not use this form. Ask for help in ResQ or call 112 now.
             </p>
           </div>
 
@@ -86,7 +86,7 @@ export const ContactPage = () => {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] shadow-sm transition-all shrink-0 cursor-pointer"
           >
             <AlertTriangle className="h-3.5 w-3.5" />
-            <span>Trigger Priority SOS</span>
+            <span>Ask for emergency help</span>
           </Link>
         </div>
       </div>
@@ -100,18 +100,18 @@ export const ContactPage = () => {
         <div className="relative max-w-4xl mx-auto px-6 lg:px-12 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] backdrop-blur-xl border border-white/10 text-xs text-rose-300 font-mono mb-6">
             <Radio className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
-            <span>ResQ Network Operations Center (NOC) Desk</span>
+            <span>ResQ support team</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-white mb-6">
-            Contact Emergency{' '}
+            Contact ResQ{' '}
             <span className="font-semibold text-gradient-crimson">
-              Operations & Triage.
+              support.
             </span>
           </h1>
 
           <p className="text-base sm:text-lg text-zinc-400 font-light max-w-2xl mx-auto leading-relaxed">
-            Direct communication channels for municipal first responders, hospital clinical teams, fleet providers, and citizen support.
+            Get help with ResQ, hospitals, or ambulance services.
           </p>
         </div>
       </section>
@@ -133,34 +133,34 @@ export const ContactPage = () => {
                   </div>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-[10px] font-mono text-rose-400 font-semibold">
                     <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
-                    24/7/365 LIVE
+                    Here all day, every day
                   </span>
                 </div>
 
                 <h3 className="text-xl font-light text-white tracking-tight mb-2">
-                  Emergency Dispatch Lines
+                Emergency phone numbers
                 </h3>
                 <p className="text-xs text-zinc-400 font-light leading-relaxed mb-6">
-                  Direct toll-free telephonic triage for immediate ambulance and trauma coordination:
+                  Call these numbers if someone needs help now:
                 </p>
 
                 <div className="space-y-3 font-mono text-xs">
                   <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
-                    <span className="text-zinc-400">National Emergency:</span>
+                    <span className="text-zinc-400">Emergency help:</span>
                     <a href="tel:112" className="text-rose-400 font-bold hover:underline">
                       112
                     </a>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
-                    <span className="text-zinc-400">State Ambulance Service:</span>
+                    <span className="text-zinc-400">Ambulance:</span>
                     <a href="tel:108" className="text-white font-bold hover:underline">
                       108
                     </a>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
-                    <span className="text-zinc-400">ResQ Dedicated Dispatch:</span>
+                    <span className="text-zinc-400">ResQ:</span>
                     <a href="tel:+911412229999" className="text-amber-400 font-bold hover:underline">
                       +91 141 222 9999
                     </a>
@@ -175,15 +175,15 @@ export const ContactPage = () => {
                 </div>
 
                 <h3 className="text-lg font-light text-white tracking-tight mb-2">
-                  Network Operations Center
+                  ResQ office
                 </h3>
                 <p className="text-xs text-zinc-400 font-light leading-relaxed mb-4">
-                  ResQ Health Systems & Crisis Telemetry Headquarters<br />
+                  ResQ office<br />
                   JL Road, Malviya Nagar, Jaipur, Rajasthan 302017
                 </p>
 
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[11px] font-mono text-zinc-400 flex items-center justify-between">
-                  <span>GPS Coordinates:</span>
+                  <span>Map location:</span>
                   <span className="text-emerald-400">26.8532° N, 75.8174° E</span>
                 </div>
               </div>
@@ -195,21 +195,21 @@ export const ContactPage = () => {
                 </div>
 
                 <h3 className="text-lg font-light text-white tracking-tight mb-2">
-                  Operating Hours & Channels
+                  When we are here
                 </h3>
 
                 <div className="space-y-3 text-xs font-mono text-zinc-400">
                   <div className="flex items-center justify-between">
-                    <span>Emergency SOS Dispatch:</span>
-                    <span className="text-emerald-400">Continuous 24/7/365</span>
+                    <span>Emergency help:</span>
+                    <span className="text-emerald-400">All day, every day</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Administrative Support:</span>
-                    <span className="text-zinc-200">09:00 - 18:00 IST (Mon-Sat)</span>
+                    <span>Other help:</span>
+                    <span className="text-zinc-200">9am - 6pm India time, Monday to Saturday</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Hospital API Onboarding:</span>
-                    <span className="text-zinc-200">24/7 On-Call Escalation</span>
+                    <span>Hospital setup help:</span>
+                    <span className="text-zinc-200">Help is here all day, every day</span>
                   </div>
                 </div>
               </div>
@@ -221,24 +221,24 @@ export const ContactPage = () => {
                 </div>
 
                 <h3 className="text-lg font-light text-white tracking-tight mb-2">
-                  Secure Email Corridors
+                  Email us
                 </h3>
 
                 <div className="space-y-2 text-xs font-mono text-zinc-400">
                   <p>
-                    <span className="text-zinc-500">Dispatch:</span>{' '}
+                    <span className="text-zinc-500">Emergency help:</span>{' '}
                     <a href="mailto:dispatch@resq.gov.in" className="text-rose-300 hover:underline">
                       dispatch@resq.gov.in
                     </a>
                   </p>
                   <p>
-                    <span className="text-zinc-500">Operations:</span>{' '}
+                    <span className="text-zinc-500">Other help:</span>{' '}
                     <a href="mailto:operations@resq.local" className="text-zinc-200 hover:underline">
                       operations@resq.local
                     </a>
                   </p>
                   <p>
-                    <span className="text-zinc-500">Governance:</span>{' '}
+                    <span className="text-zinc-500">Account checks:</span>{' '}
                     <a href="mailto:governance@resq.local" className="text-zinc-200 hover:underline">
                       governance@resq.local
                     </a>
@@ -263,20 +263,21 @@ export const ContactPage = () => {
                       <ShieldCheck className="h-8 w-8" />
                     </div>
 
-                    <p className="overline text-emerald-400 mb-2">Transmission Logged</p>
+                    <p className="overline text-emerald-400 mb-2">Message sent</p>
                     <h3 className="text-2xl sm:text-3xl font-light text-white tracking-tight mb-3">
-                      Inquiry Transmitted to NOC Desk
+                      Your message was sent
                     </h3>
 
                     <p className="text-sm text-zinc-300 leading-relaxed font-light max-w-md mx-auto mb-6">
-                      Your operational inquiry has been registered under reference{' '}
-                      <span className="font-mono text-rose-400 font-bold">{submittedTicket}</span>. A duty dispatch officer will review your ticket and reply within 2 business hours.
+                      Your message number is{' '}
+                      <span className="font-mono text-rose-400 font-bold">{submittedTicket}</span>
+                      . Our team will read it and reply within 2 work hours.
                     </p>
 
                     <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs font-mono text-zinc-400 max-w-sm mx-auto mb-8">
-                      <span>Status: In Dispatch Queue</span>
+                      <span>Message status: Waiting for a reply</span>
                       <span className="mx-2">•</span>
-                      <span>SLA: &lt; 120 Minutes</span>
+                      <span>Reply: within 2 hours</span>
                     </div>
 
                     <button
@@ -284,25 +285,25 @@ export const ContactPage = () => {
                       onClick={() => setSubmittedTicket(null)}
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all cursor-pointer"
                     >
-                      <span>Transmit Another Message</span>
+                      <span>Send another message</span>
                     </button>
                   </motion.div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <p className="overline text-rose-400 mb-2">Direct Intake Form</p>
+                      <p className="overline text-rose-400 mb-2">Contact form</p>
                       <h2 className="text-2xl sm:text-3xl font-light text-white tracking-tight mb-2">
-                        Reach Network Operations
+                        Send us a message
                       </h2>
                       <p className="text-xs sm:text-sm text-zinc-400 font-light leading-relaxed">
-                        For institutional onboarding, telemetry API support, or municipal integration inquiries.
+                        Ask about joining ResQ, using its tools, or getting help.
                       </p>
                     </div>
 
                     {/* Inquiry Type Chips */}
                     <div>
                       <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-3">
-                        Inquiry Category
+                        What do you need help with?
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {(
@@ -323,7 +324,12 @@ export const ContactPage = () => {
                                 : 'bg-white/[0.02] text-zinc-400 border-white/5 hover:text-white'
                             }`}
                           >
-                            {type}
+                            {{
+                              'General Inquiry': 'Something else',
+                              'Technical & Telemetry Support': 'Help using ResQ',
+                              'Hospital & Fleet Partnership': 'Join as a hospital or ambulance service',
+                              'Media & Security Governance': 'Press or account safety',
+                            }[type]}
                           </button>
                         ))}
                       </div>
@@ -333,28 +339,28 @@ export const ContactPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Your Full Name
+                          Your name
                         </label>
                         <input
                           required
                           type="text"
                           value={formData.fullName}
                           onChange={(e) => update('fullName', e.target.value)}
-                          placeholder="e.g. Dr. Siddharth Verma"
+                          placeholder="e.g. Sam Patel"
                           className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                         />
                       </div>
 
                       <div>
                         <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Official Email Address
+                          Email
                         </label>
                         <input
                           required
                           type="email"
                           value={formData.email}
                           onChange={(e) => update('email', e.target.value)}
-                          placeholder="you@institution.org"
+                          placeholder="you@example.com"
                           className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                         />
                       </div>
@@ -364,29 +370,29 @@ export const ContactPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Organization / Facility
+                          Hospital or group (if any)
                         </label>
                         <input
                           type="text"
                           value={formData.organization}
                           onChange={(e) => update('organization', e.target.value)}
-                          placeholder="e.g. Apex Trauma Center / Private Fleet"
+                          placeholder="e.g. City Care Hospital"
                           className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                         />
                       </div>
 
                       <div>
                         <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Operational Priority
+                          How urgent is this?
                         </label>
                         <select
                           value={formData.priority}
                           onChange={(e) => update('priority', e.target.value as PriorityLevel)}
                           className="w-full h-12 px-4 rounded-xl bg-zinc-900 border border-white/10 focus:border-rose-500 text-white text-sm outline-none transition-all cursor-pointer"
                         >
-                          <option value="Normal">Normal — Standard Inquiry</option>
-                          <option value="High Operational">High — Integration / Onboarding</option>
-                          <option value="Critical System Bug">Critical — Telemetry Incident</option>
+                          <option value="Normal">Normal — general question</option>
+                          <option value="High Operational">High — joining or setup</option>
+                          <option value="Critical System Bug">Very urgent — ResQ problem</option>
                         </select>
                       </div>
                     </div>
@@ -394,14 +400,14 @@ export const ContactPage = () => {
                     {/* Detailed Message */}
                     <div>
                       <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Operational Message / Query
+                        Your message
                       </label>
                       <textarea
                         required
                         rows={5}
                         value={formData.message}
                         onChange={(e) => update('message', e.target.value)}
-                        placeholder="Detail your request, facility specifications, or technical telemetry requirements…"
+                        placeholder="Tell us what you need help with..."
                         className="w-full p-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600 resize-none"
                       />
                     </div>
@@ -416,19 +422,19 @@ export const ContactPage = () => {
                         {isSubmitting ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Transmitting to Operations Desk…</span>
+                            <span>Sending message…</span>
                           </>
                         ) : (
                           <>
                             <Send className="h-4 w-4" />
-                            <span>Transmit Operational Inquiry</span>
+                            <span>Send message</span>
                           </>
                         )}
                       </button>
                     </div>
 
                     <p className="text-center text-[11px] font-mono text-zinc-500">
-                      Standard transmission encryption: TLS 1.3 / AES-256
+                      We lock your message while sending it (TLS 1.3) and while it is saved (AES-256).
                     </p>
                   </form>
                 )}

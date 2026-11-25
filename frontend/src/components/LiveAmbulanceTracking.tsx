@@ -18,16 +18,24 @@ interface LocationEvent {
   sourceTimestamp?: string; freshness: 'FRESH' | 'STALE'; coordinatesAreLive: boolean;
 }
 const statusLabels: Record<string, string> = {
-  ASSIGNED: 'Assigned', ACCEPTED: 'Driver accepted · route to pickup', TO_PICKUP: 'En route to pickup',
-  AT_PICKUP: 'Driver arrived at pickup', PATIENT_ONBOARD: 'Patient picked up',
-  TO_HOSPITAL: 'En route to hospital', AT_HOSPITAL: 'Arrived at hospital',
-  COMPLETED: 'Trip completed', CANCELLED: 'Trip cancelled',
+  ASSIGNED: 'Waiting for driver', ACCEPTED: 'Driver accepted · going to pickup', TO_PICKUP: 'Going to pickup',
+  AT_PICKUP: 'At pickup place', PATIENT_ONBOARD: 'Patient picked up',
+  TO_HOSPITAL: 'Going to hospital', AT_HOSPITAL: 'At hospital',
+  COMPLETED: 'Trip done', CANCELLED: 'Trip canceled',
 };
-const labelStatus = (status?: string) => statusLabels[status ?? ''] ?? status ?? 'Awaiting dispatch';
+const dispatchStatusLabels: Record<string, string> = {
+  SEARCHING: 'Looking for an ambulance',
+  OFFERED: 'Request sent to a driver',
+  ACCEPTED: 'A driver accepted the request',
+  EXHAUSTED: 'No nearby ambulance is free',
+  ESCALATED: 'A dispatcher is checking the request',
+  CANCELLED: 'Request canceled',
+};
+const labelStatus = (status?: string) => statusLabels[status ?? ''] ?? status ?? 'Waiting for a driver';
 const formatAge = (ageMs: number | null | undefined) => {
-  if (typeof ageMs !== 'number') return 'Update time unavailable';
+  if (typeof ageMs !== 'number') return 'Update time unknown';
   if (ageMs < 1000) return 'Updated just now';
-  return `Updated ${Math.floor(ageMs / 1000)}s ago`;
+  return `Updated ${Math.floor(ageMs / 1000)} seconds ago`;
 };
 
 export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOperations = false }: LiveAmbulanceTrackingProps) => {
@@ -57,10 +65,10 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       setSocketError(null);
       void subscribeTrackingRoom(socket, { type: 'emergency', id: emergencyRequestId })
         .then(refresh)
-        .catch((error: unknown) => { if (!disposed) setSocketError(error instanceof Error ? error.message : 'Live subscription failed.'); });
+        .catch(() => { if (!disposed) setSocketError('Live updates are not available.'); });
       if (subscribeHospitalOperations && snapshot?.hospital.id) {
         void subscribeTrackingRoom(socket, { type: 'hospital-operations', id: snapshot.hospital.id })
-          .catch((error: unknown) => { if (!disposed) setSocketError(error instanceof Error ? error.message : 'Hospital realtime subscription failed.'); });
+          .catch(() => { if (!disposed) setSocketError('Hospital updates are not available.'); });
       }
       refresh();
     });
@@ -68,10 +76,10 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
     socket.on('connect_error', (error) => {
       setConnected(false);
       if (error?.message === 'UNAUTHORIZED' || error?.message?.includes('UNAUTHORIZED')) {
-        setSocketError('Authentication expired. Log in to reconnect real-time tracking.');
+        setSocketError('Your sign-in ended. Sign in again to see live updates.');
         socket.disconnect();
       } else {
-        setSocketError('Realtime connection interrupted. Recovering through REST snapshots and automatic reconnect.');
+        setSocketError('Live updates stopped. Trying to reconnect.');
       }
     });
     const onLocation = (envelope: TrackingEnvelope<LocationEvent>) => {
@@ -151,8 +159,8 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
     ? { latitude: target.latitude, longitude: target.longitude, name: routePhase === 'HOSPITAL' ? snapshot?.hospital.name ?? 'Hospital' : 'Patient pickup', address: routePhase === 'HOSPITAL' ? snapshot?.hospital.address : snapshot?.pickup.label }
     : undefined;
 
-  if (snapshotQuery.isLoading) return <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">Loading authoritative tracking status…</section>;
-  if (snapshotQuery.isError || !snapshot) return <section className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-900">Tracking snapshot could not be loaded. No live position is being inferred.</p><Button size="sm" variant="secondary" onClick={() => void snapshotQuery.refetch()} icon={<RefreshCw className="h-4 w-4" />}>Retry snapshot</Button></section>;
+  if (snapshotQuery.isLoading) return <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">Loading ambulance status…</section>;
+  if (snapshotQuery.isError || !snapshot) return <section className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-900">We could not load tracking details. We are not guessing where the ambulance is.</p><Button size="sm" variant="secondary" onClick={() => void snapshotQuery.refetch()} icon={<RefreshCw className="h-4 w-4" />}>Try again</Button></section>;
 
   return (
     <section className="resq-card rounded-2xl p-4 sm:p-5 space-y-4">
@@ -160,19 +168,19 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-teal-500" />
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Live Ambulance Tracking</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Track ambulance</p>
           </div>
           <h3 className="mt-1 text-lg font-bold text-slate-950 tracking-tight">{snapshot.emergency.requestCode}</h3>
           <p className="mt-1 text-xs sm:text-sm text-slate-600 font-medium">
             {snapshot.trip?.status === 'ASSIGNED'
-              ? 'Dispatch: assigned · awaiting driver acceptance'
+              ? 'Looking for a driver'
               : snapshot.trip && snapshot.trackingActive
                 ? labelStatus(snapshot.trip.status)
                 : snapshot.trip && ['COMPLETED', 'CANCELLED'].includes(snapshot.trip.status)
                   ? labelStatus(snapshot.trip.status)
                   : snapshot.dispatch
-                    ? `Dispatch: ${snapshot.dispatch.status.toLowerCase().replaceAll('_', ' ')}`
-                    : 'Waiting for dispatch assignment'}
+                    ? dispatchStatusLabels[snapshot.dispatch.status] ?? snapshot.dispatch.status.toLowerCase().replaceAll('_', ' ')
+                    : 'Waiting for an ambulance'}
           </p>
         </div>
         <span
@@ -183,7 +191,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
           }`}
         >
           {connected ? <Wifi className="h-3.5 w-3.5 text-emerald-600" /> : <WifiOff className="h-3.5 w-3.5 text-amber-600" />}
-          {connected ? 'Realtime connected' : 'Reconnecting / REST recovery'}
+          {connected ? 'Live updates on' : 'Trying to reconnect'}
         </span>
       </header>
 
@@ -192,10 +200,10 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
           <div className="flex items-start gap-2.5">
             <Radio className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
             <div>
-              <p className="font-bold text-sm text-rose-900">No Ambulances Immediately Available</p>
+              <p className="font-bold text-sm text-rose-900">No ambulance is free right now</p>
               <p className="mt-1 leading-relaxed text-rose-800">
-                All regional ambulance units in your vicinity are currently committed to other emergency calls.
-                Do not wait—contact state emergency dispatch immediately or arrange urgent private transport to the nearest facility:
+                All nearby ambulances are helping with other calls.
+                Do not wait. Call 112 now or find a safe way to reach the nearest hospital:
               </p>
             </div>
           </div>
@@ -204,13 +212,13 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
               href="tel:108"
               className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-800 transition"
             >
-              📞 Dial 108 (Ambulance)
+              📞 Call 108 (ambulance)
             </a>
             <a
               href="tel:112"
               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition"
             >
-              📞 Dial 112 (National Emergency)
+              📞 Call 112 (emergency help)
             </a>
             {snapshot.hospital?.phone && (
               <a
@@ -228,7 +236,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
         <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-3.5 text-xs text-sky-950 flex items-start gap-2.5">
           <Radio className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 animate-pulse" />
           <p className="leading-relaxed">
-            <strong>Dispatch in progress:</strong> Driver identity, vehicle number and live GPS telemetry will appear as soon as an assigned driver accepts the dispatch.
+            <strong>Looking for a driver:</strong> The driver's name, ambulance number, and location will show after a driver accepts.
           </p>
         </div>
       )}
@@ -236,15 +244,15 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       {snapshot.trip && snapshot.trackingActive && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Assigned Unit</span>
-            <p className="font-bold text-slate-900 text-sm sm:text-base">{snapshot.ambulance?.vehicleNumber ?? 'Assigned vehicle'}</p>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Ambulance</span>
+            <p className="font-bold text-slate-900 text-sm sm:text-base">{snapshot.ambulance?.vehicleNumber ?? 'Ambulance assigned'}</p>
             <p className="text-xs text-slate-600 font-medium">
-              {snapshot.ambulance?.ambulanceType ?? 'Type unavailable'} · {snapshot.ambulance?.driverName ?? 'Driver assigned'}
+              {snapshot.ambulance?.ambulanceType ?? 'Type unknown'} · {snapshot.ambulance?.driverName ?? 'Driver assigned'}
             </p>
           </div>
           <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Location Telemetry</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Ambulance location</span>
               {location?.coordinatesAreLive && (
                 <span className="flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -253,11 +261,11 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
               )}
             </div>
             <p className={`font-bold text-sm sm:text-base ${location?.coordinatesAreLive ? 'text-emerald-700' : 'text-amber-800'}`}>
-              {location?.coordinatesAreLive ? 'Live GPS Feed' : location ? 'Last-Known Location · STALE' : 'Waiting for GPS fix'}
+              {location?.coordinatesAreLive ? 'Live location' : location ? 'Last location · May be old' : 'Waiting for location'}
             </p>
             <p className="text-xs text-slate-500 font-medium">
               {formatAge(location?.ageMs)}
-              {location?.accuracyMeters ? ` · ±${Math.round(location.accuracyMeters)} m accuracy` : ''}
+              {location?.accuracyMeters ? ` · Location may be off by about ${Math.round(location.accuracyMeters)} m` : ''}
             </p>
           </div>
         </div>
@@ -266,7 +274,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
       {snapshot.trip && !snapshot.trackingActive && ['COMPLETED', 'CANCELLED'].includes(snapshot.trip.status) && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700 flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{labelStatus(snapshot.trip.status)}. Active GPS tracking has completed.</span>
+          <span>{labelStatus(snapshot.trip.status)}. Live location tracking has ended.</span>
         </div>
       )}
 
@@ -275,15 +283,15 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
           <div className="flex items-center justify-between gap-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-teal-50 border border-teal-200/70 text-teal-900 text-xs font-bold">
               <MapPin className="h-3.5 w-3.5 text-teal-700" />
-              <span>{routePhase === 'HOSPITAL' ? 'Ambulance → Destination Hospital' : 'Ambulance → Confirmed Pickup'}</span>
+              <span>{routePhase === 'HOSPITAL' ? 'Ambulance → Hospital' : 'Ambulance → Pickup place'}</span>
             </div>
-            {routeQuery.isFetching && <span className="text-xs text-slate-500 font-medium">Refreshing route…</span>}
+            {routeQuery.isFetching && <span className="text-xs text-slate-500 font-medium">Updating route…</span>}
           </div>
 
           {routeQuery.isError && (
             <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              <span>Google Routes is unavailable or GPS is stale. Map markers remain available; no arrival is inferred from the route.</span>
-              <Button size="sm" variant="secondary" onClick={() => void routeQuery.refetch()}>Retry route</Button>
+              <span>We cannot show the route, or the location may be old. The map still shows known places. The route does not prove that the ambulance arrived.</span>
+              <Button size="sm" variant="secondary" onClick={() => void routeQuery.refetch()}>Try again</Button>
             </div>
           )}
 
@@ -294,7 +302,7 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
               <span className="text-slate-400">•</span>
               <span className="font-semibold text-teal-800">{activeRoute.duration}</span>
               <span className="text-slate-400">•</span>
-              <span className="text-[11px] text-slate-500">Google Routes updated {new Date(routeQuery.data.fetchedAt).toLocaleTimeString()}</span>
+              <span className="text-[11px] text-slate-500">Route updated {new Date(routeQuery.data.fetchedAt).toLocaleTimeString()}</span>
             </div>
           )}
 
@@ -302,16 +310,6 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
             <MapView center={center} destination={destination} markers={markers} activeRoute={activeRoute} interactive className="h-full w-full" />
           </div>
 
-          {location && !location.coordinatesAreLive && (
-            <p className="text-xs text-amber-800 font-medium">
-              This marker is the last saved coordinate, not a live location. ResQ will recover when fresh driver telemetry arrives.
-            </p>
-          )}
-          {snapshot.trip.status === 'AT_PICKUP' && (
-            <p className="text-xs text-slate-600 font-medium">
-              Driver arrival is confirmed by the backend trip action, not by map proximity.
-            </p>
-          )}
           {snapshot.trip.status === 'AT_HOSPITAL' && (
             <p className="text-xs text-slate-600 font-medium">
               Hospital arrival was confirmed by the driver and persisted by the backend. Complete the trip to stop tracking.
@@ -322,12 +320,6 @@ export const LiveAmbulanceTracking = ({ emergencyRequestId, subscribeHospitalOpe
 
       {socketError && <p role="status" className="text-xs text-amber-800 font-medium">{socketError}</p>}
 
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-        <p className="text-[11px] text-slate-500">Authoritative trip state and location telemetry verified by ResQ backend.</p>
-        <Button size="sm" variant="secondary" onClick={() => void snapshotQuery.refetch()} icon={<RefreshCw className="h-3.5 w-3.5" />}>
-          Refresh snapshot
-        </Button>
-      </footer>
     </section>
   );
 };

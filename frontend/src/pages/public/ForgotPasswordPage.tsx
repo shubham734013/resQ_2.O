@@ -19,7 +19,7 @@ export const ForgotPasswordPage = () => {
       await authApi.forgotPassword({ email: email.trim() });
       setSubmitted(true);
     } catch {
-      setError('We could not send the reset instructions right now. Please try again in a moment.');
+      setError('We could not send the reset link. Please try again soon.');
     } finally {
       setSubmitting(false);
     }
@@ -52,7 +52,7 @@ export const ForgotPasswordPage = () => {
           </div>
           <div>
             <p className="text-sm font-bold tracking-tight text-white">ResQ 2.O</p>
-            <p className="text-[10px] tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>Crisis Management Platform</p>
+            <p className="text-[10px] tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>Emergency Help</p>
           </div>
         </div>
 
@@ -81,12 +81,12 @@ export const ForgotPasswordPage = () => {
                 Check your inbox
               </h1>
               <p className="text-sm leading-relaxed mb-2" style={{ color: 'var(--text-secondary)' }}>
-                If an account with{' '}
+                If an account for{' '}
                 <span className="font-semibold text-white">{email}</span>{' '}
-                exists, you will receive password reset instructions shortly.
+                exists, we will email you a link to reset your password.
               </p>
               <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                Check your spam folder if you don't see it within a few minutes.
+                Check your spam folder if you do not see the email soon.
               </p>
 
               <div className="mt-8">
@@ -105,7 +105,7 @@ export const ForgotPasswordPage = () => {
                   }}
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Return to sign in
+                  Back to sign in
                 </Link>
               </div>
             </div>
@@ -124,7 +124,7 @@ export const ForgotPasswordPage = () => {
                   Reset your password
                 </h1>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  Enter your registered ResQ email address and we'll transmit a secure recovery link to your inbox.
+                  Enter your ResQ email address. We will email you a safe link to reset your password.
                 </p>
               </div>
 
@@ -147,7 +147,7 @@ export const ForgotPasswordPage = () => {
                 {/* Email Field */}
                 <div className="space-y-2">
                   <label className="block text-xs font-semibold tracking-wide uppercase" style={{ color: 'var(--text-tertiary)' }}>
-                    Email Address
+                    Email
                   </label>
                   <div className="relative">
                     <Mail
@@ -184,7 +184,7 @@ export const ForgotPasswordPage = () => {
                       Sending…
                     </>
                   ) : (
-                    'Send Recovery Instructions'
+                    'Send reset link'
                   )}
                 </button>
 
@@ -198,7 +198,7 @@ export const ForgotPasswordPage = () => {
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; }}
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
-                    Back to Sign In
+                    Back to sign in
                   </Link>
                 </div>
               </form>
@@ -208,7 +208,7 @@ export const ForgotPasswordPage = () => {
 
         {/* Footer note */}
         <p className="mt-8 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          ResQ 2.O · Identity & Security · End-to-end encrypted
+          ResQ 2.O · Your account is protected
         </p>
       </div>
     </main>

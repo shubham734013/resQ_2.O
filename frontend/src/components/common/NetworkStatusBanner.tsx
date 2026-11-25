@@ -25,7 +25,7 @@ export const NetworkStatusBanner = () => {
   return (
     <div role="alert" aria-live="assertive" className="sticky top-0 z-[100] flex items-center justify-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
       <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>You are offline. Live updates may be delayed. ResQ will refresh stale queries when the connection returns.</span>
+      <span>You are not connected to the internet. Updates may be late. ResQ will check again when you connect.</span>
     </div>
   );
 };

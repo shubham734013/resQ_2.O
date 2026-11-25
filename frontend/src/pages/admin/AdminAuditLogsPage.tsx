@@ -5,6 +5,7 @@ import { Button } from '../../components/common/Button';
 import { StatusBadge } from '../../components/common/StatusBadge';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5001/api/v1';
+const plainLabel = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 interface AuditLogItem {
   id: string;
@@ -26,7 +27,7 @@ const fetchAuditLogs = async (
   if (entityType) params.set('entityType', entityType);
   if (actorRole) params.set('actorRole', actorRole);
   const res = await fetch(`${API_BASE}/admin/audit-logs?${params}`, { credentials: 'include' });
-  if (!res.ok) throw new Error('Failed to load audit logs');
+  if (!res.ok) throw new Error('Could not load the activity log.');
   const data = (await res.json()) as {
     data: { items: AuditLogItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
   };
@@ -50,8 +51,8 @@ export const AdminAuditLogsPage = () => {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 font-sans">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-950">System Audit Log</h1>
-          <p className="text-xs text-slate-500">Immutable record of all governance actions and state changes across ResQ 2.0</p>
+          <h1 className="text-2xl font-black text-slate-950">Change history</h1>
+          <p className="text-xs text-slate-500">A record of changes made in ResQ.</p>
         </div>
         <Button
           variant="secondary"
@@ -74,13 +75,13 @@ export const AdminAuditLogsPage = () => {
           }}
           className="h-9 rounded-xl border border-slate-200 px-3 text-xs focus:outline-none bg-white text-slate-800"
         >
-          <option value="">All Entity Types</option>
+          <option value="">All kinds</option>
           <option value="User">User</option>
           <option value="Hospital">Hospital</option>
-          <option value="AmbulanceProvider">Ambulance Provider</option>
-          <option value="AmbulanceDriver">Ambulance Driver</option>
+          <option value="AmbulanceProvider">Ambulance provider</option>
+          <option value="AmbulanceDriver">Ambulance driver</option>
           <option value="Ambulance">Ambulance</option>
-          <option value="EmergencyRequest">Emergency Request</option>
+          <option value="EmergencyRequest">Emergency request</option>
         </select>
         <select
           value={actorRole}
@@ -90,11 +91,11 @@ export const AdminAuditLogsPage = () => {
           }}
           className="h-9 rounded-xl border border-slate-200 px-3 text-xs focus:outline-none bg-white text-slate-800"
         >
-          <option value="">All Roles</option>
+          <option value="">All roles</option>
           <option value="ADMIN">Admin</option>
           <option value="SYSTEM">System</option>
           <option value="HOSPITAL">Hospital</option>
-          <option value="AMBULANCE_PROVIDER">Ambulance Provider</option>
+          <option value="AMBULANCE_DRIVER">Ambulance driver</option>
         </select>
       </div>
 
@@ -102,24 +103,24 @@ export const AdminAuditLogsPage = () => {
         {query.isLoading ? (
           <div className="p-12 text-center text-xs text-slate-400">
             <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-            Loading audit logs…
+            Loading changes…
           </div>
         ) : items.length === 0 ? (
           <div className="p-12 text-center">
             <Shield className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">No audit log entries found</p>
-            <p className="text-xs text-slate-400 mt-1">Governance actions will appear here as they occur.</p>
+            <p className="text-sm font-semibold text-slate-700">No activity yet.</p>
+            <p className="text-xs text-slate-400 mt-1">Changes will show here.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-3">Timestamp</th>
-                  <th className="px-4 py-3">Actor Role</th>
+                  <th className="px-4 py-3">Time</th>
+                  <th className="px-4 py-3">Who</th>
                   <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Entity Type</th>
-                  <th className="px-4 py-3">Entity ID</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Item number</th>
                   <th className="px-4 py-3">Reason</th>
                 </tr>
               </thead>
@@ -130,10 +131,10 @@ export const AdminAuditLogsPage = () => {
                       {new Date(log.createdAt).toLocaleString()}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge variant="neutral" label={log.actorRole} />
+                      <StatusBadge variant="neutral" label={plainLabel(log.actorRole)} />
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-800">{log.action}</td>
-                    <td className="px-4 py-3 text-slate-600">{log.entityType}</td>
+                    <td className="px-4 py-3 font-mono text-slate-800">{plainLabel(log.action)}</td>
+                    <td className="px-4 py-3 text-slate-600">{plainLabel(log.entityType)}</td>
                     <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{log.entityId.slice(-8)}</td>
                     <td className="px-4 py-3 text-slate-500">{log.reason ?? '—'}</td>
                   </tr>
@@ -146,7 +147,7 @@ export const AdminAuditLogsPage = () => {
         {pagination && pagination.totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
             <p className="text-xs text-slate-500">
-              Page {pagination.page} of {pagination.totalPages} ({pagination.total} entries)
+              Page {pagination.page} of {pagination.totalPages} ({pagination.total} items)
             </p>
             <div className="flex gap-2">
               <Button
@@ -156,7 +157,7 @@ export const AdminAuditLogsPage = () => {
                 icon={<ChevronLeft className="h-3.5 w-3.5" />}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Prev
+                Back
               </Button>
               <Button
                 size="sm"

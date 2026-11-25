@@ -49,6 +49,7 @@ export interface EmergencyDiscoveryHospital {
   distanceType: 'DRIVING' | 'STRAIGHT_LINE';
   etaMinutes: number | null;
   estimatedTime: string | null;
+  isTestHospital?: boolean;
   emergencyAvailability: 'AVAILABLE' | 'LIMITED';
   verified: boolean;
   lastUpdated: string;

@@ -21,16 +21,15 @@ import { ROUTES } from '../routes/routePaths';
 
 const adminNavItems = [
   { label: 'Dashboard', path: ROUTES.ADMIN.DASHBOARD, icon: LayoutDashboard },
-  { label: 'SOS Requests', path: ROUTES.ADMIN.REQUESTS, icon: Activity },
+  { label: 'Emergency Requests', path: ROUTES.ADMIN.REQUESTS, icon: Activity },
   { label: 'Users', path: ROUTES.ADMIN.USERS, icon: Users },
   { label: 'Hospitals', path: ROUTES.ADMIN.HOSPITALS, icon: Building2 },
-  { label: 'Ambulance Providers', path: ROUTES.ADMIN.PROVIDERS, icon: UserRoundCog },
-  { label: 'Ambulance Drivers', path: ROUTES.ADMIN.DRIVERS, icon: UserRoundCog },
+  { label: 'Drivers', path: ROUTES.ADMIN.DRIVERS, icon: UserRoundCog },
   { label: 'Ambulances', path: ROUTES.ADMIN.AMBULANCES, icon: Ambulance },
   { label: 'Appointments', path: ROUTES.ADMIN.APPOINTMENTS, icon: Calendar },
-  { label: 'Analytics & Reports', path: ROUTES.ADMIN.ANALYTICS, icon: BarChart3 },
-  { label: 'Audit Logs', path: ROUTES.ADMIN.AUDIT_LOGS, icon: FileText },
-  { label: 'System Settings', path: ROUTES.ADMIN.SETTINGS, icon: Settings },
+  { label: 'Reports', path: ROUTES.ADMIN.ANALYTICS, icon: BarChart3 },
+  { label: 'Activity Log', path: ROUTES.ADMIN.AUDIT_LOGS, icon: FileText },
+  { label: 'Settings', path: ROUTES.ADMIN.SETTINGS, icon: Settings },
 ];
 
 export const AdminLayout = () => {
@@ -63,8 +62,8 @@ export const AdminLayout = () => {
             <Activity className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-black text-slate-950 tracking-tight">ResQ Governance™</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">State Administration</p>
+            <p className="text-sm font-black text-slate-950 tracking-tight">ResQ Admin</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">State Admin</p>
           </div>
         </div>
 
@@ -73,14 +72,14 @@ export const AdminLayout = () => {
           <p className="truncate text-xs font-bold text-slate-900">{user?.name || user?.email || 'Administrator'}</p>
           <div className="mt-1 flex items-center justify-between">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-teal-300">
-              STATE ROOT
+              Admin
             </span>
-            <span className="text-[10px] text-slate-400">TLS 1.3 MFA</span>
+            <span className="text-[10px] text-slate-400">Secure sign-in</span>
           </div>
         </div>
 
         {/* Navigation items */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="Admin Navigation">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label="Admin menu">
           {adminNavItems.map(({ label, path, icon: Icon }) => (
             <NavLink
               key={path}
@@ -108,7 +107,7 @@ export const AdminLayout = () => {
             className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-700 transition"
           >
             <LogOut className="h-4 w-4" />
-            <span>Sign Out</span>
+            <span>Sign out</span>
           </button>
         </div>
       </aside>
@@ -123,13 +122,13 @@ export const AdminLayout = () => {
                 type="button"
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100"
-                aria-label="Toggle Navigation"
+                aria-label="Open or close menu"
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
               <div className="min-w-0">
                 <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                  ResQ Enterprise Governance <ChevronRight className="h-3 w-3" /> {currentItem.label}
+                  ResQ Admin <ChevronRight className="h-3 w-3" /> {currentItem.label}
                 </p>
                 <h1 className="truncate text-base font-bold text-slate-950">{currentItem.label}</h1>
               </div>
@@ -137,7 +136,7 @@ export const AdminLayout = () => {
 
             <div className="flex items-center gap-2">
               <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                SOC-2 Type II Certified
+                SOC 2 certified
               </span>
               <button
                 type="button"
@@ -152,7 +151,7 @@ export const AdminLayout = () => {
 
           {/* Mobile Navigation Drawer */}
           {mobileOpen && (
-            <div className="lg:hidden border-t border-slate-200 bg-white px-3 py-3 space-y-1">
+            <div className="lg:hidden max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain border-t border-slate-200 bg-white px-3 py-3 space-y-1">
               {adminNavItems.map(({ label, path, icon: Icon }) => (
                 <NavLink
                   key={path}

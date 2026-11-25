@@ -65,7 +65,7 @@ export function loadGoogleMaps(): Promise<GoogleMapsApi> {
 
     const existing = document.querySelector<HTMLScriptElement>('script[data-resq-google-maps="true"]');
     if (existing) {
-      timeoutTimer = window.setTimeout(() => finish(new Error('MAPS_API_LOAD_TIMEOUT')), 15000);
+      timeoutTimer = window.setTimeout(() => finish(new Error('MAPS_API_LOAD_TIMEOUT')), 4000);
       existing.addEventListener('error', () => finish(new Error('MAPS_API_LOAD_FAILED')), { once: true });
       waitForExistingScript();
       return;
@@ -84,7 +84,7 @@ export function loadGoogleMaps(): Promise<GoogleMapsApi> {
     timeoutTimer = window.setTimeout(() => {
       script.remove();
       finish(new Error('MAPS_API_LOAD_TIMEOUT'));
-    }, 15000);
+    }, 4000);
     document.head.appendChild(script);
   }).catch((error: unknown) => {
     // Permit a clean retry after a failed load instead of caching a rejected promise forever.

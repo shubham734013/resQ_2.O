@@ -5,7 +5,6 @@ import {
   Calendar,
   AlertTriangle,
   UserRound,
-  BedDouble,
   BarChart3,
   Bell,
   Settings,
@@ -30,15 +29,13 @@ import { ROUTES } from '../routes/routePaths';
 const hospitalNavItems = [
   { label: 'Dashboard',              path: ROUTES.HOSPITAL.DASHBOARD,      icon: LayoutDashboard, badge: null,    isAlert: false },
   { label: 'Emergency Requests',     path: ROUTES.HOSPITAL.REQUESTS,       icon: AlertTriangle,   badge: 'live',  isAlert: true  },
-  { label: 'Ambulance Coordination', path: ROUTES.HOSPITAL.EMERGENCY,      icon: Ambulance,       badge: null,    isAlert: false },
-  { label: 'Patient Appointments',   path: ROUTES.HOSPITAL.APPOINTMENTS,   icon: Calendar,        badge: null,    isAlert: false },
-  { label: 'Direct Care Inquiries',  path: ROUTES.HOSPITAL.CARE_REQUESTS,  icon: Building2,       badge: null,    isAlert: false },
-  { label: 'Bed Management',         path: ROUTES.HOSPITAL.AVAILABILITY,   icon: BedDouble,       badge: null,    isAlert: false },
-  { label: 'Services & Departments', path: ROUTES.HOSPITAL.SERVICES,       icon: Stethoscope,     badge: null,    isAlert: false },
+  { label: 'Ambulance Help',         path: ROUTES.HOSPITAL.EMERGENCY,      icon: Ambulance,       badge: null,    isAlert: false },
+  { label: 'Appointments',           path: ROUTES.HOSPITAL.APPOINTMENTS,   icon: Calendar,        badge: null,    isAlert: false },
+  { label: 'Services',               path: ROUTES.HOSPITAL.SERVICES,       icon: Stethoscope,     badge: null,    isAlert: false },
   { label: 'Patients',               path: ROUTES.HOSPITAL.PATIENTS,       icon: UserRound,       badge: null,    isAlert: false },
-  { label: 'Reports & Analytics',    path: ROUTES.HOSPITAL.ANALYTICS,      icon: BarChart3,       badge: null,    isAlert: false },
+  { label: 'Reports',                path: ROUTES.HOSPITAL.ANALYTICS,      icon: BarChart3,       badge: null,    isAlert: false },
   { label: 'Notifications',          path: ROUTES.HOSPITAL.NOTIFICATIONS,  icon: Bell,            badge: 'notif', isAlert: false },
-  { label: 'Profile & Settings',     path: ROUTES.HOSPITAL.SETTINGS,       icon: Settings,        badge: null,    isAlert: false },
+  { label: 'Settings',               path: ROUTES.HOSPITAL.SETTINGS,       icon: Settings,        badge: null,    isAlert: false },
 ];
 
 export const HospitalLayout = () => {
@@ -130,7 +127,7 @@ export const HospitalLayout = () => {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-zinc-200">{hospitalName}</p>
-              <p className="text-[10px] font-mono text-zinc-500">Tier 1 Command Hub</p>
+              <p className="text-[10px] font-mono text-zinc-500">Hospital status</p>
             </div>
             <span
               className={`shrink-0 flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${
@@ -146,13 +143,13 @@ export const HospitalLayout = () => {
         </div>
 
         {/* Navigation - scrollable like in UserLayout */}
-        <nav className="flex-1 overflow-y-auto px-3.5 py-3 space-y-1" aria-label="Hospital Navigation">
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 py-3 space-y-1" aria-label="Hospital menu">
           {hospitalNavItems.map((item) => (
             <SideNavLink key={item.label} {...item} />
           ))}
         </nav>
 
-        {/* Emergency Protocol & Sign Out */}
+        {/* Emergency Hotline & Sign Out */}
         <div className="shrink-0 border-t border-white/10 p-4 space-y-3 bg-zinc-950/60">
           <div className="rounded-xl p-3 bg-rose-500/[0.06] border border-rose-500/20 backdrop-blur-md">
             <div className="flex items-center gap-2 mb-2">
@@ -160,15 +157,14 @@ export const HospitalLayout = () => {
                 <Phone className="h-3.5 w-3.5 text-rose-400" />
               </div>
               <div>
-                <p className="text-xs font-bold text-zinc-200">Emergency Protocol</p>
-                <p className="text-[10px] text-zinc-400">Command Hotline 112</p>
+                <p className="text-[10px] text-zinc-400">Emergency line: 112</p>
               </div>
             </div>
             <a
               href="tel:112"
               className="block w-full rounded-lg py-2 text-center text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-md shadow-rose-950/40 transition"
             >
-              Call Emergency Desk
+              Call 112
             </a>
           </div>
 
@@ -193,7 +189,7 @@ export const HospitalLayout = () => {
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
               className="lg:hidden p-2 rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition cursor-pointer"
-              aria-label="Toggle Navigation"
+              aria-label="Open or close menu"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -210,7 +206,7 @@ export const HospitalLayout = () => {
               <Search className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
               <input
                 type="text"
-                placeholder="Search patients, requests, appointments…"
+                placeholder="Search patients, requests, or appointments"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 className="flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 outline-none"
@@ -239,7 +235,7 @@ export const HospitalLayout = () => {
               </div>
               <div className="text-right">
                 <p className="text-xs font-semibold text-zinc-200 leading-tight truncate max-w-[120px]">{hospitalName}</p>
-                <p className="text-[10px] font-mono text-zinc-500 leading-tight">Command Admin</p>
+                <p className="text-[10px] font-mono text-zinc-500 leading-tight">Hospital admin</p>
               </div>
               <ChevronDown className="h-3 w-3 text-zinc-400" />
             </div>
@@ -247,7 +243,7 @@ export const HospitalLayout = () => {
 
           {/* Mobile Nav Drawer */}
           {mobileOpen && (
-            <div className="lg:hidden px-3 py-3 space-y-1 bg-zinc-950/95 border-t border-white/10 backdrop-blur-xl">
+            <div className="lg:hidden max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain px-3 py-3 space-y-1 bg-zinc-950/95 border-t border-white/10 backdrop-blur-xl">
               {hospitalNavItems.map((item) => (
                 <SideNavLink key={item.label} {...item} onClick={() => setMobileOpen(false)} />
               ))}

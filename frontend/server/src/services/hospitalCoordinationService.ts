@@ -1,10 +1,13 @@
 import { Types } from 'mongoose';
 import { AmbulanceModel } from '../models/Ambulance.js';
+import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { HospitalCoordinationNotificationModel, type HospitalCoordinationNotificationDocument, type HospitalCoordinationNotificationType } from '../models/HospitalCoordinationNotification.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
 import { TripModel } from '../models/Trip.js';
+import { UserModel } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
+import { resolveHospitalEmergencyPatientDetails } from '../utils/hospitalEmergencyDetails.js';
 import { broadcastEvent } from './realtimeService.js';
 
 const ACTIVE_TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] as const;
@@ -188,6 +191,17 @@ export const listHospitalCoordinationNotifications = async (hospitalId: string, 
   return { items: items.map((item) => copy(item as unknown as Record<string, unknown> & { _id: Types.ObjectId })), unreadCount, pagination: { page: query.page, limit: query.limit, total, totalPages: total ? Math.ceil(total / query.limit) : 0 } };
 };
 
+export const getHospitalCoordinationNotification = async (hospitalId: string, notificationId: string) => {
+  const hospitalObjectId = idOf(hospitalId, 'hospital');
+  const notificationObjectId = idOf(notificationId, 'notification');
+  const notification = await HospitalCoordinationNotificationModel.findOne({
+    _id: notificationObjectId,
+    hospitalId: hospitalObjectId,
+  }).lean().exec();
+  if (!notification) throw new AppError('NOT_FOUND', 'Coordination notification not found.', 404);
+  return copy(notification as unknown as Record<string, unknown> & { _id: Types.ObjectId });
+};
+
 export const acknowledgeHospitalCoordinationNotification = async (hospitalId: string, notificationId: string, actorId: string) => {
   const hospitalObjectId = idOf(hospitalId, 'hospital');
   const notificationObjectId = idOf(notificationId, 'notification');
@@ -212,16 +226,25 @@ export const acknowledgeHospitalCoordinationNotification = async (hospitalId: st
 export const getHospitalCoordinationDetail = async (hospitalId: string, emergencyId: string) => {
   const hospitalObjectId = idOf(hospitalId, 'hospital');
   const emergencyObjectId = idOf(emergencyId, 'emergency');
-  const emergency = await EmergencyRequestModel.findOne({ _id: emergencyObjectId, hospitalId: hospitalObjectId }).select('requestCode situationType category reportedAt location latitude longitude status etaMinutes updatedAt').lean().exec();
+  const emergency = await EmergencyRequestModel.findOne({ _id: emergencyObjectId, hospitalId: hospitalObjectId }).select('requestCode situationType category reportedAt location latitude longitude status etaMinutes updatedAt userId patientName patientPhone patientAge patientGender severity pickupOtpVerified pickupOverrideReason').lean().exec();
   if (!emergency) throw new AppError('NOT_FOUND', 'Emergency coordination record not found.', 404);
-  const [patient, trip] = await Promise.all([
+  const [patient, trip, user] = await Promise.all([
     HospitalPatientModel.findOne({ emergencyId: emergencyObjectId, hospitalId: hospitalObjectId }).select('caseId coordinationStatus receivedAt etaMinutes').lean().exec(),
     TripModel.findOne({ emergencyRequestId: emergencyObjectId, destinationHospitalId: hospitalObjectId }).sort({ createdAt: -1 }).lean().exec(),
+    (!emergency.patientName || !emergency.patientPhone)
+      ? UserModel.findById(emergency.userId).select('name phone').lean().exec()
+      : null,
   ]);
+  const patientDetails = resolveHospitalEmergencyPatientDetails(emergency, user);
   const isActive = Boolean(trip && (ACTIVE_TRIP_STATUSES as readonly string[]).includes(trip.status));
   let ambulance: Record<string, unknown> | null = null;
-  if (trip && trip.status !== 'ASSIGNED' && trip.status !== 'CANCELLED') {
-    const vehicle = await AmbulanceModel.findById(trip.ambulanceId).select('registrationNumber vehicleNumber ambulanceType currentStatus currentLatitude currentLongitude locationUpdatedAt locationAccuracyMeters').lean().exec();
+  let driver: { fullName?: string; phone?: string } | null = null;
+  if (trip && trip.status !== 'CANCELLED') {
+    const [vehicle, driverRecord] = await Promise.all([
+      AmbulanceModel.findById(trip.ambulanceId).select('registrationNumber vehicleNumber ambulanceType currentStatus currentLatitude currentLongitude locationUpdatedAt locationAccuracyMeters').lean().exec(),
+      trip.driverId ? AmbulanceDriverModel.findById(trip.driverId).select('fullName phone').lean().exec() : null,
+    ]);
+    driver = driverRecord;
     if (vehicle) {
       const timestamp = vehicle.locationUpdatedAt ? new Date(vehicle.locationUpdatedAt).getTime() : NaN;
       const ageMs = Date.now() - timestamp;
@@ -240,9 +263,38 @@ export const getHospitalCoordinationDetail = async (hospitalId: string, emergenc
     if (!trip || !(MATERIAL_TRANSPORT_STATUSES as readonly string[]).includes(trip.status)) allowedActions.push('CANCELLED');
   }
   return {
-    emergency: { id: String(emergency._id), requestCode: emergency.requestCode, category: emergency.category ?? emergency.situationType, situationType: emergency.situationType, reportedAt: emergency.reportedAt, status: emergency.status, pickup: { label: emergency.location, latitude: emergency.latitude, longitude: emergency.longitude }, etaMinutes: emergency.etaMinutes },
+    emergency: {
+      id: String(emergency._id),
+      requestCode: emergency.requestCode,
+      category: emergency.category ?? emergency.situationType,
+      situationType: emergency.situationType,
+      reportedAt: emergency.reportedAt,
+      status: emergency.status,
+      pickup: { label: emergency.location, latitude: emergency.latitude, longitude: emergency.longitude },
+      etaMinutes: emergency.etaMinutes,
+      ...patientDetails,
+      patientAge: emergency.patientAge,
+      patientGender: emergency.patientGender,
+      severity: emergency.severity,
+      pickupOtpVerified: emergency.pickupOtpVerified,
+      pickupOverrideReason: emergency.pickupOverrideReason,
+    },
     patient: patient ? { caseId: patient.caseId, coordinationStatus: patient.coordinationStatus, receivedAt: patient.receivedAt, etaMinutes: patient.etaMinutes } : null,
-    trip: trip ? { id: String(trip._id), status: trip.status, acceptedAt: trip.acceptedAt, arrivedAtPickupAt: trip.arrivedAtPickupAt, patientPickedUpAt: trip.patientPickedUpAt, arrivedAtHospitalAt: trip.arrivedAtHospitalAt, completedAt: trip.completedAt, createdAt: trip.createdAt, updatedAt: trip.updatedAt, history: trip.statusHistory ?? [] } : null,
+    trip: trip ? {
+      id: String(trip._id),
+      status: trip.status,
+      driver: driver ? { name: driver.fullName, phone: driver.phone } : null,
+      pickupOtpVerified: trip.pickupOtpVerified,
+      pickupOverrideReason: trip.pickupOverrideReason,
+      acceptedAt: trip.acceptedAt,
+      arrivedAtPickupAt: trip.arrivedAtPickupAt,
+      patientPickedUpAt: trip.patientPickedUpAt,
+      arrivedAtHospitalAt: trip.arrivedAtHospitalAt,
+      completedAt: trip.completedAt,
+      createdAt: trip.createdAt,
+      updatedAt: trip.updatedAt,
+      history: trip.statusHistory ?? []
+    } : null,
     ambulance, allowedActions, freshnessThresholdMs: locationStaleAfterMs(),
   };
 };

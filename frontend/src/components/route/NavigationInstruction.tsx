@@ -50,14 +50,14 @@ export const NavigationInstruction = ({
     <div
       role="banner"
       aria-live="polite"
-      aria-label={`Navigation instruction: ${currentInstruction.instruction}`}
+      aria-label={`Directions: ${currentInstruction.instruction}`}
       className={`bg-slate-950 text-white rounded-2xl shadow-2xl border border-slate-800 p-4 sm:p-5 backdrop-blur-md ${className}`}
     >
       {/* Emergency Header if applicable */}
       {isEmergency && (
         <div className="flex items-center gap-1.5 pb-2 mb-2 border-b border-slate-800 text-rose-400 text-xs font-semibold">
           <ShieldAlert className="w-3.5 h-3.5" />
-          <span>Priority Emergency Route &bull; {destinationName}</span>
+          <span>Emergency directions &bull; {destinationName}</span>
         </div>
       )}
 

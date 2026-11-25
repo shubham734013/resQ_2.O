@@ -4,7 +4,7 @@ import { Bell, Check, ChevronDown, ChevronUp, CircleAlert, RefreshCw, Wifi, Wifi
 import { StatusBadge } from '../common/StatusBadge';
 import { LiveAmbulanceTracking } from '../LiveAmbulanceTracking';
 import {
-  hospitalKeys, useAcknowledgeHospitalCoordinationNotification, useHospitalCoordinationDetail,
+  hospitalKeys, useAcceptHospitalCoordinationNotification, useAcknowledgeHospitalCoordinationNotification, useHospitalCoordinationDetail,
   useHospitalCoordinationNotifications, useHospitalEmergencyStatusMutation, useHospitalProfile,
 } from '../../hooks/useHospitalManagement';
 import type { HospitalCoordinationNotification, HospitalEmergencyStatus } from '../../types/hospitalManagement';
@@ -21,6 +21,7 @@ export const HospitalCoordinationInbox = () => {
   const notifications = useHospitalCoordinationNotifications({ state, page: 1, limit: 25 });
   const selectedDetail = useHospitalCoordinationDetail(selectedEmergencyId ?? '');
   const acknowledge = useAcknowledgeHospitalCoordinationNotification();
+  const accept = useAcceptHospitalCoordinationNotification();
   const statusMutation = useHospitalEmergencyStatusMutation();
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export const HospitalCoordinationInbox = () => {
   const items = notifications.data?.items ?? [];
   const detail = selectedDetail.data;
   const handleStatus = (emergencyId: string, next: HospitalEmergencyStatus) => {
-    if (next === 'CANCELLED' && !window.confirm('Cancel this emergency coordination? This action is only available before patient transport begins.')) return;
+    if (next === 'CANCELLED' && !window.confirm('Cancel this emergency response? You can only do this before the patient leaves.')) return;
     statusMutation.mutate({ id: emergencyId, status: next }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: hospitalKeys.coordinationDetail(emergencyId) });
@@ -85,7 +86,7 @@ export const HospitalCoordinationInbox = () => {
   return (
     <section
       className="space-y-5 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-2xl"
-      aria-label="Hospital coordination inbox"
+      aria-label="Emergency alerts"
     >
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-white/[0.08] pb-5">
         <div>
@@ -95,14 +96,11 @@ export const HospitalCoordinationInbox = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-light text-zinc-100 tracking-tight">Hospital Coordination Inbox</h2>
+                <h2 className="text-lg font-light text-zinc-100 tracking-tight">Emergency alerts</h2>
                 <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-0.5 text-xs font-mono font-bold">
                   {notifications.data?.unreadCount ?? 0} unread
                 </span>
               </div>
-              <p className="mt-1 text-xs text-zinc-400 font-light">
-                Persisted emergency telemetry, ambulance assignment, and real-time patient transport alerts.
-              </p>
             </div>
           </div>
         </div>
@@ -118,12 +116,12 @@ export const HospitalCoordinationInbox = () => {
               <>
                 <Wifi className="h-3.5 w-3.5 text-emerald-400" />
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Realtime Connected</span>
+                <span>Live connection</span>
               </>
             ) : (
               <>
                 <WifiOff className="h-3.5 w-3.5 text-amber-400" />
-                <span>Recovering via REST</span>
+                <span>Trying to reconnect</span>
               </>
             )}
           </span>
@@ -138,20 +136,20 @@ export const HospitalCoordinationInbox = () => {
           </button>
 
           <select
-            aria-label="Notification filter"
+            aria-label="Filter alerts"
             value={state}
             onChange={(event) => setState(event.target.value as 'UNREAD' | 'ALL')}
             className="rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-300 px-3 py-1.5 text-xs outline-none focus:border-rose-500/40 cursor-pointer"
           >
-            <option value="UNREAD">Unread Alerts</option>
-            <option value="ALL">All Alerts</option>
+            <option value="UNREAD">New alerts</option>
+            <option value="ALL">All alerts</option>
           </select>
         </div>
       </header>
 
       {notifications.isError && (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs text-rose-300">
-          <span>Saved coordination alerts could not be loaded. Please retry.</span>
+          <span>Could not load alerts. Try again.</span>
           <button
             type="button"
             onClick={() => void notifications.refetch()}
@@ -163,21 +161,27 @@ export const HospitalCoordinationInbox = () => {
       )}
 
       {notifications.isLoading ? (
-        <p className="p-8 text-center text-xs font-mono text-zinc-500">Loading saved alerts…</p>
+        <p className="p-8 text-center text-xs font-mono text-zinc-500">Loading alerts…</p>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.01] p-8 text-center space-y-2">
           <CircleAlert className="mx-auto h-6 w-6 text-zinc-500" />
           <p className="text-sm font-medium text-zinc-300">
-            {state === 'UNREAD' ? 'No unread coordination alerts' : 'No coordination alerts recorded'}
+            {state === 'UNREAD' ? 'No new alerts' : 'No alerts yet'}
           </p>
           <p className="text-xs text-zinc-500 font-light">
-            The server automatically reconciles active emergency transport cases when alerts occur.
+            New emergency alerts will show here.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {items.map((item: HospitalCoordinationNotification) => {
             const expanded = selectedEmergencyId === item.emergencyId;
+            const canAccept = item.type === 'EMERGENCY_RECEIVED';
+            const actionError = accept.isError && accept.variables === item.id
+              ? accept.error
+              : acknowledge.isError && acknowledge.variables === item.id
+                ? acknowledge.error
+                : null;
             return (
               <article
                 key={item.id}
@@ -205,15 +209,14 @@ export const HospitalCoordinationInbox = () => {
                       <span className="text-xs text-zinc-400 font-mono">{label(item.type)}</span>
                     </div>
                     <h3 className="mt-2 text-sm font-medium text-zinc-100">{item.title}</h3>
-                    <p className="mt-1 text-xs text-zinc-300 font-light leading-relaxed">{item.message}</p>
                     <p className="mt-2 text-[11px] font-mono text-zinc-400">
-                      Category: <span className="text-zinc-200">{item.emergencyCategory}</span>
-                      {item.etaMinutes !== undefined ? ` · ETA ${item.etaMinutes} min` : ''}
+                      Type: <span className="text-zinc-200">{item.emergencyCategory}</span>
+                      {item.etaMinutes !== undefined ? ` · Arrives in ${item.etaMinutes} min` : ''}
                       {item.tripStatus ? ` · Trip: ${label(item.tripStatus)}` : ''}
                     </p>
                     {(item.ambulanceRegistration || item.ambulanceVehicleNumber) && (
                       <p className="mt-1 text-xs font-mono text-zinc-400">
-                        Ambulance: {item.ambulanceRegistration ?? 'Registration unavailable'}
+                        Ambulance: {item.ambulanceRegistration ?? 'Number not available'}
                         {item.ambulanceVehicleNumber ? ` · ${item.ambulanceVehicleNumber}` : ''}
                       </p>
                     )}
@@ -226,12 +229,17 @@ export const HospitalCoordinationInbox = () => {
                     {item.state === 'UNREAD' && (
                       <button
                         type="button"
-                        disabled={acknowledge.isPending}
-                        onClick={() => acknowledge.mutate(item.id)}
+                        disabled={acknowledge.isPending || accept.isPending}
+                        onClick={() => canAccept ? accept.mutate(item.id) : acknowledge.mutate(item.id)}
+                        aria-label={`${canAccept ? 'Accept' : 'Acknowledge'} ${item.title}`}
                         className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-950/40 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         <Check className="h-3.5 w-3.5" />
-                        <span>{acknowledge.isPending && acknowledge.variables === item.id ? 'Saving…' : 'Acknowledge'}</span>
+                        <span>
+                          {(acknowledge.isPending && acknowledge.variables === item.id) || (accept.isPending && accept.variables === item.id)
+                            ? 'Saving…'
+                            : canAccept ? 'Accept' : 'Acknowledge'}
+                        </span>
                       </button>
                     )}
                     <button
@@ -239,19 +247,25 @@ export const HospitalCoordinationInbox = () => {
                       onClick={() => setSelectedEmergencyId(expanded ? null : item.emergencyId)}
                       className="px-3 py-1.5 rounded-xl text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/10 transition flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span>{expanded ? 'Hide Case' : 'View Case'}</span>
+                      <span>{expanded ? 'Hide details' : 'View details'}</span>
                       {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     </button>
                   </div>
                 </div>
 
+                {actionError && (
+                  <p role="alert" className="mt-3 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                    Could not {canAccept ? 'accept' : 'acknowledge'} this alert. {actionError.message || 'Try again.'}
+                  </p>
+                )}
+
                 {expanded && (
                   <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
                     {selectedDetail.isLoading ? (
-                      <p className="text-xs font-mono text-zinc-500">Loading current case state…</p>
+                      <p className="text-xs font-mono text-zinc-500">Loading details…</p>
                     ) : selectedDetail.isError || !detail ? (
                       <div className="flex items-center justify-between gap-3 text-xs text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
-                        <span>Current case details could not be loaded.</span>
+                        <span>Could not load these details.</span>
                         <button
                           type="button"
                           onClick={() => void selectedDetail.refetch()}
@@ -262,19 +276,19 @@ export const HospitalCoordinationInbox = () => {
                       </div>
                     ) : (
                       <>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 bg-white/[0.02] border border-white/5 p-4 rounded-xl text-xs">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 bg-white/[0.02] border border-white/5 p-4 rounded-xl text-xs">
                           <div>
                             <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Emergency</p>
                             <p className="mt-1 font-semibold text-zinc-200">{detail.emergency.requestCode}</p>
                             <p className="mt-0.5 text-zinc-400 font-light">{detail.emergency.situationType}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Coordination State</p>
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Case status</p>
                             <p className="mt-1 font-semibold text-zinc-200">{label(detail.patient?.coordinationStatus ?? detail.emergency.status)}</p>
                             <p className="mt-0.5 text-zinc-400 font-mono">Case {detail.patient?.caseId ?? 'not linked'}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Trip Status</p>
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Trip status</p>
                             <p className="mt-1 font-semibold text-zinc-200">{detail.trip ? label(detail.trip.status) : 'Awaiting assignment'}</p>
                             <p className="mt-0.5 text-zinc-400 font-light">
                               {detail.trip?.arrivedAtHospitalAt
@@ -285,9 +299,36 @@ export const HospitalCoordinationInbox = () => {
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Assigned Ambulance</p>
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Patient</p>
+                            <p className="mt-1 font-semibold text-zinc-200">{detail.emergency.patientName || 'Details not available'}</p>
+                            {detail.emergency.patientPhone ? (
+                                <a
+                                  href={`tel:${detail.emergency.patientPhone.replace(/[^0-9+]/g, '')}`}
+                                  className="mt-0.5 inline-block text-rose-300 hover:text-rose-200"
+                                >
+                                  Call {detail.emergency.patientPhone}
+                                </a>
+                            ) : (
+                                <p className="mt-0.5 text-zinc-500">Phone number not shared</p>
+                            )}
+                            {(detail.emergency.patientAge !== undefined || detail.emergency.patientGender) && (
+                                <p className="mt-0.5 text-zinc-400">
+                                  {[detail.emergency.patientAge !== undefined ? `${detail.emergency.patientAge} years` : null, detail.emergency.patientGender || null]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Ambulance</p>
                             <p className="mt-1 font-semibold text-zinc-200">{detail.ambulance ? detail.ambulance.registrationNumber : 'Not currently assigned'}</p>
                             <p className="mt-0.5 text-zinc-400 font-mono">{detail.ambulance ? `${detail.ambulance.vehicleNumber} · ${detail.ambulance.ambulanceType}` : 'No active vehicle'}</p>
+                            {detail.trip?.driver?.name && <p className="mt-1 text-zinc-300">Driver: {detail.trip.driver.name}</p>}
+                            {detail.trip?.driver?.phone && (
+                                <a href={`tel:${detail.trip.driver.phone.replace(/[^0-9+]/g, '')}`} className="mt-0.5 inline-block text-rose-300 hover:text-rose-200">
+                                  Call driver
+                                </a>
+                            )}
                           </div>
                         </div>
 
@@ -299,7 +340,7 @@ export const HospitalCoordinationInbox = () => {
 
                         {detail.allowedActions.length > 0 && (
                           <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.08] pt-3">
-                            <span className="mr-2 text-xs font-mono text-zinc-400">Permitted Hospital Actions:</span>
+                            <span className="mr-2 text-xs font-mono text-zinc-400">Actions:</span>
                             {detail.allowedActions.map((action) => (
                               <button
                                 key={action}
@@ -320,7 +361,7 @@ export const HospitalCoordinationInbox = () => {
 
                         {statusMutation.isError && (
                           <p role="alert" className="text-xs text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
-                            The backend rejected or could not save that status transition. Refresh case details before trying again.
+                            Could not save this change. Refresh the details and try again.
                           </p>
                         )}
                       </>
@@ -333,9 +374,6 @@ export const HospitalCoordinationInbox = () => {
         </div>
       )}
 
-      <p className="text-[11px] font-mono text-zinc-500">
-        Notification acknowledgement is hospital-scoped. Minimal operational records only &mdash; zero unrestricted medical data exposed.
-      </p>
     </section>
   );
 };

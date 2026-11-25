@@ -18,9 +18,11 @@ import type {
 } from '../schemas/hospital.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
+import { UserModel } from '../models/User.js';
 import { DispatchJobModel } from '../models/DispatchJob.js';
 import { broadcastEvent } from './realtimeService.js';
 import { recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
+import { resolveHospitalEmergencyPatientDetails } from '../utils/hospitalEmergencyDetails.js';
 
 type ProfileInput = z.infer<typeof hospitalProfileUpdateSchema>;
 type ServicesInput = z.infer<typeof hospitalServicesUpdateSchema>;
@@ -134,8 +136,69 @@ const emergencyOut = (x: Record<string, unknown>): HospitalEmergency => ({
   driverId: x.driverId ? String(x.driverId) : undefined,
   patientId: x.patientId ? String(x.patientId) : undefined,
   etaMinutes: typeof x.etaMinutes === 'number' ? x.etaMinutes : undefined,
+  patientName: typeof x.patientName === 'string' ? x.patientName : undefined,
+  patientPhone: typeof x.patientPhone === 'string' ? x.patientPhone : undefined,
+  patientAge: typeof x.patientAge === 'number' ? x.patientAge : undefined,
+  patientGender: typeof x.patientGender === 'string' ? x.patientGender : undefined,
+  severity: typeof x.severity === 'string' ? (x.severity as 'CRITICAL' | 'URGENT' | 'STANDARD') : undefined,
+  pickupOtpVerified: Boolean(x.pickupOtpVerified),
+  pickupOverrideReason: typeof x.pickupOverrideReason === 'string' ? x.pickupOverrideReason : undefined,
+  ambulanceRegistration: typeof x.ambulanceRegistration === 'string' ? x.ambulanceRegistration : undefined,
+  ambulanceVehicleNumber: typeof x.ambulanceVehicleNumber === 'string' ? x.ambulanceVehicleNumber : undefined,
+  ambulanceType: typeof x.ambulanceType === 'string' ? x.ambulanceType : undefined,
+  driverName: typeof x.driverName === 'string' ? x.driverName : undefined,
+  driverPhone: typeof x.driverPhone === 'string' ? x.driverPhone : undefined,
+  ambulanceLatitude: typeof x.ambulanceLatitude === 'number' ? x.ambulanceLatitude : undefined,
+  ambulanceLongitude: typeof x.ambulanceLongitude === 'number' ? x.ambulanceLongitude : undefined,
+  tripStatus: typeof x.tripStatus === 'string' ? x.tripStatus : undefined,
   createdAt: x.createdAt as Date, updatedAt: x.updatedAt as Date,
 });
+
+const enrichEmergency = async (doc: Record<string, unknown>): Promise<HospitalEmergency> => {
+  const base = emergencyOut(doc);
+  const emergencyObjectId = new Types.ObjectId(String(doc._id));
+  const [user, trip] = await Promise.all([
+    (!base.patientName || !base.patientPhone) && doc.userId
+      ? UserModel.findById(String(doc.userId)).select('name phone').lean().exec()
+      : null,
+    TripModel.findOne({ emergencyRequestId: emergencyObjectId })
+      .sort({ createdAt: -1 })
+      .select('status ambulanceId driverId pickupOtpVerified pickupOverrideReason')
+      .lean()
+      .exec(),
+  ]);
+  const patientDetails = resolveHospitalEmergencyPatientDetails(base, user);
+  base.patientName = patientDetails.patientName;
+  base.patientPhone = patientDetails.patientPhone;
+  if (!base.ambulanceId && trip?.ambulanceId) base.ambulanceId = String(trip.ambulanceId);
+  if (!base.driverId && trip?.driverId) base.driverId = String(trip.driverId);
+  if (trip) {
+    base.tripStatus = trip.status;
+    if (trip.pickupOtpVerified !== undefined) base.pickupOtpVerified = trip.pickupOtpVerified;
+    if (trip.pickupOverrideReason) base.pickupOverrideReason = trip.pickupOverrideReason;
+  }
+
+  const ambulanceId = doc.ambulanceId ?? trip?.ambulanceId;
+  const driverId = doc.driverId ?? trip?.driverId;
+  if (ambulanceId || driverId) {
+    const [ambulance, driver] = await Promise.all([
+      ambulanceId ? AmbulanceModel.findById(ambulanceId).select('registrationNumber vehicleNumber ambulanceType currentLatitude currentLongitude').lean().exec() : null,
+      driverId ? AmbulanceDriverModel.findById(driverId).select('fullName phone').lean().exec() : null,
+    ]);
+    if (ambulance) {
+      base.ambulanceRegistration = ambulance.registrationNumber;
+      base.ambulanceVehicleNumber = ambulance.vehicleNumber;
+      base.ambulanceType = ambulance.ambulanceType;
+      base.ambulanceLatitude = ambulance.currentLatitude;
+      base.ambulanceLongitude = ambulance.currentLongitude;
+    }
+    if (driver) {
+      base.driverName = driver.fullName;
+      base.driverPhone = driver.phone;
+    }
+  }
+  return base;
+};
 
 export const listEmergencies = async (hospitalId: string, query: EmergencyQuery) => {
   const ownership = hospitalOwnershipFilter(hospitalId);
@@ -164,23 +227,32 @@ export const listEmergencies = async (hospitalId: string, query: EmergencyQuery)
     } },
   ]).exec();
   const items = result?.items ?? []; const total = result?.total[0]?.count ?? 0;
-  return pagination(items.map((x) => emergencyOut(x as unknown as Record<string, unknown>)), total, query.page, query.limit);
+  const enriched = await Promise.all(items.map((x) => enrichEmergency(x as unknown as Record<string, unknown>)));
+  return pagination(enriched, total, query.page, query.limit);
 };
 
 export const getEmergencySummary = async (hospitalId: string) => {
-  const grouped = await EmergencyRequestModel.aggregate<{ _id: HospitalEmergencyStatus; count: number }>([
-    { $match: hospitalOwnershipFilter(hospitalId) }, { $group: { _id: '$status', count: { $sum: 1 } } },
-  ]).exec();
+  const hospitalIdFilter = hospitalOwnershipFilter(hospitalId);
+  const [grouped, enRoutePatients] = await Promise.all([
+    EmergencyRequestModel.aggregate<{ _id: HospitalEmergencyStatus; count: number }>([
+      { $match: hospitalIdFilter }, { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]).exec(),
+    TripModel.aggregate<{ count: number }>([
+      { $match: { destinationHospitalId: hospitalIdFilter.hospitalId, status: { $in: ['PATIENT_ONBOARD', 'TO_HOSPITAL'] } } },
+      { $group: { _id: '$emergencyRequestId' } },
+      { $count: 'count' },
+    ]).exec(),
+  ]);
   const summary: Record<HospitalEmergencyStatus, number> = { RECEIVED: 0, REVIEWING: 0, PREPARING: 0, AMBULANCE_COORDINATION: 0, RESOLVED: 0, CANCELLED: 0 };
   grouped.forEach((row) => { summary[row._id] = row.count; });
-  return summary;
+  return { ...summary, patientsEnRouteByAmbulance: enRoutePatients[0]?.count ?? 0 };
 };
 
 export const getEmergency = async (hospitalId: string, emergencyId: string) => {
   if (!Types.ObjectId.isValid(emergencyId)) throw new AppError('INVALID_ID', 'Invalid emergency id', 400);
   const emergency = await EmergencyRequestModel.findOne({ _id: emergencyId, ...hospitalOwnershipFilter(hospitalId) }).lean().exec();
   if (!emergency) notFound('Emergency request not found');
-  return emergencyOut(emergency as unknown as Record<string, unknown>);
+  return enrichEmergency(emergency as unknown as Record<string, unknown>);
 };
 
 export const allowedEmergencyTransition: Record<HospitalEmergencyStatus, HospitalEmergencyStatus[]> = {
@@ -202,7 +274,7 @@ export const updateEmergencyStatus = async (
   const requestObjectId = new Types.ObjectId(emergencyId);
   const current = await EmergencyRequestModel.findOne({ _id: requestObjectId, hospitalId: hospitalObjectId }).select('status').lean().exec();
   if (!current) throw new AppError('NOT_FOUND', 'Emergency request not found', 404);
-  if (current.status === status) return emergencyOut((await EmergencyRequestModel.findById(requestObjectId).lean().exec())! as unknown as Record<string, unknown>);
+  if (current.status === status) return enrichEmergency((await EmergencyRequestModel.findById(requestObjectId).lean().exec())! as unknown as Record<string, unknown>);
   const allowedNextStatuses = allowedEmergencyTransition[current.status];
   if (!allowedNextStatuses?.includes(status)) throw new AppError('INVALID_STATUS_TRANSITION', 'Emergency status transition is not allowed', 409);
 
@@ -301,7 +373,7 @@ export const updateEmergencyStatus = async (
     broadcastEvent(`emergency:${requestObjectId}`, 'tracking:status', statusRefresh);
   }
 
-  return emergencyOut(updated as unknown as Record<string, unknown>);
+  return enrichEmergency(updated as unknown as Record<string, unknown>);
 };
 
 const patientOut = (x: Record<string, unknown>): HospitalPatient => ({

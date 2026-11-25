@@ -13,7 +13,7 @@ export const PendingApprovalPage = ({ status = 'PENDING' }: PendingApprovalPageP
   const navigate = useNavigate();
 
   const effectiveStatus = user?.accountStatus ?? status;
-  const roleName = user?.role ? user.role.replaceAll('_', ' ').toLowerCase() : 'organization';
+  const roleName = user?.role ? user.role.replaceAll('_', ' ').toLowerCase() : 'team';
 
   const isSuspended = effectiveStatus === 'SUSPENDED';
   const isRejected = effectiveStatus === 'REJECTED';
@@ -39,47 +39,45 @@ export const PendingApprovalPage = ({ status = 'PENDING' }: PendingApprovalPageP
 
         <h1 className="text-2xl font-black text-slate-950 tracking-tight">
           {isSuspended
-            ? 'Account Suspended'
+            ? 'Account paused'
             : isRejected
-            ? 'Registration Not Approved'
-            : 'Operational Approval Pending'}
+            ? 'Sign-up not approved'
+            : 'Waiting for approval'}
         </h1>
 
         <p className="mt-3 text-sm text-slate-600 leading-relaxed">
           {isSuspended ? (
             <>
-              Your {roleName} account has been placed on operational hold by network administration.
-              Operational dispatch and patient management features are restricted.
+              Your {roleName} account is paused by the ResQ team. You cannot use its work and patient care tools right now.
             </>
           ) : isRejected ? (
             <>
-              Your {roleName} registration could not be verified with our partner health registry.
-              Please reach out to ResQ Governance to submit revised documentation.
+              We could not check your {roleName} sign-up with our health partner. Contact ResQ support to send updated papers.
             </>
           ) : (
             <>
-              Your <strong className="text-slate-900">{user?.name || roleName}</strong> account registration has been received and is currently under compliance review by ResQ State Administrators.
-              Operational features will automatically unlock as soon as your medical license and facilities are verified.
+              We got the sign-up for <strong className="text-slate-900">{user?.name || roleName}</strong>. The ResQ team is checking it.
+              You can use the work tools after we check your license and facility.
             </>
           )}
         </p>
 
         <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left space-y-2 text-xs">
           <div className="flex justify-between text-slate-600">
-            <span>Account Email:</span>
+            <span>Email:</span>
             <span className="font-semibold text-slate-900">{user?.email}</span>
           </div>
           <div className="flex justify-between text-slate-600">
-            <span>Role Requested:</span>
-            <span className="font-semibold uppercase tracking-wider text-teal-700">{user?.role}</span>
+            <span>Account type:</span>
+            <span className="font-semibold text-teal-700">{roleName}</span>
           </div>
           <div className="flex justify-between text-slate-600">
-            <span>Review SLA:</span>
-            <span className="font-semibold text-slate-900">Standard 2 to 4 Business Hours</span>
+            <span>Review time:</span>
+            <span className="font-semibold text-slate-900">Usually 2 to 4 work hours</span>
           </div>
           <div className="flex justify-between text-slate-600">
-            <span>Governance Standard:</span>
-            <span className="font-semibold text-slate-900">Ayushman Bharat Digital Mission (ABDM)</span>
+            <span>Health rules:</span>
+            <span className="font-semibold text-slate-900">Ayushman Bharat Digital Mission (India’s health data program)</span>
           </div>
         </div>
 
@@ -90,7 +88,7 @@ export const PendingApprovalPage = ({ status = 'PENDING' }: PendingApprovalPageP
             icon={<LogOut className="h-4 w-4" />}
             className="w-full sm:w-auto"
           >
-            Sign Out
+            Sign out
           </Button>
 
           <Button
@@ -99,7 +97,7 @@ export const PendingApprovalPage = ({ status = 'PENDING' }: PendingApprovalPageP
             icon={<PhoneCall className="h-4 w-4" />}
             className="w-full sm:w-auto"
           >
-            Contact Governance Support
+            Contact ResQ support
           </Button>
         </div>
       </div>

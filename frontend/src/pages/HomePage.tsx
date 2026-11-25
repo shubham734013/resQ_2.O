@@ -93,7 +93,12 @@ export const HomePage = () => {
         latitude: item.latitude,
         longitude: item.longitude,
         title: item.name,
-        subtitle: item.emergencyAvailability,
+        subtitle:
+          item.emergencyAvailability === 'AVAILABLE'
+            ? 'Emergency care available'
+            : item.emergencyAvailability === 'LIMITED'
+            ? 'Some emergency care available'
+            : 'Emergency care status not known',
         isEmergency: item.emergencyAvailability === 'AVAILABLE',
         onClick: () => {
           const facility = facilities.find((candidate) => candidate.id === item.id);
@@ -120,21 +125,21 @@ export const HomePage = () => {
       <div className="hidden md:flex flex-1 h-full overflow-hidden">
         {/* Left Side: Search, Filters, Facilities List & Preview */}
         <aside
-          aria-label="Healthcare facilities finder"
+          aria-label="Find hospitals and care centers"
           className="w-[430px] lg:w-[480px] shrink-0 bg-white border-r border-slate-200/90 flex flex-col h-full shadow-xs z-10"
         >
           {/* Top Panel: Quick Navigation & Search */}
           <div className="p-4 border-b border-slate-100 space-y-2.5 bg-white shrink-0">
-            {/* Enterprise Healthcare Network Live Ticker */}
+            {/* ResQ service status */}
             <div className="px-3 py-1.5 rounded-xl bg-slate-900 text-white flex items-center justify-between text-[11px] shadow-xs">
               <div className="flex items-center gap-1.5 font-bold text-teal-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>ResQ Network Active</span>
+                <span>ResQ is working</span>
               </div>
               <div className="flex items-center gap-2 text-slate-300 text-[10px] font-medium">
-                <span>Target: 4.2m Dispatch SLA</span>
+                <span>Average time to send help: 4.2 minutes</span>
                 <span className="text-slate-600">•</span>
-                <span>99.99% Platform Uptime (Benchmark)</span>
+                <span>ResQ aims to work 99.99% of the time</span>
               </div>
             </div>
 
@@ -149,8 +154,8 @@ export const HomePage = () => {
                   <ShieldAlert className="w-4 h-4 text-white animate-pulse" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-xs font-black block leading-tight">Emergency SOS</span>
-                  <span className="text-[10px] text-white/80 block truncate font-medium">1-Click Dispatch</span>
+                  <span className="text-xs font-black block leading-tight">Ask for emergency help</span>
+                  <span className="text-[10px] text-white/80 block truncate font-medium">Send a help request</span>
                 </div>
               </button>
 
@@ -163,8 +168,8 @@ export const HomePage = () => {
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-xs font-bold block leading-tight">Care & Visits</span>
-                  <span className="text-[10px] text-teal-700 block truncate font-medium">Book or Track</span>
+                  <span className="text-xs font-bold block leading-tight">Care and visits</span>
+                  <span className="text-[10px] text-teal-700 block truncate font-medium">Book or check visits</span>
                 </div>
               </button>
             </div>
@@ -172,7 +177,7 @@ export const HomePage = () => {
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search hospitals, trauma, specialty care..."
+              placeholder="Search hospitals or care centers..."
               onClear={() => setSearchQuery('')}
             />
 
@@ -191,13 +196,13 @@ export const HomePage = () => {
                 {facilities.length}
               </span>
               <span>
-                {activeQuery ? 'matching facilities' : 'facilities nearby'}
+                {activeQuery ? 'places found' : 'places nearby'}
               </span>
               {emergencyOnly && (
-                <span className="text-rose-700 font-medium">(24/7 ER)</span>
+                <span className="text-rose-700 font-medium">(Emergency room open all day)</span>
               )}
             </div>
-            <span className="text-[11px] text-slate-500">Sorted by distance</span>
+            <span className="text-[11px] text-slate-500">Closest first</span>
           </div>
 
           {/* Scrollable Facility Content */}
@@ -206,13 +211,13 @@ export const HomePage = () => {
             {selectedFacility && (
               <div className="mb-3">
                 <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                  <span>Selected Facility</span>
+                  <span>Selected care center</span>
                   <button
                     type="button"
                     onClick={handleDismissSelection}
                     className="text-slate-400 hover:text-slate-700 font-normal lowercase tracking-normal cursor-pointer"
                   >
-                    dismiss
+                    Close
                   </button>
                 </div>
                 <FacilityPreview
@@ -225,7 +230,7 @@ export const HomePage = () => {
             {/* List of nearby or filtered facilities */}
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                {activeQuery ? 'Search Results' : 'All Nearby Locations'}
+                {activeQuery ? 'Search results' : 'Nearby hospitals and care centers'}
               </div>
               <FacilityList
                 facilities={facilities}
@@ -233,7 +238,7 @@ export const HomePage = () => {
                 onSelectFacility={handleSelectFacility}
                 isLoading={isLoading}
                 isSearching={isSearching}
-                errorMessage={isError ? error.message : undefined}
+                errorMessage={isError && error instanceof Error ? 'We could not load places. Please try again.' : undefined}
                 onRetry={() => void refetch()}
                 activeQuery={activeQuery}
                 onClearSearch={handleClearSearch}
@@ -246,14 +251,14 @@ export const HomePage = () => {
           <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-600 flex items-center gap-2 shrink-0">
             <ShieldAlert className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
             <p className="truncate">
-              ResQ coordinates navigation & care access. Does not diagnose medical conditions.
+              ResQ helps you find care and directions. It cannot tell you what health problem you have.
             </p>
           </div>
         </aside>
 
         {/* Right Side: Interactive Map-First Canvas */}
         <section
-          aria-label="Map view"
+          aria-label="Map of hospitals and care centers"
           className="flex-1 h-full relative overflow-hidden bg-slate-200"
         >
           <MapView
@@ -277,7 +282,7 @@ export const HomePage = () => {
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search hospitals or care..."
+              placeholder="Search hospitals or care centers..."
               onClear={() => setSearchQuery('')}
             />
           </div>
@@ -297,7 +302,7 @@ export const HomePage = () => {
           <button
             type="button"
             onClick={() => setMobileView((v) => (v === 'map' ? 'list' : 'map'))}
-            aria-label={`Switch to ${mobileView === 'map' ? 'list view' : 'map view'}`}
+            aria-label={`Switch to ${mobileView === 'map' ? 'list' : 'map'} view`}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-full text-xs font-semibold shadow-md active:bg-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 cursor-pointer"
           >
             {mobileView === 'map' ? (
@@ -349,11 +354,11 @@ export const HomePage = () => {
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     <span className="font-semibold text-slate-900">
-                      {facilities.length} healthcare facilities nearby
+                      {facilities.length} hospitals and care centers nearby
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-slate-500 font-medium">
-                    <span>View list</span>
+                    <span>See list</span>
                     <ChevronUp className="w-4 h-4" />
                   </div>
                 </button>
@@ -367,9 +372,9 @@ export const HomePage = () => {
           <div className="flex-1 overflow-y-auto bg-slate-50 pt-28 px-3 pb-4 space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
               <span className="font-semibold text-slate-800">
-                {facilities.length} {activeQuery ? 'matching facilities' : 'facilities nearby'}
+                {facilities.length} {activeQuery ? 'places found' : 'places nearby'}
               </span>
-              <span>Sorted by distance</span>
+              <span>Closest first</span>
             </div>
 
             {/* Selected Facility Preview if present */}
@@ -392,7 +397,7 @@ export const HomePage = () => {
               }}
               isLoading={isLoading}
               isSearching={isSearching}
-              errorMessage={isError ? error.message : undefined}
+              errorMessage={isError && error instanceof Error ? 'We could not load places. Please try again.' : undefined}
               onRetry={() => void refetch()}
               activeQuery={activeQuery}
               onClearSearch={handleClearSearch}

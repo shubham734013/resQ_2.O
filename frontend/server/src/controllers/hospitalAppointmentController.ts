@@ -43,6 +43,14 @@ export const bookAppointmentController = async (req: AuthenticatedRequest, res: 
 };
 
 export const listMyAppointmentsController = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const auth = req.auth;
+  if (!auth) throw new AppError('AUTHENTICATION_REQUIRED', 'Authentication required', 401);
+  if (auth.role !== 'USER' && auth.role !== 'ADMIN') {
+    return sendSuccess(res, {
+      items: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+    });
+  }
   const userId = getUserId(req);
   const query = res.locals.validatedQuery ?? req.query;
   const result = await service.listUserAppointments(userId, query);

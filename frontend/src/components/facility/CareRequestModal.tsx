@@ -37,7 +37,7 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
     setErrorMessage(null);
 
     if (visitReason.trim().length < 3) {
-      setErrorMessage('Please provide a brief reason for your visit (at least 3 characters).');
+      setErrorMessage('Tell us why you need care in at least 3 characters.');
       return;
     }
 
@@ -54,8 +54,8 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
         onSuccess: (data) => {
           setCreatedReferenceId(data.referenceId);
         },
-        onError: (err) => {
-          setErrorMessage(err instanceof Error ? err.message : 'Failed to submit care request.');
+        onError: () => {
+          setErrorMessage('We could not send your care request. Try again.');
         },
       }
     );
@@ -78,14 +78,14 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Direct Care Request</h2>
+              <h2 className="text-base font-semibold text-slate-900">Ask the hospital for care</h2>
               <p className="text-xs text-slate-500 truncate max-w-xs">{facility.name}</p>
             </div>
           </div>
           <button
             onClick={handleReset}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors"
-            aria-label="Close modal"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -97,9 +97,9 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-xs text-amber-900">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <span className="font-semibold">Non-Emergency Workflow</span>
+              <span className="font-semibold">For non-emergency care</span>
               <p className="text-[11px] text-amber-800 leading-relaxed">
-                This form is for routine and non-urgent consultations only. If you are experiencing a life-threatening medical emergency, please use Emergency SOS.
+                Use this form for regular care only. For a serious emergency, call 112 now.
               </p>
             </div>
           </div>
@@ -111,15 +111,15 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-900">Request Submitted Successfully</h3>
+                <h3 className="text-lg font-bold text-slate-900">Request sent</h3>
                 <p className="text-xs text-slate-500">
-                  {facility.name} has received your request and will review it shortly.
+                  {facility.name} received your request. It has not been accepted yet.
                 </p>
               </div>
 
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-w-sm mx-auto space-y-2 text-left">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-500">Reference ID:</span>
+                  <span className="text-slate-500">Request number:</span>
                   <span className="font-mono font-bold text-slate-800">{createdReferenceId}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
@@ -128,7 +128,7 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
                 </div>
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-slate-500">Status:</span>
-                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded-full">PENDING</span>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded-full">Waiting for the hospital</span>
                 </div>
               </div>
 
@@ -160,7 +160,7 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
 
               {/* Department */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Department / Clinical Service</label>
+                <label className="text-xs font-semibold text-slate-700">Department</label>
                 <select
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
@@ -176,29 +176,29 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
 
               {/* Request Type */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Type of Consultation</label>
+                <label className="text-xs font-semibold text-slate-700">Type of visit</label>
                 <select
                   value={requestType}
                   onChange={(e) => setRequestType(e.target.value as CareRequestType)}
                   className="w-full h-10 px-3 text-sm bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
-                  <option value="GENERAL_CONSULTATION">General Consultation</option>
-                  <option value="SPECIALIST_CONSULTATION">Specialist Consultation</option>
-                  <option value="DIAGNOSTIC">Diagnostic / Lab Service</option>
-                  <option value="FOLLOW_UP">Follow-up Visit</option>
-                  <option value="ROUTINE_CHECKUP">Routine Health Checkup</option>
-                  <option value="OTHER">Other Health Inquiry</option>
+                  <option value="GENERAL_CONSULTATION">General visit</option>
+                  <option value="SPECIALIST_CONSULTATION">Visit with a doctor for one type of care</option>
+                  <option value="DIAGNOSTIC">Test or lab visit</option>
+                  <option value="FOLLOW_UP">Return visit</option>
+                  <option value="ROUTINE_CHECKUP">Regular health check</option>
+                  <option value="OTHER">Other</option>
                 </select>
               </div>
 
               {/* Reason for Visit */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Reason for Request</label>
+                <label className="text-xs font-semibold text-slate-700">Why are you asking?</label>
                 <textarea
                   value={visitReason}
                   onChange={(e) => setVisitReason(e.target.value)}
                   rows={3}
-                  placeholder="Briefly describe your symptoms or reason for visit (non-emergency only)..."
+                  placeholder="Tell us what you need. For non-emergency care only…"
                   className="w-full p-3 text-sm bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
                   required
                 />
@@ -209,31 +209,31 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Preferred Timing</span>
+                    <span>Best time</span>
                   </label>
                   <select
                     value={preferredTiming}
                     onChange={(e) => setPreferredTiming(e.target.value as PreferredTiming)}
                     className="w-full h-10 px-3 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500"
                   >
-                    <option value="FLEXIBLE">Flexible / Any Time</option>
-                    <option value="MORNING">Morning (09:00 - 12:00)</option>
-                    <option value="AFTERNOON">Afternoon (12:00 - 16:00)</option>
-                    <option value="EVENING">Evening (16:00 - 20:00)</option>
+                    <option value="FLEXIBLE">Any time</option>
+                    <option value="MORNING">Morning (9:00 am–12:00 pm)</option>
+                    <option value="AFTERNOON">Afternoon (12:00 pm–4:00 pm)</option>
+                    <option value="EVENING">Evening (4:00–8:00 pm)</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Contact Preference</label>
+                  <label className="text-xs font-semibold text-slate-700">How should we contact you?</label>
                   <select
                     value={contactPreference}
                     onChange={(e) => setContactPreference(e.target.value as ContactPreference)}
                     className="w-full h-10 px-3 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500"
                   >
-                    <option value="IN_APP">In-App Notification</option>
-                    <option value="PHONE">Phone Call</option>
+                    <option value="IN_APP">App alert</option>
+                    <option value="PHONE">Phone call</option>
                     <option value="EMAIL">Email</option>
-                    <option value="SMS">SMS</option>
+                    <option value="SMS">Text message</option>
                   </select>
                 </div>
               </div>
@@ -249,7 +249,7 @@ export const CareRequestModal = ({ facility, isOpen, onClose }: CareRequestModal
                   disabled={createMutation.isPending}
                   icon={<Send className="w-4 h-4" />}
                 >
-                  {createMutation.isPending ? 'Submitting...' : 'Send Request'}
+                  {createMutation.isPending ? 'Sending…' : 'Send request'}
                 </Button>
               </div>
             </form>

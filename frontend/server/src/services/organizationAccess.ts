@@ -7,7 +7,6 @@ import {
   type MembershipRole,
 } from '../models/OrganizationMembership.js';
 import { HospitalModel } from '../models/Hospital.js';
-import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { AuditLogModel } from '../models/AuditLog.js';
 import type { AuthenticatedIdentity } from '../types/auth.js';
@@ -280,8 +279,8 @@ export const createOrganization = async (
     throw new AppError('UNAUTHORIZED', 'Authenticated creator required to provision organization', 401);
   }
 
-  // Only platform ADMIN, HOSPITAL, or AMBULANCE_PROVIDER can create organizations
-  if (creator.role !== 'ADMIN' && creator.role !== 'HOSPITAL' && creator.role !== 'AMBULANCE_PROVIDER') {
+  // Only platform ADMIN or HOSPITAL can create organizations
+  if (creator.role !== 'ADMIN' && creator.role !== 'HOSPITAL') {
     throw new AppError('FORBIDDEN', 'Citizens and drivers cannot provision organization tenants', 403);
   }
 
@@ -289,22 +288,16 @@ export const createOrganization = async (
   if (creator.role === 'HOSPITAL' && input.type !== 'HOSPITAL_NETWORK') {
     throw new AppError('FORBIDDEN', 'Hospitals can only provision HOSPITAL_NETWORK organizations', 403);
   }
-  if (creator.role === 'AMBULANCE_PROVIDER' && input.type !== 'AMBULANCE_OPERATOR') {
-    throw new AppError('FORBIDDEN', 'Ambulance providers can only provision AMBULANCE_OPERATOR organizations', 403);
-  }
 
   const org = await OrganizationModel.create(input);
 
   let membership: OrganizationMembershipDocument | undefined;
 
   // Provision initial membership for healthcare creators with defined least-privilege permissions
-  if (creator.role === 'HOSPITAL' || creator.role === 'AMBULANCE_PROVIDER') {
+  if (creator.role === 'HOSPITAL') {
     try {
-      const defaultRole: MembershipRole = creator.role === 'HOSPITAL' ? 'HOSPITAL_ADMIN' : 'PROVIDER_ADMIN';
-      const defaultPermissions: string[] =
-        creator.role === 'HOSPITAL'
-          ? ['hospital:manage', 'membership:manage', 'patient:manage', 'emergency:coordinate']
-          : ['fleet:manage', 'driver:manage', 'membership:manage', 'dispatch:manage'];
+      const defaultRole: MembershipRole = 'HOSPITAL_ADMIN';
+      const defaultPermissions: string[] = ['hospital:manage', 'membership:manage', 'patient:manage', 'emergency:coordinate'];
 
       membership = await OrganizationMembershipModel.create({
         organizationId: org._id,
@@ -400,12 +393,11 @@ export const addPrincipalToOrganization = async (
   }
   if (
     org.type === 'AMBULANCE_OPERATOR' &&
-    input.principalType !== 'AMBULANCE_PROVIDER' &&
-    input.principalType !== 'AMBULANCE_DRIVER'
+    (input.principalType as string) !== 'AMBULANCE_DRIVER'
   ) {
     throw new AppError(
       'INCOMPATIBLE_PRINCIPAL_TYPE',
-      'Ambulance operators can only accept ambulance provider and driver principals',
+      'Ambulance operators can only accept ambulance driver principals',
       400
     );
   }
@@ -417,13 +409,7 @@ export const addPrincipalToOrganization = async (
     if (hosp.accountStatus === 'SUSPENDED' || hosp.accountStatus === 'REJECTED') {
       throw new AppError('PRINCIPAL_SUSPENDED', 'Hospital account is suspended or rejected', 403);
     }
-  } else if (input.principalType === 'AMBULANCE_PROVIDER') {
-    const prov = await AmbulanceProviderModel.findById(princId).exec();
-    if (!prov) throw new AppError('PRINCIPAL_NOT_FOUND', 'Ambulance provider principal record not found', 404);
-    if (prov.accountStatus === 'SUSPENDED' || prov.accountStatus === 'REJECTED') {
-      throw new AppError('PRINCIPAL_SUSPENDED', 'Ambulance provider account is suspended or rejected', 403);
-    }
-  } else if (input.principalType === 'AMBULANCE_DRIVER') {
+  } else if ((input.principalType as string) === 'AMBULANCE_DRIVER') {
     const driver = await AmbulanceDriverModel.findById(princId).exec();
     if (!driver) throw new AppError('PRINCIPAL_NOT_FOUND', 'Ambulance driver principal record not found', 404);
     if (driver.accountStatus === 'SUSPENDED' || driver.accountStatus === 'REJECTED') {
@@ -524,13 +510,6 @@ export const assertEmergencyCoordinationAccess = (
   if (principal.role === 'HOSPITAL') {
     if (principal.id !== emergency.assignedHospitalId) {
       throw new AppError('FORBIDDEN', 'Hospital is not assigned to this emergency coordination workflow', 403);
-    }
-    return;
-  }
-
-  if (principal.role === 'AMBULANCE_PROVIDER') {
-    if (principal.id !== emergency.assignedProviderId) {
-      throw new AppError('FORBIDDEN', 'Provider is not assigned to this emergency dispatch', 403);
     }
     return;
   }

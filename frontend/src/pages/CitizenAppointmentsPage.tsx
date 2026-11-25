@@ -68,13 +68,13 @@ export const CitizenAppointmentsPage = ({
   });
 
   const handleCancelAppointment = (id: string) => {
-    if (window.confirm('Are you sure you want to cancel this appointment? This will release your reserved slot.')) {
+    if (window.confirm('Cancel this appointment? The time will be free for someone else.')) {
       cancelAppointmentMutation.mutate({ id, reason: 'Cancelled by patient' });
     }
   };
 
   const handleCancelCareRequest = (id: string) => {
-    if (window.confirm('Are you sure you want to cancel this care request?')) {
+    if (window.confirm('Cancel this care request?')) {
       cancelCareRequestMutation.mutate({ id, reason: 'Cancelled by patient' });
     }
   };
@@ -93,47 +93,47 @@ export const CitizenAppointmentsPage = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 shadow-xs">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span>{status}</span>
+            <span>{status === 'CONFIRMED' ? 'Confirmed' : 'Accepted'}</span>
           </span>
         );
       case 'PENDING':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-xs">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span>PENDING</span>
+            <span>Waiting</span>
           </span>
         );
       case 'ALTERNATIVE_PROPOSED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 shadow-xs">
             <Clock className="w-3 h-3 text-indigo-400" />
-            <span>TIME PROPOSED</span>
+            <span>New time offered</span>
           </span>
         );
       case 'COMPLETED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 shadow-xs">
             <CheckCircle2 className="w-3 h-3 text-blue-400" />
-            <span>COMPLETED</span>
+            <span>Done</span>
           </span>
         );
       case 'CANCELLED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-white/[0.04] text-zinc-400 border border-white/10 shadow-xs">
-            <span>CANCELLED</span>
+            <span>Canceled</span>
           </span>
         );
       case 'REJECTED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-xs">
             <AlertCircle className="w-3 h-3 text-rose-400" />
-            <span>DECLINED</span>
+            <span>Not accepted</span>
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-white/[0.04] text-zinc-300 border border-white/10">
-            <span>{status}</span>
+            <span>{status.replaceAll('_', ' ').toLowerCase()}</span>
           </span>
         );
     }
@@ -159,14 +159,11 @@ export const CitizenAppointmentsPage = ({
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-mono font-medium text-teal-300 mb-3 shadow-xs">
               <HeartHandshake className="w-3.5 h-3.5 text-teal-400" />
-              <span>Patient Coordination Hub</span>
+              <span>Your care</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-zinc-100">
-              Hospital Requests & Appointments
+              Hospital requests and visits
             </h1>
-            <p className="text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed font-light">
-              Manage your direct hospital consultations, reserved time windows, and clinical provider responses.
-            </p>
           </div>
 
           <button
@@ -175,7 +172,7 @@ export const CitizenAppointmentsPage = ({
             className="self-start sm:self-auto px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 text-zinc-100 font-medium text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm group"
           >
             <Search className="w-3.5 h-3.5 text-rose-400 group-hover:scale-110 transition-transform" />
-            <span>Find Hospitals</span>
+            <span>Find hospitals</span>
           </button>
         </div>
 
@@ -209,7 +206,7 @@ export const CitizenAppointmentsPage = ({
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Direct Care Requests</span>
+            <span>Care requests</span>
             {Boolean(careRequestsQuery.data?.pagination.total) && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
                 {careRequestsQuery.data?.pagination.total}
@@ -227,7 +224,7 @@ export const CitizenAppointmentsPage = ({
             }`}
           >
             <Bell className="w-4 h-4" />
-            <span>Notifications</span>
+            <span>Updates</span>
             {Boolean(notificationsQuery.data?.items.filter((n) => n.status === 'UNREAD').length) && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-rose-600 text-white shadow-xs animate-pulse">
                 {notificationsQuery.data?.items.filter((n) => n.status === 'UNREAD').length}
@@ -243,12 +240,12 @@ export const CitizenAppointmentsPage = ({
             <div className="flex flex-wrap items-center gap-2 py-1">
               {(
                 [
-                  { id: 'ALL', label: 'ALL' },
-                  { id: 'PENDING', label: 'PENDING' },
-                  { id: 'CONFIRMED', label: 'CONFIRMED' },
-                  { id: 'ALTERNATIVE_PROPOSED', label: 'TIME PROPOSED' },
-                  { id: 'COMPLETED', label: 'COMPLETED' },
-                  { id: 'CANCELLED', label: 'CANCELLED' },
+                  { id: 'ALL', label: 'All' },
+                  { id: 'PENDING', label: 'Waiting' },
+                  { id: 'CONFIRMED', label: 'Confirmed' },
+                  { id: 'ALTERNATIVE_PROPOSED', label: 'New time offered' },
+                  { id: 'COMPLETED', label: 'Done' },
+                  { id: 'CANCELLED', label: 'Canceled' },
                 ] as const
               ).map((st) => {
                 const isActive = appointmentStatusFilter === st.id;
@@ -273,7 +270,7 @@ export const CitizenAppointmentsPage = ({
             {appointmentsQuery.isLoading ? (
               <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-16 text-center space-y-3">
                 <Loader2 className="w-6 h-6 animate-spin text-rose-500 mx-auto" />
-                <p className="text-xs font-mono text-zinc-400">Loading scheduled doctor appointments…</p>
+                <p className="text-xs font-mono text-zinc-400">Loading appointments…</p>
               </div>
             ) : appointmentsQuery.data?.items.length === 0 ? (
               /* Empty State */
@@ -282,9 +279,9 @@ export const CitizenAppointmentsPage = ({
                   <Calendar className="w-8 h-8" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-light text-zinc-100 tracking-tight">No appointments found</h3>
+                  <h3 className="text-xl font-light text-zinc-100 tracking-tight">No appointments yet</h3>
                   <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed font-light">
-                    You have no scheduled clinical consultations matching this status filter.
+                    No appointments match this filter.
                   </p>
                 </div>
                 <button
@@ -292,7 +289,7 @@ export const CitizenAppointmentsPage = ({
                   onClick={() => navigate(ROUTES.USER.HOSPITALS)}
                   className="bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-medium text-xs rounded-xl px-6 py-3 shadow-lg shadow-rose-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Browse Healthcare Facilities</span>
+                  <span>Find a hospital</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -312,7 +309,7 @@ export const CitizenAppointmentsPage = ({
                         <div>
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <h3 className="font-light text-zinc-100 text-base md:text-lg tracking-tight">
-                              {hospital?.name ?? 'Healthcare Facility'}
+                              {hospital?.name ?? 'Hospital'}
                             </h3>
                             {getStatusBadge(appt.status)}
                           </div>
@@ -340,7 +337,7 @@ export const CitizenAppointmentsPage = ({
                         <div className="flex items-center gap-2.5 text-zinc-300">
                           <Clock className="w-4 h-4 text-rose-400 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Time Window</p>
+                            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Time</p>
                             <p className="font-semibold text-zinc-200 mt-0.5">
                               {appt.startTime} – {appt.endTime} ({appt.slotDurationMinutes} min)
                             </p>
@@ -351,7 +348,7 @@ export const CitizenAppointmentsPage = ({
                           <div className="flex items-center gap-2.5 text-zinc-300">
                             <Phone className="w-4 h-4 text-rose-400 shrink-0" />
                             <div>
-                              <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Hospital Desk</p>
+                              <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Hospital</p>
                               <a
                                 href={`tel:${hospital.phone}`}
                                 className="font-semibold text-rose-400 hover:text-rose-300 underline mt-0.5 block"
@@ -366,18 +363,18 @@ export const CitizenAppointmentsPage = ({
                       {/* Reason & Hospital Notes */}
                       <div className="space-y-1.5 text-xs text-zinc-300">
                         <p>
-                          <span className="font-mono text-zinc-500 uppercase tracking-wider text-[10px] mr-1.5">Visit Reason:</span>
+                          <span className="font-mono text-zinc-500 uppercase tracking-wider text-[10px] mr-1.5">Why you are going:</span>
                           <span className="text-zinc-200">{appt.visitReason}</span>
                         </p>
                         {appt.notes && (
                           <p>
-                            <span className="font-mono text-zinc-500 uppercase tracking-wider text-[10px] mr-1.5">Instructions:</span>
+                            <span className="font-mono text-zinc-500 uppercase tracking-wider text-[10px] mr-1.5">Notes:</span>
                             <span className="text-zinc-300 font-light">{appt.notes}</span>
                           </p>
                         )}
                         {appt.rejectionReason && (
                           <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
-                            <span className="font-semibold block mb-0.5">Reason for Decline:</span>
+                            <span className="font-semibold block mb-0.5">Why they said no:</span>
                             <span className="font-light">{appt.rejectionReason}</span>
                           </div>
                         )}
@@ -388,7 +385,7 @@ export const CitizenAppointmentsPage = ({
                         <div className="p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl space-y-2 text-xs text-indigo-200">
                           <div className="flex items-center gap-2 font-semibold text-indigo-300">
                             <Clock className="w-4 h-4 text-indigo-400" />
-                            <span>Hospital Proposed an Alternative Slot:</span>
+                            <span>The hospital offered another time:</span>
                           </div>
                           <p className="text-indigo-100 font-light">
                             <strong className="font-semibold text-white">{appt.alternativeSlot.date}</strong> at{' '}
@@ -396,7 +393,7 @@ export const CitizenAppointmentsPage = ({
                             {appt.alternativeSlot.notes ? ` — "${appt.alternativeSlot.notes}"` : ''}
                           </p>
                           <p className="text-[11px] text-indigo-300/80 font-mono">
-                            Please call {hospital?.phone ?? 'the facility desk'} to confirm or adjust your booking.
+                            Call {hospital?.phone ?? 'the hospital'} to accept or change the time.
                           </p>
                         </div>
                       )}
@@ -432,11 +429,11 @@ export const CitizenAppointmentsPage = ({
             <div className="flex flex-wrap items-center gap-2 py-1">
               {(
                 [
-                  { id: 'ALL', label: 'ALL' },
-                  { id: 'PENDING', label: 'PENDING' },
-                  { id: 'ACCEPTED', label: 'ACCEPTED' },
-                  { id: 'REJECTED', label: 'DECLINED' },
-                  { id: 'CANCELLED', label: 'CANCELLED' },
+                  { id: 'ALL', label: 'All' },
+                  { id: 'PENDING', label: 'Waiting' },
+                  { id: 'ACCEPTED', label: 'Accepted' },
+                  { id: 'REJECTED', label: 'Not accepted' },
+                  { id: 'CANCELLED', label: 'Canceled' },
                 ] as const
               ).map((st) => {
                 const isActive = requestStatusFilter === st.id;
@@ -461,7 +458,7 @@ export const CitizenAppointmentsPage = ({
             {careRequestsQuery.isLoading ? (
               <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-16 text-center space-y-3">
                 <Loader2 className="w-6 h-6 animate-spin text-teal-500 mx-auto" />
-                <p className="text-xs font-mono text-zinc-400">Loading direct care requests…</p>
+                <p className="text-xs font-mono text-zinc-400">Loading care requests…</p>
               </div>
             ) : careRequestsQuery.data?.items.length === 0 ? (
               /* Empty State */
@@ -470,9 +467,9 @@ export const CitizenAppointmentsPage = ({
                   <Building2 className="w-8 h-8" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-light text-zinc-100 tracking-tight">No care requests found</h3>
+                  <h3 className="text-xl font-light text-zinc-100 tracking-tight">No care requests yet</h3>
                   <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed font-light">
-                    You haven't submitted any direct care requests matching this status filter.
+                    No care requests match this filter.
                   </p>
                 </div>
                 <button
@@ -480,7 +477,7 @@ export const CitizenAppointmentsPage = ({
                   onClick={() => navigate(ROUTES.USER.HOSPITALS)}
                   className="bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-medium text-xs rounded-xl px-6 py-3 shadow-lg shadow-rose-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Browse Healthcare Facilities</span>
+                  <span>Find a hospital</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -500,12 +497,12 @@ export const CitizenAppointmentsPage = ({
                         <div>
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <h3 className="font-light text-zinc-100 text-base md:text-lg tracking-tight">
-                              {hospital?.name ?? 'Healthcare Facility'}
+                              {hospital?.name ?? 'Hospital'}
                             </h3>
                             {getStatusBadge(req.status)}
                           </div>
                           <p className="text-xs text-zinc-400 mt-1 font-light">
-                            {req.serviceDepartment} · {req.requestType.replace(/_/g, ' ')}
+                            {req.serviceDepartment} · {req.requestType.replace(/_/g, ' ').toLowerCase()}
                           </p>
                         </div>
                         <div className="text-left sm:text-right">
@@ -519,33 +516,38 @@ export const CitizenAppointmentsPage = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white/[0.02] border border-white/5 p-4 rounded-xl">
                         <div>
                           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-0.5">
-                            Timing Preference
+                            Best time
                           </span>
-                          <span className="font-medium text-zinc-200">{req.preferredTiming}</span>
+                          <span className="font-medium text-zinc-200">{req.preferredTiming === 'FLEXIBLE' ? 'Any time' : req.preferredTiming.toLowerCase()}</span>
                         </div>
                         <div>
                           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-0.5">
-                            Contact Preference
+                            How to contact you
                           </span>
-                          <span className="font-medium text-zinc-200">{req.contactPreference}</span>
+                          <span className="font-medium text-zinc-200">{({
+                            IN_APP: 'App alert',
+                            PHONE: 'Phone call',
+                            EMAIL: 'Email',
+                            SMS: 'Text message',
+                          }[req.contactPreference] ?? req.contactPreference.toLowerCase())}</span>
                         </div>
                       </div>
 
                       {/* Reason & Hospital response */}
                       <div className="space-y-2 text-xs text-zinc-300">
                         <p>
-                          <span className="font-mono text-zinc-500 uppercase tracking-wider text-[10px] mr-1.5">Reason:</span>
+                          <span className="font-mono text-zinc-500 uppercase tracking-wider text-[10px] mr-1.5">Why you asked:</span>
                           <span className="text-zinc-200">{req.visitReason}</span>
                         </p>
                         {req.hospitalResponse?.notes && (
                           <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1 text-emerald-300">
-                            <p className="font-semibold text-xs">Hospital Response:</p>
+                            <p className="font-semibold text-xs">Hospital reply:</p>
                             <p className="font-light">{req.hospitalResponse.notes}</p>
                           </div>
                         )}
                         {req.rejectionReason && (
                           <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-1 text-rose-300">
-                            <p className="font-semibold text-xs">Decline Reason:</p>
+                            <p className="font-semibold text-xs">Why they said no:</p>
                             <p className="font-light">{req.rejectionReason}</p>
                           </div>
                         )}
@@ -581,7 +583,7 @@ export const CitizenAppointmentsPage = ({
             {notificationsQuery.isLoading ? (
               <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-16 text-center space-y-3">
                 <Loader2 className="w-6 h-6 animate-spin text-rose-500 mx-auto" />
-                <p className="text-xs font-mono text-zinc-400">Loading notifications…</p>
+                <p className="text-xs font-mono text-zinc-400">Loading messages…</p>
               </div>
             ) : notificationsQuery.data?.items.length === 0 ? (
               /* Empty State */
@@ -590,9 +592,9 @@ export const CitizenAppointmentsPage = ({
                   <Bell className="w-8 h-8" />
                 </div>
                 <div className="space-y-1.5">
-                  <h3 className="text-xl font-light text-zinc-100 tracking-tight">No notifications yet</h3>
+                  <h3 className="text-xl font-light text-zinc-100 tracking-tight">No messages yet</h3>
                   <p className="text-zinc-400 text-sm max-w-sm mx-auto leading-relaxed font-light">
-                    Direct updates regarding your medical appointments and care requests will appear here.
+                    Updates about your appointments and care requests will show here.
                   </p>
                 </div>
               </div>

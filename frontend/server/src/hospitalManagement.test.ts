@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hospitalProfileUpdateSchema, hospitalEmergencyStatusUpdateSchema, hospitalResourcesUpdateSchema, hospitalEmergencyListQuerySchema } from './schemas/hospital.js';
 import { allowedEmergencyTransition, hospitalOwnershipFilter } from './services/hospitalService.js';
+import { resolveHospitalEmergencyPatientDetails } from './utils/hospitalEmergencyDetails.js';
 
 test('hospital profile rejects admin-owned fields', () => {
   const result = hospitalProfileUpdateSchema.safeParse({ accountStatus: 'ACTIVE' });
@@ -40,4 +41,19 @@ test('emergency queue query validates search and bounded pagination', () => {
   assert.equal(hospitalEmergencyListQuerySchema.safeParse({ search: 'RSQ-ABC123', page: 1, limit: 50 }).success, true);
   assert.equal(hospitalEmergencyListQuerySchema.safeParse({ page: 0 }).success, false);
   assert.equal(hospitalEmergencyListQuerySchema.safeParse({ limit: 101 }).success, false);
+});
+
+test('hospital emergency details use the SOS account details instead of made-up patient data', () => {
+  assert.deepEqual(
+    resolveHospitalEmergencyPatientDetails({}, { name: 'Jordan Lee', phone: '+15551234567' }),
+    { patientName: 'Jordan Lee', patientPhone: '+15551234567' },
+  );
+  assert.deepEqual(
+    resolveHospitalEmergencyPatientDetails({ patientName: 'Patient Name', patientPhone: '5550100' }, { name: 'Account Name', phone: '5550200' }),
+    { patientName: 'Patient Name', patientPhone: '5550100' },
+  );
+  assert.deepEqual(
+    resolveHospitalEmergencyPatientDetails({ patientName: ' ', patientPhone: '' }, null),
+    { patientName: undefined, patientPhone: undefined },
+  );
 });

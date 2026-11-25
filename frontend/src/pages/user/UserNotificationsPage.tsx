@@ -27,20 +27,20 @@ export const UserNotificationsPage = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono mb-2">
             <Radio className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
-            <span>Care Telemetry Pings</span>
+            <span>Care updates</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-light text-zinc-100 tracking-tight">
-            Care & Appointment Notifications
+            Care and visit updates
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Real-time status updates from hospitals, clinics, and emergency dispatches.
+            Live updates from hospitals, clinics, and emergency requests.
           </p>
         </div>
 
         {notifications.data?.unreadCount ? (
           <span className="text-xs font-mono font-bold text-rose-300 bg-rose-500/10 px-3.5 py-1.5 rounded-full border border-rose-500/20 flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-rose-400 animate-ping" />
-            {notifications.data.unreadCount} Unread
+            {notifications.data.unreadCount} new
           </span>
         ) : null}
       </div>
@@ -49,7 +49,7 @@ export const UserNotificationsPage = () => {
       {notifications.isLoading ? (
         <div className="py-16 text-center text-sm font-mono text-zinc-500 space-y-3">
           <div className="w-7 h-7 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p>Loading notification telemetry…</p>
+          <p>Loading updates…</p>
         </div>
       ) : items.length === 0 ? (
         /* Empty State */
@@ -58,9 +58,9 @@ export const UserNotificationsPage = () => {
             <Bell className="h-7 w-7" />
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-lg font-light text-zinc-100 tracking-tight">No Notifications</h2>
+            <h2 className="text-lg font-light text-zinc-100 tracking-tight">No updates yet</h2>
             <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-              You are all caught up! Updates regarding emergency triage, paramedic transit, and clinic bookings will appear here.
+              You are all caught up. Updates about emergency requests, ambulance trips, and clinic visits will show here.
             </p>
           </div>
         </div>
@@ -97,7 +97,7 @@ export const UserNotificationsPage = () => {
                     </span>
                     <span className="text-zinc-600">•</span>
                     <span className="font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                      {notif.type.replace(/_/g, ' ')}
+                      {notif.type.toLowerCase().replace(/_/g, ' ')}
                     </span>
                   </div>
                 </div>
@@ -111,7 +111,7 @@ export const UserNotificationsPage = () => {
                   className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-mono text-zinc-300 hover:text-white transition cursor-pointer disabled:opacity-50"
                 >
                   <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Mark read</span>
+                  <span>Mark as read</span>
                 </button>
               )}
             </div>

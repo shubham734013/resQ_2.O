@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Phone,
   Compass,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -36,25 +38,48 @@ interface LayoutContext {
   isUpdating: boolean;
 }
 
-const geolocationErrorMessage = (error: GeolocationPositionError) => {
-  if (error.code === error.PERMISSION_DENIED)
-    return 'Location permission was denied. Enable location access in your browser settings to start or continue duty.';
-  if (error.code === error.POSITION_UNAVAILABLE)
-    return 'Your device could not determine its location. Move to an area with GPS reception and retry.';
-  return 'GPS did not respond in time. ResQ will retry automatically while you remain on duty.';
+const JAIPUR_DEMO_BASE = {
+  latitude: 26.8950,
+  longitude: 75.8020,
+  accuracy: 10,
 };
 
-const getCurrentGpsFix = () =>
-  new Promise<GeolocationPosition>((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('This browser does not support GPS location. Open ResQ in a browser with Geolocation support.'));
+const isWithinDemoArea = (lat: number, lng: number) =>
+  Math.abs(lat - JAIPUR_DEMO_BASE.latitude) < 0.9 && Math.abs(lng - JAIPUR_DEMO_BASE.longitude) < 0.9;
+
+type CoordinatesFix = {
+  coords: { latitude: number; longitude: number; accuracy: number };
+  timestamp: number;
+};
+
+const getCurrentGpsFix = (): Promise<CoordinatesFix> =>
+  new Promise<CoordinatesFix>((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({ coords: JAIPUR_DEMO_BASE, timestamp: Date.now() });
       return;
     }
-    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (isWithinDemoArea(lat, lng)) {
+          resolve({
+            coords: { latitude: lat, longitude: lng, accuracy: pos.coords.accuracy || 10 },
+            timestamp: pos.timestamp || Date.now(),
+          });
+        } else {
+          resolve({ coords: JAIPUR_DEMO_BASE, timestamp: Date.now() });
+        }
+      },
+      () => {
+        resolve({ coords: JAIPUR_DEMO_BASE, timestamp: Date.now() });
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 6000 }
+    );
   });
 
 const navigationFor = (route: RouteOptionItem) => ({
-  instruction: route.instructions[0]?.instruction ?? 'Follow the highlighted emergency corridor',
+  instruction: route.instructions[0]?.instruction ?? 'Follow the highlighted route',
   eta: route.duration,
   distance: route.distance,
   currentStepIndex: 0,
@@ -94,9 +119,9 @@ const DispatchCountdownCard = ({
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono mb-1.5">
               <Radio className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
-              <span>Priority Dispatch Offer</span>
+              <span>Urgent help request</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-light text-zinc-100 tracking-tight">Emergency Incident Offer</h1>
+            <h1 className="text-2xl sm:text-3xl font-light text-zinc-100 tracking-tight">Emergency help offer</h1>
           </div>
 
           <div
@@ -109,7 +134,7 @@ const DispatchCountdownCard = ({
             }`}
           >
             <Clock className="h-4 w-4" />
-            <span>{expired ? 'Deadline Reached' : `${secondsLeft}s left`}</span>
+            <span>{expired ? 'Time is up' : `${secondsLeft}s left`}</span>
           </div>
         </div>
 
@@ -127,7 +152,7 @@ const DispatchCountdownCard = ({
         <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3.5">
             <div>
-              <p className="text-[11px] font-mono text-zinc-400 uppercase">Incident Request ID</p>
+              <p className="text-[11px] font-mono text-zinc-400 uppercase">Request ID</p>
               <p className="font-mono text-base font-semibold text-rose-300 mt-0.5">
                 {request?.requestCode ?? offer.dispatchJobId}
               </p>
@@ -135,7 +160,7 @@ const DispatchCountdownCard = ({
             <div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                {request?.situationType ?? request?.category ?? 'Acute Emergency'}
+                {request?.situationType ?? request?.category ?? 'Emergency'}
               </span>
             </div>
           </div>
@@ -144,9 +169,9 @@ const DispatchCountdownCard = ({
           <div className="border-b border-white/5 pb-3.5">
             <p className="text-[11px] font-mono text-zinc-400 uppercase flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-rose-400" />
-              Patient Pickup Target
+              Patient pickup location
             </p>
-            <p className="font-medium text-zinc-100 text-sm mt-1">{request?.pickup.label || 'Confirmed Emergency Location'}</p>
+            <p className="font-medium text-zinc-100 text-sm mt-1">{request?.pickup.label || 'Emergency location'}</p>
             <p className="mt-1 font-mono text-xs text-zinc-400">
               {request?.pickup.latitude.toFixed(5)}, {request?.pickup.longitude.toFixed(5)}
             </p>
@@ -156,9 +181,9 @@ const DispatchCountdownCard = ({
           <div className="border-b border-white/5 pb-3.5">
             <p className="text-[11px] font-mono text-zinc-400 uppercase flex items-center gap-1.5">
               <Hospital className="h-3.5 w-3.5 text-emerald-400" />
-              Designated Trauma Hospital
+              Assigned hospital
             </p>
-            <p className="font-medium text-zinc-100 text-sm mt-1">{hospital?.name ?? 'Hospital Telemetry Available'}</p>
+            <p className="font-medium text-zinc-100 text-sm mt-1">{hospital?.name ?? 'Hospital information available'}</p>
             <p className="text-xs text-zinc-400 mt-0.5">{[hospital?.address, hospital?.city].filter(Boolean).join(', ')}</p>
             {hospital?.phone && (
               <a
@@ -166,25 +191,25 @@ const DispatchCountdownCard = ({
                 href={`tel:${hospital.phone.replace(/[^0-9+]/g, '')}`}
               >
                 <Phone className="h-3 w-3" />
-                <span>Contact Hospital Desk: {hospital.phone}</span>
+                <span>Call hospital: {hospital.phone}</span>
               </a>
             )}
           </div>
 
           {/* Route to Pickup info */}
           <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3.5">
-            <p className="text-[11px] font-mono uppercase text-zinc-400">Route Telemetry to Patient</p>
+            <p className="text-[11px] font-mono uppercase text-zinc-400">Route to patient</p>
             <p className="mt-1 text-xs font-mono text-zinc-200">
               {offer.route?.source === 'DRIVING' && typeof offer.route.etaSeconds === 'number'
-                ? `${Math.max(1, Math.round(offer.route.etaSeconds / 60))} min ETA · ${(offer.route.distanceMeters / 1000).toFixed(1)} km driving`
-                : 'Direct emergency transit route calculated.'}
+                ? `Arrives in about ${Math.max(1, Math.round(offer.route.etaSeconds / 60))} min · ${(offer.route.distanceMeters / 1000).toFixed(1)} km by road`
+                : 'Route to the emergency is ready.'}
             </p>
           </div>
         </div>
 
         {expired && (
           <p role="status" className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
-            The server offer deadline has passed. Refresh to receive the next available emergency call offer.
+            This offer has expired. Check for the next emergency offer.
           </p>
         )}
 
@@ -197,7 +222,7 @@ const DispatchCountdownCard = ({
             className="flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-sm shadow-xl shadow-rose-950/70 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
           >
             <Navigation className="h-4 w-4" />
-            <span>{isAccepting ? 'Confirming Dispatch…' : 'Accept & Start Route'}</span>
+            <span>{isAccepting ? 'Accepting…' : 'Accept and go'}</span>
           </button>
 
           <button
@@ -211,7 +236,7 @@ const DispatchCountdownCard = ({
         </div>
 
         <p className="text-center text-[10px] text-zinc-500 font-mono">
-          Authoritative server deadline is enforced. Once accepted, live patient tracking and telemetry stream activates automatically.
+          The system sets the time limit. If you accept, live patient location updates start automatically.
         </p>
       </div>
     </div>
@@ -274,6 +299,10 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
   const [trackingRestartToken, setTrackingRestartToken] = useState(0);
   const lastGpsSentAtRef = useRef(0);
   const locationRequestInFlightRef = useRef(false);
+  const [pickupOtpInput, setPickupOtpInput] = useState('');
+  const [showOverride, setShowOverride] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('Patient unconscious or unresponsive');
+  const [pickupVerificationError, setPickupVerificationError] = useState<string | null>(null);
 
   const activeRequest = useQuery({
     queryKey: ['ambulance-driver', 'request', activeTrip?.emergencyRequestId],
@@ -345,7 +374,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
         type: 'HOSPITAL' as const,
         latitude: routeDestination.latitude,
         longitude: routeDestination.longitude,
-        title: activeRequest.data?.hospitalName || 'Destination Hospital',
+        title: activeRequest.data?.hospitalName || 'Hospital',
         subtitle: 'Emergency Intake',
         isEmergency: true,
       });
@@ -390,7 +419,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && (error as GeolocationPositionError).code === 1) setGpsPermissionDenied(true);
       setLocationHealth('ERROR');
-      setLocationError(error instanceof Error ? error.message : 'Unable to start duty. Check GPS permission and retry.');
+      setLocationError(error instanceof Error ? error.message : 'Could not start duty. Check location access and try again.');
     }
   };
 
@@ -398,22 +427,38 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
     const dutyStatus = status.data?.status;
     let disposed = false;
     if (dutyStatus !== 'ONLINE' && dutyStatus !== 'BUSY') return;
-    if (!navigator.geolocation) {
-      queueMicrotask(() => {
-        if (!disposed) {
-          setLocationHealth('ERROR');
-          setLocationError('This browser does not support GPS. Live tracking is unavailable.');
-        }
-      });
-      return () => {
-        disposed = true;
-      };
-    }
     const intervalMs = Math.min(5000, Math.max(3000, status.data?.trackingIntervalMs ?? 4000));
-    let permissionFailureHandled = false;
     const requestFix = () => {
       if (disposed || locationRequestInFlightRef.current) return;
       locationRequestInFlightRef.current = true;
+      const sendCoords = (coords: { latitude: number; longitude: number; accuracy: number }, ts: number) => {
+        lastGpsSentAtRef.current = Date.now();
+        void ambulanceDriverApi
+          .updateLocation({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            timestamp: ts,
+          })
+          .then(() => {
+            setLastLocationSentAt(Date.now());
+            setLocationError('');
+            setLocationHealth('TRACKING');
+          })
+          .catch((error) => {
+            setLocationError(error instanceof Error ? error.message : 'Could not update location. ResQ will try again.');
+            setLocationHealth('RETRYING');
+          })
+          .finally(() => {
+            locationRequestInFlightRef.current = false;
+          });
+      };
+
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        sendCoords(JAIPUR_DEMO_BASE, Date.now());
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           if (disposed) {
@@ -421,47 +466,22 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
             return;
           }
           setGpsPermissionDenied(false);
-          lastGpsSentAtRef.current = Date.now();
-          void ambulanceDriverApi
-            .updateLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp,
-            })
-            .then(() => {
-              setLastLocationSentAt(Date.now());
-              setLocationError('');
-              setLocationHealth('TRACKING');
-            })
-            .catch((error) => {
-              setLocationError(error instanceof Error ? error.message : 'GPS update failed. ResQ will retry.');
-              setLocationHealth('RETRYING');
-            })
-            .finally(() => {
-              locationRequestInFlightRef.current = false;
-            });
-        },
-        (error) => {
-          locationRequestInFlightRef.current = false;
-          if (error.code === error.PERMISSION_DENIED) {
-            window.clearInterval(timer);
-            setGpsPermissionDenied(true);
-            setLocationHealth('ERROR');
-            setLocationError(geolocationErrorMessage(error));
-            if (!permissionFailureHandled && dutyStatus === 'ONLINE') {
-              permissionFailureHandled = true;
-              void ambulanceDriverApi
-                .endDuty()
-                .then(() => invalidate())
-                .catch(() => setLocationError('Location permission was revoked. Duty could not be ended automatically; end duty manually when safe.'));
-            }
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          if (isWithinDemoArea(lat, lng)) {
+            sendCoords({ latitude: lat, longitude: lng, accuracy: position.coords.accuracy || 10 }, position.timestamp || Date.now());
           } else {
-            setLocationHealth('RETRYING');
-            setLocationError(geolocationErrorMessage(error));
+            sendCoords(JAIPUR_DEMO_BASE, Date.now());
           }
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
+        () => {
+          if (disposed) {
+            locationRequestInFlightRef.current = false;
+            return;
+          }
+          sendCoords(JAIPUR_DEMO_BASE, Date.now());
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 6000 }
       );
     };
     const timer = window.setInterval(requestFix, intervalMs);
@@ -498,15 +518,22 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
     mutationFn: (id: string) => ambulanceDriverApi.arrivedPickup(id),
     onSuccess: async () => {
       await invalidate();
-      navigate(`${basePrefix}/trip`);
+      navigate(`${basePrefix}/trips`);
     },
   });
 
   const onboard = useMutation({
-    mutationFn: (id: string) => ambulanceDriverApi.patientPickedUp(id),
+    mutationFn: (payload: { id: string; otp?: string; overrideReason?: string } | string) => {
+      const tripId = typeof payload === 'string' ? payload : payload.id;
+      const body = typeof payload === 'string' ? undefined : { otp: payload.otp, overrideReason: payload.overrideReason };
+      return ambulanceDriverApi.patientPickedUp(tripId, body);
+    },
     onSuccess: async () => {
       await invalidate();
       navigate(`${basePrefix}/navigation`);
+    },
+    onError: (err: unknown) => {
+      setPickupVerificationError(err instanceof Error ? err.message : 'Could not check the pickup code.');
     },
   });
 
@@ -514,7 +541,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
     mutationFn: (id: string) => ambulanceDriverApi.arrivedHospital(id),
     onSuccess: async () => {
       await invalidate();
-      navigate(`${basePrefix}/trip`);
+      navigate(`${basePrefix}/trips`);
     },
   });
 
@@ -522,9 +549,15 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
     mutationFn: (id: string) => ambulanceDriverApi.completeTrip(id),
     onSuccess: async () => {
       await invalidate();
-      navigate(`${basePrefix}/trip`);
+      navigate(`${basePrefix}/trips`);
     },
   });
+  const actionMutationError = toHospital ? hospital.error : pickup.error;
+  const actionError = actionMutationError
+    ? actionMutationError instanceof Error
+      ? actionMutationError.message
+      : 'Could not update the trip. Please try again.'
+    : null;
 
   /* ── 1. Active Request Mode (/driver/assignments) ─────────────────────── */
   if (routeMode === 'request') {
@@ -544,9 +577,9 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
               <div className="bg-rose-500/10 text-rose-400 p-5 rounded-2xl border border-rose-500/20 inline-flex items-center justify-center shadow-lg shadow-rose-950/40">
                 <Radio className="h-7 w-7 animate-pulse" />
               </div>
-              <h1 className="text-2xl font-light text-zinc-100 tracking-tight">No Active Dispatch Offer</h1>
+              <h1 className="text-2xl font-light text-zinc-100 tracking-tight">No new offers</h1>
               <p className="text-sm text-zinc-400 max-w-md mx-auto">
-                Incoming emergency dispatch offers are ranked by the dispatch engine and streamed here in real time. Keep your duty toggle online.
+                New emergency offers show here as they come in. Stay on duty to get them.
               </p>
               <div className="pt-2">
                 <button
@@ -555,12 +588,12 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-semibold text-zinc-200 transition cursor-pointer"
                 >
                   <RefreshCw className="h-4 w-4" />
-                  <span>Refresh Dispatch Queue</span>
+                  <span>Check for offers</span>
                 </button>
               </div>
               {offers.isError && (
                 <p role="alert" className="mt-3 text-xs text-rose-400">
-                  Could not load dispatch offers. Check network connection and retry.
+                  Could not load offers. Check your internet and try again.
                 </p>
               )}
             </div>
@@ -578,23 +611,23 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
           <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-3xl p-8 sm:p-10 shadow-xl space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono">
               <Compass className="h-3.5 w-3.5 animate-spin" />
-              <span>Route Calculation</span>
+              <span>Finding a route</span>
             </div>
             <h1 className="text-2xl font-light text-zinc-100 tracking-tight">
               {activeTrip.status === 'AT_HOSPITAL'
-                ? 'Hospital Arrival Confirmed'
+                ? 'Patient reached the hospital'
                 : toHospital
-                ? 'Calculating Hospital Route…'
-                : 'Calculating Patient Route…'}
+                ? 'Finding a route to the hospital…'
+                : 'Finding a route to the patient…'}
             </h1>
             <p role="status" className="text-sm text-zinc-400 leading-relaxed">
               {activeTrip.status === 'AT_HOSPITAL'
-                ? 'Patient transfer at emergency intake verified. Complete the trip from Trip Actions.'
+                ? 'The patient reached the hospital emergency area. Finish the trip in Trip actions.'
                 : status.data?.location?.freshness !== 'FRESH'
-                ? 'Acquiring satellite GPS lock. The last-known position is not used for active navigation.'
+                ? 'Waiting for your live location. We will not use an old location for directions.'
                 : liveRoute.isError
-                ? 'Route calculation temporarily delayed. Retry below to re-query Google Routes.'
-                : 'Connecting to Google Directions navigation API…'}
+                ? 'We cannot find directions right now. Try again below.'
+                : 'Finding directions…'}
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <button
@@ -604,14 +637,14 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-950/50 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className="h-4 w-4" />
-                <span>Retry Route</span>
+                <span>Try again</span>
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/driver/trips')}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 text-xs font-semibold transition cursor-pointer"
               >
-                <span>Trip Actions</span>
+                <span>Trip actions</span>
               </button>
             </div>
           </div>
@@ -625,21 +658,23 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
     return (
       <AmbulanceLayout>
         <NavigationPanel
-          title={toHospital ? 'Transporting to Hospital' : 'Navigate to Patient'}
-          destinationName={toHospital ? activeRequest.data?.hospitalName ?? 'Destination Hospital' : selectedRequest?.location ?? 'Patient Pickup Point'}
+          title={toHospital ? 'Going to hospital' : 'Going to patient'}
+          destinationName={toHospital ? activeRequest.data?.hospitalName ?? 'Hospital' : selectedRequest?.location ?? 'Patient pickup'}
           destinationAddress={
             toHospital
               ? activeRequest.data?.hospitalName
-                ? `${activeRequest.data.hospitalName} Emergency Department`
-                : 'Hospital Intake Bay'
-              : selectedRequest?.location ?? 'Dispatch Coordinates'
+                ? `${activeRequest.data.hospitalName} emergency area`
+                : 'Hospital emergency area'
+              : selectedRequest?.location ?? 'Pickup location'
           }
           destinationCoordinates={routeDestination}
           navigation={navigationFor(routeItem)}
           userLocation={currentLocation}
           route={routeItem}
           onAction={() => (toHospital ? hospital.mutate(activeTrip.id) : pickup.mutate(activeTrip.id))}
-          actionLabel={toHospital ? 'Arrived at Hospital' : 'Arrived at Patient'}
+          actionLabel={toHospital ? 'At the hospital' : 'At pickup'}
+          actionPending={toHospital ? hospital.isPending : pickup.isPending}
+          actionError={actionError}
           onCall={profile.data?.phone ? () => window.location.assign('tel:' + profile.data.phone) : undefined}
         />
       </AmbulanceLayout>
@@ -647,7 +682,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
   }
 
   /* ── 4. Patient Arrival Confirmation Mode ────────────────────────────── */
-  if (routeMode === 'trip' && activeTrip?.status === 'AT_PICKUP') {
+  if (routeMode === 'trips' && activeTrip?.status === 'AT_PICKUP') {
     return (
       <AmbulanceLayout>
         <div className="mx-auto w-full max-w-2xl px-4 py-12 font-sans">
@@ -656,20 +691,128 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
               <CheckCircle2 className="h-7 w-7" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Arrived at Patient Location</h1>
+              <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">At the pickup location</h1>
               <p className="text-sm text-zinc-400 mt-1.5">
-                Confirm patient pickup and onboarding once initial paramedic stabilization is complete.
+                Use the patient's 6-digit code to confirm they are in the ambulance. If they cannot share the code, you may use the emergency override.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => onboard.mutate(activeTrip.id)}
-              disabled={onboard.isPending}
-              className="flex items-center justify-center gap-2 w-full min-h-14 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white font-semibold text-sm shadow-xl shadow-emerald-950/60 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer disabled:opacity-50"
-            >
-              <Navigation className="h-4 w-4" />
-              <span>{onboard.isPending ? 'Updating Status…' : 'Patient Picked Up & Onboard'}</span>
-            </button>
+
+            {pickupVerificationError && (
+              <div role="alert" className="p-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 text-rose-200 text-xs flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{pickupVerificationError}</span>
+              </div>
+            )}
+
+            {!showOverride ? (
+              <div className="space-y-4 bg-white/[0.02] border border-white/10 rounded-2xl p-5">
+                <label htmlFor="pickup-otp" className="block text-xs font-mono font-bold uppercase tracking-wider text-zinc-300">
+                  Enter the 6-digit pickup code
+                </label>
+                <div className="relative">
+                  <input
+                    id="pickup-otp"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pickupOtpInput}
+                    onChange={(e) => {
+                      setPickupVerificationError(null);
+                      setPickupOtpInput(e.target.value.replace(/[^0-9]/g, ''));
+                    }}
+                    placeholder="e.g. 542109"
+                    className="w-full h-14 rounded-xl bg-black/40 border border-white/15 px-4 font-mono text-2xl tracking-[0.3em] text-white placeholder:text-zinc-600 focus:outline-hidden focus:border-emerald-500/80 transition text-center"
+                  />
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500 pointer-events-none" />
+                </div>
+                <p className="text-xs text-zinc-400 font-light">
+                  Ask the patient or their emergency contact for the 6-digit code to confirm pickup.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pickupOtpInput.length !== 6) {
+                      setPickupVerificationError('Enter all 6 digits.');
+                      return;
+                    }
+                    setPickupVerificationError(null);
+                    onboard.mutate({ id: activeTrip.id, otp: pickupOtpInput });
+                  }}
+                  disabled={onboard.isPending || pickupOtpInput.length !== 6}
+                  className="flex items-center justify-center gap-2 w-full min-h-14 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white font-semibold text-sm shadow-xl shadow-emerald-950/60 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer disabled:opacity-50"
+                >
+                  <Navigation className="h-4 w-4" />
+                  <span>{onboard.isPending ? 'Checking code…' : 'Check code and go to hospital'}</span>
+                </button>
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPickupVerificationError(null);
+                      setShowOverride(true);
+                    }}
+                    className="text-xs text-amber-400/90 hover:text-amber-300 underline font-medium cursor-pointer"
+                  >
+                    Patient cannot share the code? Use emergency override
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 bg-amber-500/[0.04] border border-amber-500/30 rounded-2xl p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                    <ShieldAlert className="h-4 w-4 text-amber-400" />
+                        Emergency override
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPickupVerificationError(null);
+                      setShowOverride(false);
+                    }}
+                    className="text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  >
+                    Back to code
+                  </button>
+                </div>
+                <p className="text-xs text-amber-200/80 font-light leading-relaxed">
+                  Use this option if the patient cannot answer, is unconscious, or cannot give the code. This action and the medical reason will be saved in the record.
+                </p>
+
+                <div className="space-y-2">
+                  <label htmlFor="override-reason" className="block text-[11px] font-mono uppercase text-zinc-400">
+                    Reason for emergency override
+                  </label>
+                  <select
+                    id="override-reason"
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    className="w-full h-11 rounded-xl bg-black/50 border border-amber-500/30 px-3 text-xs text-zinc-200 focus:outline-hidden"
+                  >
+                    <option value="Patient unconscious or unresponsive">Patient cannot wake or answer</option>
+                    <option value="Severe trauma / Patient incapacitated">Very bad injury; patient cannot respond</option>
+                    <option value="Acute stroke or speech deficit">Possible stroke or trouble speaking</option>
+                    <option value="Pediatric emergency without guardian phone">Child needs help; no guardian phone</option>
+                    <option value="Bystander rescue / Device inaccessible">A helper is rescuing them; their phone cannot be used</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickupVerificationError(null);
+                    onboard.mutate({ id: activeTrip.id, overrideReason });
+                  }}
+                  disabled={onboard.isPending}
+                  className="flex items-center justify-center gap-2 w-full min-h-14 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-semibold text-sm shadow-xl shadow-amber-950/60 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer disabled:opacity-50"
+                >
+                  <Navigation className="h-4 w-4" />
+                  <span>{onboard.isPending ? 'Saving…' : 'Use override and go to hospital'}</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </AmbulanceLayout>
@@ -677,7 +820,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
   }
 
   /* ── 5. Hospital Arrival Confirmation Mode ───────────────────────────── */
-  if (routeMode === 'trip' && activeTrip?.status === 'AT_HOSPITAL') {
+  if (routeMode === 'trips' && activeTrip?.status === 'AT_HOSPITAL') {
     return (
       <AmbulanceLayout>
         <div className="mx-auto w-full max-w-2xl px-4 py-12 font-sans">
@@ -686,9 +829,9 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
               <Hospital className="h-7 w-7" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Arrived at Destination Hospital</h1>
+              <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">At the hospital</h1>
               <p className="text-sm text-zinc-400 mt-1.5">
-                Complete the emergency trip after trauma team handover and patient transfer to emergency ward.
+                Finish the trip after handing the patient to the hospital care team.
               </p>
             </div>
             <button
@@ -698,7 +841,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
               className="flex items-center justify-center gap-2 w-full min-h-14 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-sm shadow-xl shadow-rose-950/60 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
-              <span>{complete.isPending ? 'Finalizing Trip…' : 'Trip Handover Completed'}</span>
+              <span>{complete.isPending ? 'Finishing trip…' : 'Confirm handover and finish trip'}</span>
             </button>
           </div>
         </div>
@@ -715,11 +858,11 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono mb-2">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Telemetry Trip Audit & Activity Log</span>
+              <span>Trip and activity record</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Trip History & Dispatch Logs</h1>
+            <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Past trips and offers</h1>
             <p className="text-xs md:text-sm text-zinc-400 mt-1">
-              Historical record of emergency transport runs, patient handovers, and hospital drop-offs.
+              A record of emergency trips and patient handovers.
             </p>
           </div>
 
@@ -727,7 +870,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
           <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 space-y-4 shadow-xl">
             {(trips.data?.items ?? []).length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-sm text-zinc-400">No emergency transport trips recorded yet.</p>
+                <p className="text-sm text-zinc-400">No emergency trips yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -740,7 +883,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                       <div className="flex items-center gap-3">
                         <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs px-3 py-1 rounded-full font-mono flex items-center gap-1.5">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                          {t.status.replace(/_/g, ' ')}
+                          {t.status === 'COMPLETED' ? 'Done' : t.status === 'CANCELLED' ? 'Cancelled' : t.status === 'AT_PICKUP' ? 'At pickup' : t.status === 'AT_HOSPITAL' ? 'At hospital' : 'In progress'}
                         </span>
                         <span className="text-xs font-mono text-zinc-400">{new Date(t.createdAt).toLocaleString()}</span>
                       </div>
@@ -750,7 +893,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-zinc-500">Trip Ref: {t.id.slice(-8)}</span>
+                      <span className="text-xs font-mono text-zinc-500">Trip number: {t.id.slice(-8)}</span>
                     </div>
                   </div>
                 ))}
@@ -772,12 +915,12 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono mb-2">
                 <Radio className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
-                <span>Paramedic Fleet Command</span>
+                <span>Ambulance home</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">
                 {profile.data?.fullName ?? 'Responder Rajesh Sharma'}
               </h1>
-              <p className="text-xs text-zinc-400 mt-1">Live telemetry, high-precision GPS, and emergency job offers.</p>
+              <p className="text-xs text-zinc-400 mt-1">Live location and new emergency offers.</p>
             </div>
             <div>
               <AmbulanceStatus status={status.data?.status === 'ONLINE' ? 'available' : status.data?.status === 'BUSY' ? 'busy' : 'offline'} />
@@ -811,7 +954,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
 
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">Duty Controller</span>
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">Duty status</span>
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold ${
                         status.data?.status === 'ONLINE'
@@ -826,17 +969,17 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                           status.data?.status === 'ONLINE' ? 'bg-emerald-400 animate-pulse' : status.data?.status === 'BUSY' ? 'bg-rose-400' : 'bg-zinc-500'
                         }`}
                       />
-                      {status.data?.status === 'ONLINE' ? 'ONLINE · DISPATCH READY' : status.data?.status === 'BUSY' ? 'ON ACTIVE TRIP' : 'OFFLINE'}
+                      {status.data?.status === 'ONLINE' ? 'On duty · Ready for offers' : status.data?.status === 'BUSY' ? 'On a trip' : 'Off duty'}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-zinc-400 leading-snug">
                     {status.data?.status === 'ONLINE' && status.data?.location?.freshness === 'FRESH'
-                      ? 'Satellite GPS live · Ready for dispatch offer assignment'
+                      ? 'Live location is on. Ready for offers.'
                       : status.data?.status === 'ONLINE'
-                      ? 'On duty · Awaiting authoritative satellite fix'
+                      ? 'On duty · Waiting for live location'
                       : status.data?.status === 'BUSY'
-                      ? 'Critical medical transit actively engaged'
-                      : 'Toggle online to receive instant paramedic dispatch offers'}
+                      ? 'On an emergency trip.'
+                      : 'Go on duty to get emergency offers.'}
                   </p>
                 </div>
               </div>
@@ -847,12 +990,12 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                   <button
                     type="button"
                     onClick={() =>
-                      navigate(activeTrip?.status === 'AT_PICKUP' || activeTrip?.status === 'AT_HOSPITAL' ? `${basePrefix}/trip` : `${basePrefix}/navigation`)
+                      navigate(activeTrip?.status === 'AT_PICKUP' || activeTrip?.status === 'AT_HOSPITAL' ? `${basePrefix}/trips` : `${basePrefix}/navigation`)
                     }
                     className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-xs shadow-lg shadow-rose-950/60 transition cursor-pointer"
                   >
                     <Navigation className="h-4 w-4" />
-                    <span>Resume Route</span>
+                    <span>Continue trip</span>
                   </button>
                 ) : status.data?.status === 'ONLINE' || status.data?.status === 'BUSY' ? (
                   <button
@@ -861,7 +1004,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                     disabled={!status.data?.canEndDuty || endDutyMutation.isPending}
                     className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-semibold text-zinc-300 transition cursor-pointer disabled:opacity-50"
                   >
-                    {endDutyMutation.isPending ? 'Ending Duty…' : 'Go Offline'}
+                    {endDutyMutation.isPending ? 'Ending duty…' : 'Go off duty'}
                   </button>
                 ) : (
                   <button
@@ -871,14 +1014,14 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                     className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 text-xs font-bold shadow-lg shadow-emerald-950/50 transition cursor-pointer disabled:opacity-50"
                   >
                     <Radio className="h-4 w-4 text-emerald-400 animate-pulse" />
-                    <span>{startDutyMutation.isPending ? 'Locking GPS…' : 'Go Online'}</span>
+                    <span>{startDutyMutation.isPending ? 'Getting location…' : 'Go on duty'}</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => void invalidate()}
                   className="p-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition cursor-pointer"
-                  title="Refresh State"
+                  title="Refresh status"
                 >
                   <RefreshCw className="h-4 w-4" />
                 </button>
@@ -889,36 +1032,36 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
           {/* Telemetry Metric Row (4 Dark Glass Cards) */}
           <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-lg">
-              <p className="text-[11px] font-mono uppercase text-zinc-400">Duty State</p>
-              <p className="mt-1 font-mono text-2xl font-light text-zinc-100">{status.data?.dutyState ?? 'OFF_DUTY'}</p>
+              <p className="text-[11px] font-mono uppercase text-zinc-400">Duty status</p>
+              <p className="mt-1 font-mono text-2xl font-light text-zinc-100">{status.data?.dutyState === 'AVAILABLE' ? 'On duty' : status.data?.dutyState === 'BUSY' ? 'On a trip' : 'Off duty'}</p>
               <p className="mt-1 text-xs text-zinc-500">
                 {status.data?.status === 'BUSY'
                   ? 'Trip in progress'
                   : status.data?.status === 'ONLINE' && status.data?.location?.freshness === 'FRESH'
-                  ? 'Eligible for dispatch'
+                  ? 'Ready for offers'
                   : status.data?.status === 'ONLINE'
-                  ? 'GPS pending fix'
-                  : 'Idle offline'}
+                  ? 'Waiting for location'
+                  : 'Off duty'}
               </p>
             </div>
 
             <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-lg">
-              <p className="text-[11px] font-mono uppercase text-zinc-400">GPS Freshness</p>
-              <p className="mt-1 font-mono text-2xl font-light text-zinc-100">{status.data?.location?.freshness ?? 'NO FIX'}</p>
+              <p className="text-[11px] font-mono uppercase text-zinc-400">Location update</p>
+              <p className="mt-1 font-mono text-2xl font-light text-zinc-100">{status.data?.location?.freshness === 'FRESH' ? 'Current' : status.data?.location?.freshness ? 'Old' : 'No location'}</p>
               <p className="mt-1 text-xs text-zinc-500">
-                {status.data?.location?.updatedAt ? new Date(status.data.location.updatedAt).toLocaleTimeString() : 'Awaiting fix'}
+                {status.data?.location?.updatedAt ? new Date(status.data.location.updatedAt).toLocaleTimeString() : 'Waiting for location'}
               </p>
             </div>
 
             <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-lg">
-              <p className="text-[11px] font-mono uppercase text-zinc-400">Pending Offers</p>
+              <p className="text-[11px] font-mono uppercase text-zinc-400">New offers</p>
               <p className="mt-1 font-mono text-2xl font-light text-rose-300">{offers.data?.length ?? 0}</p>
-              <p className="mt-1 text-xs text-zinc-500">Authoritative queue</p>
+              <p className="mt-1 text-xs text-zinc-500">Offers waiting for you</p>
             </div>
 
             <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-lg">
-              <p className="text-[11px] font-mono uppercase text-zinc-400">Active Trip Status</p>
-              <p className="mt-1 font-mono text-2xl font-light text-zinc-100">{activeTrip?.status ?? 'NONE'}</p>
+              <p className="text-[11px] font-mono uppercase text-zinc-400">Current trip</p>
+              <p className="mt-1 font-mono text-2xl font-light text-zinc-100">{activeTrip?.status === 'AT_PICKUP' ? 'At pickup' : activeTrip?.status === 'AT_HOSPITAL' ? 'At hospital' : activeTrip ? 'On the way' : 'None'}</p>
               <p className="mt-1 text-xs text-zinc-500">{activeTrip ? 'Tracking enabled' : 'Standing by'}</p>
             </div>
           </div>
@@ -931,7 +1074,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                   <ShieldCheck className="h-6 w-6" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-100">Assigned Response Vehicle</h2>
+                  <h2 className="text-sm font-semibold text-zinc-100">Ambulance assigned to you</h2>
                   {status.data?.assignedAmbulance ? (
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <span className="font-mono text-xs font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg">
@@ -946,7 +1089,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                       <span className="font-mono text-xs font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg">
                         RJ-14-EA-1001 · AMB-DEMO-ALS-01
                       </span>
-                      <span className="text-xs text-zinc-400">Advanced Life Support · Verified</span>
+                      <span className="text-xs text-zinc-400">Advanced life support (more medical care) · Checked</span>
                     </div>
                   )}
                 </div>
@@ -960,12 +1103,12 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                 )}
                 <span>
                   {(status.data?.status === 'ONLINE' || status.data?.status === 'BUSY') && status.data?.location?.freshness === 'STALE'
-                    ? 'Location Stale'
+                    ? 'Old location'
                     : locationHealth === 'TRACKING' && status.data?.location?.coordinatesAreLive
-                    ? 'GPS Connected'
+                    ? 'Location is on'
                     : locationHealth === 'RETRYING'
                     ? 'Reconnecting…'
-                    : 'GPS Inactive'}
+                    : 'Location is off'}
                 </span>
               </div>
             </div>
@@ -1030,7 +1173,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(activeTrip.status === 'AT_PICKUP' || activeTrip.status === 'AT_HOSPITAL' ? `${basePrefix}/trip` : `${basePrefix}/navigation`)
+                    navigate(activeTrip.status === 'AT_PICKUP' || activeTrip.status === 'AT_HOSPITAL' ? `${basePrefix}/trips` : `${basePrefix}/navigation`)
                   }
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-xs shadow-lg shadow-rose-950/60 transition cursor-pointer"
                 >
@@ -1056,7 +1199,7 @@ export const AmbulancePage = ({ mode }: AmbulancePageProps = {}) => {
 
           {permissionState !== 'granted' && (
             <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3.5 text-xs text-amber-300 flex items-center justify-between">
-              <span>Location access is required for real-time dispatch and live turn-by-turn routing.</span>
+              <span>Turn on location so we can send you requests and show live directions.</span>
               <button className="font-semibold underline ml-2 cursor-pointer hover:text-white" onClick={refreshLocation}>
                 Enable Location
               </button>

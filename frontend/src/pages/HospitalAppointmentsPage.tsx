@@ -174,6 +174,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
   };
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const statusLabel = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 font-sans">
@@ -188,7 +189,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
-          <span>Incoming Care Requests</span>
+          <span>Care requests</span>
         </button>
 
         <button
@@ -200,7 +201,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
           }`}
         >
           <Calendar className="w-3.5 h-3.5" />
-          <span>Appointments Schedule</span>
+          <span>Appointments</span>
         </button>
 
         <button
@@ -212,7 +213,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
           }`}
         >
           <Settings className="w-3.5 h-3.5" />
-          <span>Availability Configuration</span>
+          <span>Hours and slots</span>
         </button>
       </div>
 
@@ -231,24 +232,24 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                       : 'bg-white/[0.04] border border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08]'
                   }`}
                 >
-                  {st}
+                  {st === 'ALL' ? 'All' : statusLabel(st)}
                 </button>
               ))}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-zinc-400 bg-white/[0.04] border border-white/10 px-3 py-1.5 rounded-xl">
-                Total: <span className="text-zinc-200 font-semibold">{incomingRequestsQuery.data?.pagination.total ?? 0}</span>
+                Requests: <span className="text-zinc-200 font-semibold">{incomingRequestsQuery.data?.pagination.total ?? 0}</span>
               </span>
             </div>
           </div>
 
           {incomingRequestsQuery.isLoading ? (
             <div className="p-12 text-center text-sm font-mono text-zinc-500 bg-white/[0.02] border border-white/10 rounded-2xl">
-              Loading incoming care requests...
+              Loading care requests...
             </div>
           ) : incomingRequestsQuery.data?.items.length === 0 ? (
             <div className="p-12 bg-white/[0.02] rounded-2xl border border-white/10 text-center text-sm font-mono text-zinc-500">
-              No care requests found for this filter.
+              No care requests found.
             </div>
           ) : (
             <div className="grid gap-3">
@@ -278,11 +279,11 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                                 : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
                             }`}
                           >
-                            {req.status}
+                            {statusLabel(req.status)}
                           </span>
                         </div>
                         <p className="text-xs text-zinc-400 mt-1">
-                          <span className="text-zinc-300 font-medium">{req.serviceDepartment}</span> &bull; {req.requestType.replace(/_/g, ' ')} &bull; Timing: <span className="font-mono text-zinc-300">{req.preferredTiming}</span>
+                          <span className="text-zinc-300 font-medium">{req.serviceDepartment}</span> &bull; {statusLabel(req.requestType)} &bull; Time: <span className="font-mono text-zinc-300">{req.preferredTiming}</span>
                         </p>
                       </div>
 
@@ -294,7 +295,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                     </div>
 
                     <div className="text-xs text-zinc-300 bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-1">
-                      <span className="font-semibold text-zinc-200">Visit Reason:</span> {req.visitReason}
+                      <span className="font-semibold text-zinc-200">Reason for visit:</span> {req.visitReason}
                     </div>
 
                     {user && (
@@ -312,7 +313,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                           </span>
                         )}
                         <span className="text-zinc-500 font-mono text-[11px]">
-                          Submitted {new Date(req.createdAt).toLocaleString()}
+                          Sent {new Date(req.createdAt).toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -327,7 +328,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                           }}
                           className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-300 bg-white/[0.04] border border-white/10 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30 transition-all"
                         >
-                          Decline Request
+                          Say no
                         </button>
                         <button
                           type="button"
@@ -337,7 +338,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                           }}
                           className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-500 shadow-lg shadow-rose-950/50 hover:from-rose-500 hover:to-rose-400 transition-all"
                         >
-                          Accept Request
+                          Accept
                         </button>
                       </div>
                     )}
@@ -364,13 +365,13 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                       : 'bg-white/[0.04] border border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08]'
                   }`}
                 >
-                  {st.replace('_', ' ')}
+                  {st === 'ALL' ? 'All' : statusLabel(st)}
                 </button>
               ))}
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-xs font-mono text-zinc-400">Filter by Date:</label>
+              <label className="text-xs font-mono text-zinc-400">Date:</label>
               <input
                 type="date"
                 value={dateFilter}
@@ -390,11 +391,11 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
 
           {appointmentsQuery.isLoading ? (
             <div className="p-12 text-center text-sm font-mono text-zinc-500 bg-white/[0.02] border border-white/10 rounded-2xl">
-              Loading appointments...
+              Loading appointments…
             </div>
           ) : appointmentsQuery.data?.items.length === 0 ? (
             <div className="p-12 bg-white/[0.02] rounded-2xl border border-white/10 text-center text-sm font-mono text-zinc-500">
-              No appointments scheduled for this filter.
+              No appointments found.
             </div>
           ) : (
             <div className="grid gap-3">
@@ -425,7 +426,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                                 : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                             }`}
                           >
-                            {appt.status}
+                            {statusLabel(appt.status)}
                           </span>
                         </div>
                         <p className="text-xs text-zinc-400 mt-1">
@@ -443,11 +444,11 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
 
                     <div className="text-xs text-zinc-300 bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-1">
                       <div>
-                        <span className="font-semibold text-zinc-200">Reason:</span> {appt.visitReason}
+                        <span className="font-semibold text-zinc-200">Reason for visit:</span> {appt.visitReason}
                       </div>
                       {appt.notes && (
                         <p className="mt-1 text-zinc-400">
-                          <span className="font-semibold text-zinc-300">Patient Notes:</span> {appt.notes}
+                          <span className="font-semibold text-zinc-300">Notes:</span> {appt.notes}
                         </p>
                       )}
                     </div>
@@ -475,14 +476,14 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                             }}
                             className="px-4 py-2 rounded-xl text-xs font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition-all"
                           >
-                            Propose New Time
+                            Suggest a new time
                           </button>
                           <button
                             type="button"
                             onClick={() => confirmApptMutation.mutate({ id: appt._id })}
                             className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-500 shadow-lg shadow-rose-950/50 hover:from-rose-500 hover:to-rose-400 transition-all"
                           >
-                            Confirm Appointment
+                            Confirm
                           </button>
                         </>
                       )}
@@ -493,7 +494,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                           onClick={() => completeApptMutation.mutate(appt._id)}
                           className="px-4 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all shadow-lg shadow-emerald-950/30"
                         >
-                          Mark Completed
+                          Mark as done
                         </button>
                       )}
                     </div>
@@ -505,17 +506,17 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
         </div>
       )}
 
-      {/* Subtab 3: Availability Configuration */}
+      {/* Subtab 3: Hours and slots */}
       {subTab === 'availability' && (
         <form onSubmit={handleSaveAvailability} className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 p-6 sm:p-8 space-y-6 max-w-4xl shadow-2xl">
           <div>
-            <h3 className="font-semibold text-zinc-100 text-base tracking-tight">Department Availability Configuration</h3>
-            <p className="text-xs text-zinc-400 mt-1">Configure weekly operating hours, appointment slot durations, and capacity per slot.</p>
+            <h3 className="font-semibold text-zinc-100 text-base tracking-tight">Set department hours</h3>
+            <p className="text-xs text-zinc-400 mt-1">Choose open days, hours, and how many patients can book each time slot.</p>
           </div>
 
           {availabilitySettingsQuery.data && availabilitySettingsQuery.data.length > 0 && (
             <div className="space-y-2.5 p-4 bg-white/[0.02] rounded-xl border border-white/5">
-              <span className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider">Currently Configured Departments:</span>
+              <span className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider">Departments with saved hours:</span>
               <div className="flex flex-wrap gap-2">
                 {availabilitySettingsQuery.data.map((cfg) => (
                   <button
@@ -530,7 +531,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                     }}
                     className="px-3 py-1.5 text-xs bg-white/[0.04] border border-white/10 rounded-xl hover:border-rose-500/40 hover:text-rose-300 font-mono text-zinc-300 transition-all"
                   >
-                    {cfg.department} ({cfg.slotDurationMinutes}m &bull; cap: {cfg.maxCapacityPerSlot})
+                    {cfg.department} ({cfg.slotDurationMinutes} min &bull; up to {cfg.maxCapacityPerSlot} patients)
                   </button>
                 ))}
               </div>
@@ -550,22 +551,22 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Slot Duration</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Visit length</label>
               <select
                 value={slotDuration}
                 onChange={(e) => setSlotDuration(Number(e.target.value))}
                 className="w-full h-10 px-3 text-xs bg-zinc-900 border border-white/10 text-zinc-100 rounded-xl outline-none focus:border-rose-500/50 [color-scheme:dark]"
               >
-                <option value={15} className="bg-zinc-900 text-zinc-100">15 Minutes</option>
-                <option value={20} className="bg-zinc-900 text-zinc-100">20 Minutes</option>
-                <option value={30} className="bg-zinc-900 text-zinc-100">30 Minutes</option>
-                <option value={45} className="bg-zinc-900 text-zinc-100">45 Minutes</option>
-                <option value={60} className="bg-zinc-900 text-zinc-100">60 Minutes</option>
+                <option value={15} className="bg-zinc-900 text-zinc-100">15 minutes</option>
+                <option value={20} className="bg-zinc-900 text-zinc-100">20 minutes</option>
+                <option value={30} className="bg-zinc-900 text-zinc-100">30 minutes</option>
+                <option value={45} className="bg-zinc-900 text-zinc-100">45 minutes</option>
+                <option value={60} className="bg-zinc-900 text-zinc-100">60 minutes</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Max Capacity / Slot</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Patients per time</label>
               <input
                 type="number"
                 min={1}
@@ -580,7 +581,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
 
           {/* Weekly Schedule Table */}
           <div className="space-y-2.5">
-            <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Weekly Schedule</label>
+            <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Weekly hours</label>
             <div className="space-y-2">
               {weeklySchedule.map((day, idx) => (
                 <div key={day.dayOfWeek} className="flex flex-wrap items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl text-xs text-zinc-300">
@@ -624,7 +625,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                         }}
                         className="h-8 px-2.5 bg-white/[0.04] border border-white/10 text-zinc-200 rounded-lg outline-none focus:border-rose-500/50 [color-scheme:dark]"
                       />
-                      <span className="text-zinc-500 text-[11px] ml-2 font-mono">Break:</span>
+                      <span className="text-zinc-500 text-[11px] ml-2 font-mono">Break time:</span>
                       <input
                         type="time"
                         value={day.breakStartTime || ''}
@@ -650,7 +651,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                       />
                     </div>
                   ) : (
-                    <span className="text-zinc-500 italic font-mono text-xs">Closed / Inactive</span>
+                    <span className="text-zinc-500 italic font-mono text-xs">Closed</span>
                   )}
                 </div>
               ))}
@@ -658,7 +659,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Blackout Dates (Comma-separated YYYY-MM-DD)</label>
+            <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Dates when closed (use YYYY-MM-DD, separate with commas)</label>
             <input
               type="text"
               placeholder="2026-12-25, 2027-01-01"
@@ -674,7 +675,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
               disabled={updateSettingsMutation.isPending}
               className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-500 shadow-lg shadow-rose-950/50 hover:from-rose-500 hover:to-rose-400 transition-all disabled:opacity-50"
             >
-              {updateSettingsMutation.isPending ? 'Saving...' : 'Save Availability Settings'}
+              {updateSettingsMutation.isPending ? 'Saving…' : 'Save hours'}
             </button>
           </div>
         </form>
@@ -685,28 +686,28 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <form onSubmit={handleRespondCareRequest} className="w-full max-w-md bg-zinc-950/95 border border-white/15 backdrop-blur-2xl rounded-2xl shadow-2xl p-6 space-y-4 text-zinc-100">
             <h3 className="font-semibold text-zinc-100 text-base tracking-tight">
-              {responseAction === 'ACCEPT' ? 'Accept Care Request' : 'Decline Care Request'}
+              {responseAction === 'ACCEPT' ? 'Accept care request' : 'Say no to care request'}
             </h3>
 
             {responseAction === 'ACCEPT' ? (
               <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Instructions / Notes for Patient (Optional)</label>
+                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Note for patient (optional)</label>
                 <textarea
                   value={responseNotes}
                   onChange={(e) => setResponseNotes(e.target.value)}
                   rows={3}
-                  placeholder="e.g. Please arrive 15 minutes before 10:00 AM with prior medical reports..."
+                  placeholder="For example: Please come 15 minutes early and bring your medical papers."
                   className="w-full p-3 text-xs bg-white/[0.04] border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 outline-none focus:border-rose-500/50"
                 />
               </div>
             ) : (
               <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Reason for Declining (Required)</label>
+                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Why can't you accept? (Required)</label>
                 <textarea
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={3}
-                  placeholder="e.g. The specialist is on leave; please contact next week..."
+                  placeholder="For example: The doctor is away. Please call next week."
                   className="w-full p-3 text-xs bg-white/[0.04] border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 outline-none focus:border-rose-500/50"
                   required
                 />
@@ -733,7 +734,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                     : 'bg-rose-600/90 hover:bg-rose-600 shadow-rose-950/60'
                 }`}
               >
-                {respondCareMutation.isPending ? 'Submitting...' : responseAction === 'ACCEPT' ? 'Confirm Acceptance' : 'Decline Request'}
+                {respondCareMutation.isPending ? 'Sending…' : responseAction === 'ACCEPT' ? 'Accept request' : 'Send reply'}
               </button>
             </div>
           </form>
@@ -745,8 +746,8 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <form onSubmit={handleProposeAlternative} className="w-full max-w-md bg-zinc-950/95 border border-white/15 backdrop-blur-2xl rounded-2xl shadow-2xl p-6 space-y-4 text-zinc-100">
             <div>
-              <h3 className="font-semibold text-zinc-100 text-base tracking-tight">Propose Alternative Time</h3>
-              <p className="text-xs text-zinc-400 mt-1">Offer the patient an alternative date or time window for this appointment.</p>
+              <h3 className="font-semibold text-zinc-100 text-base tracking-tight">Suggest a new time</h3>
+              <p className="text-xs text-zinc-400 mt-1">Offer a new date or time for this visit.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -776,7 +777,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
               <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Note for Patient</label>
               <input
                 type="text"
-                placeholder="Doctor in surgery at original time..."
+                placeholder="For example: The doctor is busy at that time."
                 value={alternativeNotes}
                 onChange={(e) => setAlternativeNotes(e.target.value)}
                 className="w-full h-9 px-3 text-xs bg-white/[0.04] border border-white/10 text-zinc-100 placeholder-zinc-500 rounded-xl outline-none focus:border-rose-500/50"
@@ -796,7 +797,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                 disabled={proposeAltMutation.isPending}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-500 shadow-lg shadow-rose-950/50 hover:from-rose-500 hover:to-rose-400 transition-all"
               >
-                {proposeAltMutation.isPending ? 'Sending...' : 'Send Proposal'}
+                {proposeAltMutation.isPending ? 'Sending…' : 'Send new time'}
               </button>
             </div>
           </form>
@@ -808,17 +809,17 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <form onSubmit={handleRejectAppointment} className="w-full max-w-md bg-zinc-950/95 border border-white/15 backdrop-blur-2xl rounded-2xl shadow-2xl p-6 space-y-4 text-zinc-100">
             <div>
-              <h3 className="font-semibold text-zinc-100 text-base tracking-tight">Decline Appointment</h3>
-              <p className="text-xs text-zinc-400 mt-1">Provide a reason to notify the patient of the cancellation.</p>
+              <h3 className="font-semibold text-zinc-100 text-base tracking-tight">Say no to appointment</h3>
+              <p className="text-xs text-zinc-400 mt-1">Tell the patient why this visit cannot happen.</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Reason for Declining (Required)</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">Why can't you accept? (Required)</label>
               <textarea
                 value={apptRejectReason}
                 onChange={(e) => setApptRejectReason(e.target.value)}
                 rows={3}
-                placeholder="e.g. Clinic undergoing deep sanitization / Doctor unavailable..."
+                placeholder="For example: The doctor is not available."
                 className="w-full p-3 text-xs bg-white/[0.04] border border-white/10 rounded-xl text-zinc-100 placeholder-zinc-500 outline-none focus:border-rose-500/50"
                 required
               />
@@ -837,7 +838,7 @@ export const HospitalAppointmentsPage = ({ initialSubTab = 'appointments' }: Hos
                 disabled={rejectApptMutation.isPending}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600/90 hover:bg-rose-600 shadow-lg shadow-rose-950/60 transition-all"
               >
-                {rejectApptMutation.isPending ? 'Declining...' : 'Decline Appointment'}
+                {rejectApptMutation.isPending ? 'Sending…' : 'Say no'}
               </button>
             </div>
           </form>

@@ -10,7 +10,6 @@ import {
   ArrowRight,
   User,
   Building2,
-  Ambulance,
   Navigation,
   AlertCircle,
   Compass,
@@ -31,35 +30,32 @@ interface RoleTab {
 const ROLE_TABS: RoleTab[] = [
   { value: 'USER', label: 'Citizen', icon: User, sub: 'Public access' },
   { value: 'HOSPITAL', label: 'Hospital', icon: Building2, sub: 'Facility portal' },
-  { value: 'AMBULANCE_PROVIDER', label: 'Provider', icon: Ambulance, sub: 'Fleet operator' },
   { value: 'AMBULANCE_DRIVER', label: 'Driver', icon: Navigation, sub: 'Field responder' },
 ];
 
 const errorMessage = (error: unknown): string => {
   if (error instanceof AuthApiError) {
     if (error.code === 'ACCOUNT_PENDING')
-      return 'Your account is pending operational approval. You will receive access once approved.';
+      return 'Your account is waiting for approval. You can sign in after it is approved.';
     if (error.code === 'ACCOUNT_SUSPENDED')
-      return 'Your account has been suspended. Please contact ResQ support.';
+      return 'Your account is paused. Please contact ResQ support.';
     if (error.code === 'ACCOUNT_REJECTED')
-      return 'Your account registration was not approved.';
-    if (error.code === 'INVALID_CREDENTIALS') return 'Invalid email or password.';
+      return 'Your sign-up was not approved.';
+    if (error.code === 'INVALID_CREDENTIALS') return 'Your email or password is not right.';
     if (error.code === 'ROLE_MISMATCH')
-      return 'This social identity is linked to another ResQ role.';
+      return 'This sign-in is linked to a different ResQ account type.';
     if (error.code === 'SOCIAL_AUTH_NOT_CONFIGURED')
-      return 'Social login is not configured on the server.';
+      return 'This sign-in option is not set up yet. Please contact ResQ support.';
     if (error.code === 'INVALID_SOCIAL_CREDENTIAL')
-      return 'Unable to verify social credentials. Please try again.';
+      return 'We could not check your sign-in. Please try again.';
     if (error.code === 'SOCIAL_PROVIDER_UNAVAILABLE')
-      return 'Authentication provider is temporarily unavailable. Please try again.';
+      return 'This sign-in option is not working right now. Please try again.';
     if (error.status === 403)
-      return 'You do not have permission to access this portal with this account.';
+      return 'This account cannot open this page.';
     if (error.status >= 500)
-      return 'ResQ is temporarily unavailable. Please try again in a few moments.';
+      return 'ResQ is not working right now. Please try again soon.';
   }
-  return error instanceof Error && error.message
-    ? error.message
-    : 'Unable to sign in. Please verify your details and try again.';
+  return 'We could not sign you in. Check your details and try again.';
 };
 
 export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
@@ -69,11 +65,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
 
   const requestedPath = (location.state as { from?: string } | null)?.from ?? '';
   const initialRoleHint: LoginRoleHint =
-    requestedPath.startsWith('/provider') ||
-    requestedPath.startsWith('/ambulance-provider') ||
-    requestedPath === '/ambulance/provider'
-      ? 'AMBULANCE_PROVIDER'
-      : requestedPath.startsWith('/driver') || requestedPath.startsWith('/ambulance')
+    requestedPath.startsWith('/driver') || requestedPath.startsWith('/ambulance')
       ? 'AMBULANCE_DRIVER'
       : requestedPath.startsWith('/hospital')
       ? 'HOSPITAL'
@@ -107,7 +99,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
       if (admin) {
         const user = (await authApi.adminLogin({ email, password })).data.user;
         if (user.role !== 'ADMIN') {
-          setError('This account is not an administrator account.');
+          setError('This is not an admin account.');
           return;
         }
         try {
@@ -117,7 +109,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
         }
         const authenticated = await refreshUser();
         if (!authenticated) {
-          setError('Your session could not be established. Please try again.');
+          setError('We could not sign you in. Please try again.');
           return;
         }
         finishLogin(authenticated);
@@ -126,7 +118,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
         if (user.role !== roleHint) {
           await logout();
           setError(
-            `Wrong account type. You selected ${roleHint.replaceAll('_', ' ').toLowerCase()}, but this account is ${user.role.replaceAll('_', ' ').toLowerCase()}. Select the correct account type and try again.`
+            `This account is for ${user.role.replaceAll('_', ' ').toLowerCase()}, not ${roleHint.replaceAll('_', ' ').toLowerCase()}. Choose the right account type and try again.`
           );
           return;
         }
@@ -139,7 +131,6 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
     }
   };
 
-  const selectedTab = ROLE_TABS.find((t) => t.value === roleHint) ?? ROLE_TABS[0];
 
   return (
     <main className="min-h-screen bg-[#070709] text-white font-sans selection:bg-rose-500/20 selection:text-rose-200 mesh-bg grid-texture flex items-center justify-center p-6 sm:p-8 relative overflow-hidden">
@@ -167,9 +158,6 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
               <p className="text-base font-bold tracking-tight text-white group-hover:text-rose-100 transition-colors">
                 resQ 2.O
               </p>
-              <p className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">
-                {admin ? 'Command Operations' : 'Emergency Response Platform'}
-              </p>
             </div>
           </Link>
 
@@ -188,20 +176,15 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
           {/* Heading */}
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-white mb-2">
-              {admin ? 'Admin Operations Sign In' : 'Sign in to resQ'}
+              {admin ? 'Admin sign in' : 'Sign in to resQ'}
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-400 font-light leading-relaxed">
-              {admin
-                ? 'Restricted sovereign clearance for emergency administrators.'
-                : 'Access zero-latency dispatch, clinical routing, and care telemetry.'}
-            </p>
           </div>
 
           {/* Role Segmented Pill Bar — Non-Admin Only */}
           {!admin && (
             <div className="mb-7">
               <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-3">
-                Account Type
+                Choose your account
               </label>
 
               {/* Segmented Tab Pill Bar with Framer Motion layoutId */}
@@ -237,13 +220,6 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
                 })}
               </div>
 
-              {/* Active Role Subtext Feedback */}
-              <div className="mt-3 px-1 flex items-center gap-2 text-xs font-mono text-zinc-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
-                <span>
-                  Signing in as <strong className="text-zinc-200 font-semibold">{selectedTab.label}</strong> — {selectedTab.sub}
-                </span>
-              </div>
             </div>
           )}
 
@@ -266,7 +242,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
             {/* Email Field */}
             <div>
               <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                Email Address
+                Email
               </label>
               <input
                 required
@@ -290,7 +266,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
                   to="/forgot-password"
                   className="text-[11px] font-mono text-zinc-400 hover:text-rose-300 transition-colors"
                 >
-                  Forgot password?
+                  Forgot your password?
                 </Link>
               </div>
 
@@ -330,7 +306,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
                   </>
                 ) : (
                   <>
-                    <span>Sign In to Portal</span>
+                    <span>Sign in</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -339,7 +315,7 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
           </form>
 
           {/* Social Auth Integration */}
-          {!admin && (roleHint === 'USER' || roleHint === 'AMBULANCE_PROVIDER') && (
+          {!admin && roleHint === 'USER' && (
             <SocialAuthButtons roleHint={roleHint} onSuccess={finishLogin} onError={setError} />
           )}
 
@@ -348,18 +324,18 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
             {!admin ? (
               <div className="space-y-3 text-center">
                 <p className="text-xs text-zinc-400 font-light">
-                  Need to find care without signing in?{' '}
+                  Need care but do not have an account?{' '}
                   <Link
                     to="/search"
                     className="font-semibold text-white hover:text-rose-300 transition-colors inline-flex items-center gap-1"
                   >
-                    <span>Browse Facility Directory</span>
+                    <span>Find a hospital</span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 </p>
 
                 <p className="text-xs text-zinc-500 font-light">
-                  New to the emergency network?{' '}
+                  New to ResQ?{' '}
                   <Link
                     to="/register"
                     className="font-semibold text-white hover:text-rose-300 transition-colors"
@@ -371,18 +347,13 @@ export const LoginPage = ({ admin = false }: { admin?: boolean }) => {
             ) : (
               <p className="text-center text-xs text-zinc-400 font-mono">
                 <Link to="/login" className="hover:text-white transition-colors">
-                  ← Back to standard user sign in
+                  ← Back to regular sign in
                 </Link>
               </p>
             )}
           </div>
 
         </div>
-
-        {/* Security Stamp */}
-        <p className="mt-8 text-center text-[11px] font-mono text-zinc-500">
-          resQ 2.O · Zero-Trust Encryption · ISO 27001 Certified
-        </p>
 
       </div>
     </main>

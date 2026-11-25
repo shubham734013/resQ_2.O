@@ -24,7 +24,7 @@ export const PublicLayout = () => {
   const navLinks = [
     { label: 'Home', path: ROUTES.PUBLIC.HOME },
     { label: 'About', path: ROUTES.PUBLIC.ABOUT },
-    { label: 'Support & Help', path: ROUTES.PUBLIC.HELP },
+    { label: 'Help', path: ROUTES.PUBLIC.HELP },
     { label: 'Contact', path: ROUTES.PUBLIC.CONTACT },
   ];
 
@@ -44,17 +44,17 @@ export const PublicLayout = () => {
                   resQ 2.O
                 </span>
                 <span className="hidden sm:inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  Crisis Fabric
+                  Emergency help
                 </span>
               </div>
               <span className="text-[11px] font-mono text-zinc-400 tracking-wider">
-                Healthcare Network
+                Health care network
               </span>
             </div>
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1.5" aria-label="Public Navigation">
+          <nav className="hidden md:flex items-center gap-1.5" aria-label="Main menu">
             {navLinks.map((link) => (
               <NavLink
                 key={link.path}
@@ -76,11 +76,11 @@ export const PublicLayout = () => {
           {/* Action CTAs */}
           <div className="hidden sm:flex items-center gap-3">
             <Link
-              to={ROUTES.USER.EMERGENCY}
+              to={user && user.role !== 'USER' ? getRoleHome(user.role) : ROUTES.USER.EMERGENCY}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-600/30 hover:from-rose-500 hover:to-rose-600 btn-shimmer transition-all"
             >
               <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />
-              Emergency SOS
+              {user && user.role !== 'USER' ? 'My work page' : 'Get emergency help'}
             </Link>
 
             {isAuthenticated && user ? (
@@ -88,7 +88,7 @@ export const PublicLayout = () => {
                 to={getRoleHome(user.role)}
                 className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-zinc-200 hover:text-white hover:bg-white/[0.08] transition"
               >
-                Portal ({user.role.replaceAll('_', ' ').toLowerCase()})
+                My account
               </Link>
             ) : (
               <>
@@ -105,7 +105,7 @@ export const PublicLayout = () => {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 px-4 py-2 text-xs font-semibold text-white transition"
                 >
                   <UserPlus className="h-3.5 w-3.5" />
-                  Register
+                  Sign up
                 </Link>
               </>
             )}
@@ -116,7 +116,7 @@ export const PublicLayout = () => {
             type="button"
             className="md:hidden p-2 rounded-xl text-zinc-300 hover:bg-white/[0.05]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle navigation"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -124,7 +124,7 @@ export const PublicLayout = () => {
 
         {/* Mobile Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-white/[0.08] bg-[#070709]/95 backdrop-blur-2xl px-6 py-4 space-y-2">
+          <div className="md:hidden max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain border-t border-white/[0.08] bg-[#070709]/95 backdrop-blur-2xl px-6 py-4 space-y-2">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -137,11 +137,11 @@ export const PublicLayout = () => {
             ))}
             <div className="pt-3 border-t border-white/[0.08] flex flex-col gap-2.5">
               <Link
-                to={ROUTES.USER.EMERGENCY}
+                to={user && user.role !== 'USER' ? getRoleHome(user.role) : ROUTES.USER.EMERGENCY}
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-600/30"
               >
-                <AlertTriangle className="h-4 w-4" /> Trigger Emergency SOS
+                <AlertTriangle className="h-4 w-4" /> {user && user.role !== 'USER' ? 'My work page' : 'Get emergency help'}
               </Link>
               {isAuthenticated && user ? (
                 <Link
@@ -149,7 +149,7 @@ export const PublicLayout = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-zinc-300"
                 >
-                  My Portal
+                  My account
                 </Link>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -165,7 +165,7 @@ export const PublicLayout = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center justify-center gap-1.5 rounded-xl bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white border border-white/10"
                   >
-                    <UserPlus className="h-3.5 w-3.5" /> Register
+                    <UserPlus className="h-3.5 w-3.5" /> Sign up
                   </Link>
                 </div>
               )}

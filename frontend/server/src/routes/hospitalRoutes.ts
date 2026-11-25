@@ -23,7 +23,7 @@ import {
   listEmergenciesController, getEmergencySummaryController, getEmergencyController, updateEmergencyStatusController,
   listPatientsController, getPatientController,
   listAmbulancesController, getAmbulanceController,
-  listCoordinationNotificationsController, acknowledgeCoordinationNotificationController, getCoordinationDetailController,
+  listCoordinationNotificationsController, acknowledgeCoordinationNotificationController, acceptCoordinationNotificationController, getCoordinationDetailController,
 } from '../controllers/hospitalController.js';
 import type { z } from 'zod';
 
@@ -65,6 +65,7 @@ hospitalRouter.get('/ambulances/:id', getAmbulanceController);
 
 hospitalRouter.get('/coordination/notifications', validateQuery(hospitalCoordinationNotificationListQuerySchema), listCoordinationNotificationsController);
 hospitalRouter.post('/coordination/notifications/:id/acknowledge', acknowledgeCoordinationNotificationController);
+hospitalRouter.post('/coordination/notifications/:id/accept', acceptCoordinationNotificationController);
 hospitalRouter.get('/coordination/emergencies/:id', getCoordinationDetailController);
 
 // Hospital Care Notifications

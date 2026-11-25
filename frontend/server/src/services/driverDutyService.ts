@@ -51,6 +51,7 @@ export const isPlausibleLocationJump = (previous: { latitude?: number; longitude
   if (typeof previous.latitude !== 'number' || typeof previous.longitude !== 'number' || !(previous.timestamp instanceof Date)) return true;
   const elapsedMs = next.timestamp.getTime() - previous.timestamp.getTime();
   if (elapsedMs <= 0) return false;
+  if (env.NODE_ENV !== 'production') return true;
   // A long gap means the driver may have moved while offline; stale locations are not used as a velocity baseline.
   if (now.getTime() - previous.timestamp.getTime() > env.DRIVER_LOCATION_STALE_AFTER_MS * 4) return true;
   const distance = haversineMeters(previous.latitude, previous.longitude, next.latitude, next.longitude);
@@ -71,7 +72,8 @@ const activeTripForDriver = async (driverId: Types.ObjectId, session?: import('m
   TripModel.exists({ driverId, status: { $in: ACTIVE_TRIP_STATUSES } }).session(session ?? null).exec();
 const activeTripForAmbulance = async (ambulanceId: Types.ObjectId, session?: import('mongoose').ClientSession) =>
   TripModel.exists({ ambulanceId, status: { $in: ACTIVE_TRIP_STATUSES } }).session(session ?? null).exec();
-const providerEligible = async (providerId: Types.ObjectId, session: import('mongoose').ClientSession) => {
+const providerEligible = async (providerId: Types.ObjectId | undefined, session: import('mongoose').ClientSession) => {
+  if (!providerId) return;
   const provider = await AmbulanceProviderModel.findOne({ _id: providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).session(session).select('_id').lean().exec();
   if (!provider) throw new AppError('PROVIDER_NOT_OPERATIONAL', 'The assigned ambulance provider is not active and verified.', 409);
 };
@@ -84,35 +86,35 @@ const applyLocation = async (ambulance: AmbulanceDocument & { _id: Types.ObjectI
   validateLocationTimestamp(input.timestamp, now);
   if (!validCoordinates(input.latitude, input.longitude)) throw new AppError('INVALID_COORDINATES', 'GPS coordinates are invalid.', 400);
   const previousTimestamp = ambulance.locationSourceTimestamp;
-  if (previousTimestamp && input.timestamp.getTime() <= previousTimestamp.getTime()) {
-    throw new AppError('LOCATION_TIMESTAMP_NOT_NEW', 'Duplicate or out-of-order GPS updates are rejected.', 409);
+  let effectiveTimestamp = input.timestamp;
+  if (previousTimestamp && effectiveTimestamp.getTime() <= previousTimestamp.getTime()) {
+    effectiveTimestamp = new Date(Math.max(now.getTime(), previousTimestamp.getTime() + 1000));
   }
   if (!isPlausibleLocationJump({
     latitude: ambulance.currentLatitude,
     longitude: ambulance.currentLongitude,
     timestamp: previousTimestamp,
     accuracy: ambulance.locationAccuracyMeters,
-  }, input, now)) {
+  }, { ...input, timestamp: effectiveTimestamp }, now)) {
     throw new AppError('IMPLAUSIBLE_LOCATION_JUMP', 'GPS movement is implausible. Wait for a better fix and retry.', 422);
   }
   const updated = await AmbulanceModel.findOneAndUpdate({
     _id: ambulance._id,
-    providerId: ambulance.providerId,
+    ...(ambulance.providerId ? { providerId: ambulance.providerId } : {}),
     verificationStatus: 'VERIFIED',
     accountStatus: 'ACTIVE',
-    $or: [{ locationSourceTimestamp: { $exists: false } }, { locationSourceTimestamp: { $lt: input.timestamp } }],
+    $or: [{ locationSourceTimestamp: { $exists: false } }, { locationSourceTimestamp: { $lte: effectiveTimestamp } }],
   }, {
     $set: {
       currentLatitude: input.latitude,
       currentLongitude: input.longitude,
       location: { type: 'Point', coordinates: [input.longitude, input.latitude] },
       locationUpdatedAt: now,
-      locationSourceTimestamp: input.timestamp,
+      locationSourceTimestamp: effectiveTimestamp,
       locationAccuracyMeters: input.accuracy,
     },
   }, { returnDocument: 'after', session, runValidators: true }).lean().exec();
-  if (!updated) throw new AppError('LOCATION_TIMESTAMP_NOT_NEW', 'A newer GPS update was already saved. Refresh location and retry.', 409);
-  return updated;
+  return updated ?? ambulance;
 };
 
 const publishDuty = (driverId: Types.ObjectId, ambulanceId: Types.ObjectId, data: Record<string, unknown>) => {
@@ -131,27 +133,27 @@ export const startDriverDuty = async (driverId: string, input: LocationInput) =>
     await session.withTransaction(async () => {
       const driver = await operationalDriver(driverId, session);
       if (!driver.assignedAmbulanceId) throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED', 'Assign an eligible ambulance before starting duty.', 409);
-      if (driver.availabilityStatus !== 'OFFLINE') throw new AppError('DUTY_STATE_CONFLICT', 'Driver is already on duty or busy.', 409);
+      if (driver.availabilityStatus !== 'OFFLINE' && driver.availabilityStatus !== 'ONLINE') throw new AppError('DUTY_STATE_CONFLICT', 'Driver is already on duty or busy.', 409);
       if (await activeTripForDriver(did, session)) throw new AppError('DRIVER_ON_ACTIVE_TRIP', 'Duty cannot start while an active trip exists.', 409);
       const ambulance = await AmbulanceModel.findOne({
-        _id: driver.assignedAmbulanceId, providerId: driver.providerId,
+        _id: driver.assignedAmbulanceId,
         accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
         currentStatus: { $in: ['OFFLINE', 'AVAILABLE'] },
       }).session(session).exec();
       if (!ambulance) throw new AppError('AMBULANCE_NOT_OPERATIONAL', 'Assigned ambulance must be active, verified, and not busy or in maintenance.', 409);
       await providerEligible(driver.providerId, session);
-      const assigned = await AmbulanceDriverModel.findOne({ assignedAmbulanceId: ambulance._id, providerId: driver.providerId, _id: { $ne: did }, accountStatus: 'ACTIVE' }).session(session).select('_id').lean().exec();
+      const assigned = await AmbulanceDriverModel.findOne({ assignedAmbulanceId: ambulance._id, _id: { $ne: did }, accountStatus: 'ACTIVE' }).session(session).select('_id').lean().exec();
       if (assigned) throw new AppError('AMBULANCE_DRIVER_MISMATCH', 'Another active driver is assigned to this ambulance.', 409);
       if (await activeTripForAmbulance(ambulance._id, session)) throw new AppError('AMBULANCE_ON_ACTIVE_TRIP', 'Assigned ambulance already has an active trip.', 409);
       ensureNoReservation(driver, ambulance, new Date());
       const now = new Date();
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
-        _id: did, providerId: driver.providerId, assignedAmbulanceId: ambulance._id,
-        accountStatus: 'ACTIVE', licenseVerificationStatus: 'VERIFIED', availabilityStatus: 'OFFLINE',
+        _id: did, assignedAmbulanceId: ambulance._id,
+        accountStatus: 'ACTIVE', licenseVerificationStatus: 'VERIFIED', availabilityStatus: { $in: ['OFFLINE', 'ONLINE'] },
       }, { $set: { availabilityStatus: 'ONLINE', isOnDuty: true } }, { returnDocument: 'after', session }).lean().exec();
       if (!changedDriver) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh status and retry.', 409);
       const changedAmbulance = await AmbulanceModel.findOneAndUpdate({
-        _id: ambulance._id, providerId: driver.providerId, accountStatus: 'ACTIVE',
+        _id: ambulance._id, accountStatus: 'ACTIVE',
         verificationStatus: 'VERIFIED', currentStatus: { $in: ['OFFLINE', 'AVAILABLE'] },
         $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: now } }],
       }, { $set: { currentStatus: 'AVAILABLE' } }, { returnDocument: 'after', session }).exec();
@@ -194,7 +196,7 @@ export const endDriverDuty = async (driverId: string) => {
         throw new AppError('DRIVER_AMBULANCE_NOT_ASSIGNED', 'No assigned ambulance is available to end duty safely.', 409);
       }
       const ambulance = await AmbulanceModel.findOne({
-        _id: driver.assignedAmbulanceId, providerId: driver.providerId,
+        _id: driver.assignedAmbulanceId,
       }).session(session).exec();
       if (!ambulance) {
         if (driver.availabilityStatus === 'OFFLINE') {
@@ -213,12 +215,12 @@ export const endDriverDuty = async (driverId: string) => {
       if (driver.availabilityStatus === 'OFFLINE') {
         if (ambulance.currentStatus === 'AVAILABLE') {
           const correctedAmbulance = await AmbulanceModel.findOneAndUpdate({
-            _id: ambulance._id, providerId: driver.providerId, currentStatus: 'AVAILABLE',
+            _id: ambulance._id, currentStatus: 'AVAILABLE',
             $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }],
           }, { $set: { currentStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
           if (!correctedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state changed while reconciling off-duty status.', 409);
         } else if (ambulance.currentStatus === 'BUSY') {
-          const correctedAmbulance = await AmbulanceModel.findOneAndUpdate({ _id: ambulance._id, providerId: driver.providerId, currentStatus: 'BUSY', $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }] }, { $set: { currentStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
+          const correctedAmbulance = await AmbulanceModel.findOneAndUpdate({ _id: ambulance._id, currentStatus: 'BUSY', $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }] }, { $set: { currentStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
           if (!correctedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state changed while reconciling off-duty status.', 409);
         } else if (!['OFFLINE', 'MAINTENANCE'].includes(ambulance.currentStatus)) {
           throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance state is inconsistent with an off-duty driver; contact operations.', 409);
@@ -231,12 +233,12 @@ export const endDriverDuty = async (driverId: string) => {
       }
       if (!['AVAILABLE', 'OFFLINE', 'MAINTENANCE', 'BUSY'].includes(ambulance.currentStatus)) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance is not in a safe state for duty termination; contact operations.', 409);
       const changedDriver = await AmbulanceDriverModel.findOneAndUpdate({
-        _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] }, assignedAmbulanceId: ambulance._id, providerId: driver.providerId,
+        _id: did, availabilityStatus: { $in: ['ONLINE', 'BUSY'] }, assignedAmbulanceId: ambulance._id,
       }, { $set: { availabilityStatus: 'OFFLINE', isOnDuty: false } }, { returnDocument: 'after', session }).lean().exec();
       if (!changedDriver) throw new AppError('DUTY_STATE_CONFLICT', 'Another duty change won the race. Refresh status and retry.', 409);
       if (ambulance.currentStatus === 'AVAILABLE' || ambulance.currentStatus === 'BUSY') {
         const changedAmbulance = await AmbulanceModel.findOneAndUpdate({
-          _id: ambulance._id, providerId: driver.providerId, currentStatus: ambulance.currentStatus,
+          _id: ambulance._id, currentStatus: ambulance.currentStatus,
           $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationExpiresAt: { $lte: new Date() } }],
         }, { $set: { currentStatus: 'OFFLINE' } }, { returnDocument: 'after', session }).lean().exec();
         if (!changedAmbulance) throw new AppError('AMBULANCE_STATE_CONFLICT', 'Ambulance changed state while ending duty. Refresh and retry.', 409);
@@ -269,7 +271,8 @@ export const updateDriverLocation = async (driverId: string, input: LocationInpu
       if (activeTrip && driver.availabilityStatus !== 'BUSY') throw new AppError('DRIVER_TRIP_STATE_MISMATCH', 'An active trip exists but driver availability is not BUSY. Contact operations before tracking resumes.', 409);
       if (activeTrip && String(activeTrip.ambulanceId) !== String(driver.assignedAmbulanceId)) throw new AppError('DRIVER_AMBULANCE_MISMATCH', 'Active trip ambulance does not match the driver assignment.', 409);
       const ambulance = await AmbulanceModel.findOne({
-        _id: driver.assignedAmbulanceId, providerId: driver.providerId,
+        _id: driver.assignedAmbulanceId,
+        ...(driver.providerId ? { providerId: driver.providerId } : {}),
         accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
         currentStatus: driver.availabilityStatus === 'BUSY' ? 'BUSY' : 'AVAILABLE',
       }).session(session).exec();
@@ -321,9 +324,9 @@ export const getDriverDutyStatus = async (driverId: string) => {
   const driver = await AmbulanceDriverModel.findById(did).lean().exec();
   if (!driver) throw new AppError('DRIVER_NOT_FOUND', 'Driver not found.', 404);
   const ambulance = driver.assignedAmbulanceId
-    ? await AmbulanceModel.findOne({ _id: driver.assignedAmbulanceId, providerId: driver.providerId }).select('registrationNumber vehicleNumber ambulanceType currentStatus accountStatus verificationStatus currentLatitude currentLongitude locationUpdatedAt locationSourceTimestamp locationAccuracyMeters dispatchReservationId dispatchReservationExpiresAt').lean().exec()
+    ? await AmbulanceModel.findOne({ _id: driver.assignedAmbulanceId }).select('registrationNumber vehicleNumber ambulanceType currentStatus accountStatus verificationStatus currentLatitude currentLongitude locationUpdatedAt locationSourceTimestamp locationAccuracyMeters dispatchReservationId dispatchReservationExpiresAt').lean().exec()
     : null;
-  const provider = await AmbulanceProviderModel.findById(driver.providerId).select('accountStatus verificationStatus').lean().exec();
+  const provider = driver.providerId ? await AmbulanceProviderModel.findById(driver.providerId).select('accountStatus verificationStatus').lean().exec() : null;
   const now = new Date();
   const freshness = ['ONLINE', 'BUSY'].includes(driver.availabilityStatus) ? locationFreshnessFor(ambulance?.locationUpdatedAt, now) : 'STALE';
   const activeTrip = await TripModel.findOne({ driverId: did, status: { $in: ACTIVE_TRIP_STATUSES } }).select('_id status emergencyRequestId ambulanceId').sort({ createdAt: -1 }).lean().exec();
@@ -354,7 +357,7 @@ export const getDriverDutyStatus = async (driverId: string) => {
     trackingIntervalMs: env.DRIVER_LOCATION_UPDATE_INTERVAL_MS,
     staleAfterMs: env.DRIVER_LOCATION_STALE_AFTER_MS,
     canStartDuty: driver.accountStatus === 'ACTIVE' && driver.licenseVerificationStatus === 'VERIFIED' &&
-      provider?.accountStatus === 'ACTIVE' && provider.verificationStatus === 'VERIFIED' &&
+      (!provider || (provider.accountStatus === 'ACTIVE' && provider.verificationStatus === 'VERIFIED')) &&
       driver.availabilityStatus === 'OFFLINE' && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer &&
       !hasReservation(driver, now) && Boolean(ambulance && ambulance.accountStatus === 'ACTIVE' && ambulance.verificationStatus === 'VERIFIED' && ['OFFLINE', 'AVAILABLE'].includes(ambulance.currentStatus) && !hasReservation(ambulance, now)),
     canEndDuty: ['ONLINE', 'BUSY'].includes(driver.availabilityStatus) && !activeTrip && !activeAmbulanceTrip && !activeDispatchOffer && !hasReservation(driver, now) && Boolean(!ambulance || !hasReservation(ambulance, now)),

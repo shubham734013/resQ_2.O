@@ -43,10 +43,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render(): ReactNode {
     if (this.state.hasError) {
-      const title = this.props.fallbackTitle ?? 'An unexpected error occurred';
+      const title = this.props.fallbackTitle ?? 'Something went wrong';
       const description =
         this.props.fallbackDescription ??
-        'A rendering error prevented this page from displaying properly. You can try recovering or return to the main dashboard.';
+        'This page did not load. Try again or go back to the home page.';
 
       return (
         <div
@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
             {this.state.error?.message && (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-left text-[11px] font-mono text-slate-700 overflow-x-auto max-h-28">
-                {this.state.error.message}
+                Something went wrong while loading this page.
               </div>
             )}
 

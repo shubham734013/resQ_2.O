@@ -57,7 +57,7 @@ export const FacilityPreview = ({
 
   return (
     <motion.section
-      aria-label={`Selected facility: ${facility.name}`}
+      aria-label={`Selected hospital: ${facility.name}`}
       initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
@@ -72,7 +72,7 @@ export const FacilityPreview = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Dismiss facility preview"
+            aria-label="Close hospital details"
             className="w-12 h-1 rounded-full bg-white/20 hover:bg-white/40 cursor-pointer"
           />
         </div>
@@ -84,17 +84,17 @@ export const FacilityPreview = ({
           {facility.emergencyAvailable ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
-              <span>24/7 Emergency</span>
+              <span>Emergency care</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
-              <span>Urgent Care Services</span>
+              <span>Urgent care</span>
             </span>
           )}
           {facility.verified && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Verified</span>
+              <span>Checked</span>
             </span>
           )}
           {facility.openStatus && (
@@ -118,7 +118,7 @@ export const FacilityPreview = ({
                   .catch(() => {});
               }
             }}
-            aria-label="Share facility information"
+            aria-label="Share hospital details"
             className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
@@ -127,7 +127,7 @@ export const FacilityPreview = ({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Dismiss facility preview"
+              aria-label="Close hospital details"
               className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -219,7 +219,7 @@ export const FacilityPreview = ({
             aria-label={`View details for ${facility.name}`}
             className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-rose-400 hover:text-rose-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span>View Details</span>
+            <span>View details</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
 

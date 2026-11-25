@@ -27,21 +27,17 @@ test('tracking snapshot authorization scopes user, hospital, driver and provider
   assert.equal(canAccessTrackingSnapshot(identity(String(userId), 'USER'), emergency, trip), true);
   assert.equal(canAccessTrackingSnapshot(identity(String(hospitalId), 'HOSPITAL'), emergency, trip), true);
   assert.equal(canAccessTrackingSnapshot(identity(String(driverId), 'AMBULANCE_DRIVER'), emergency, trip), true);
-  assert.equal(canAccessTrackingSnapshot(identity(String(providerId), 'AMBULANCE_PROVIDER'), emergency, trip), true);
   assert.equal(canAccessTrackingSnapshot(identity(String(otherId), 'USER'), emergency, trip), false);
   assert.equal(canAccessTrackingSnapshot(identity(String(otherId), 'HOSPITAL'), emergency, trip), false);
   assert.equal(canAccessTrackingSnapshot(identity(String(otherId), 'AMBULANCE_DRIVER'), emergency, trip), false);
-  assert.equal(canAccessTrackingSnapshot(identity(String(otherId), 'AMBULANCE_PROVIDER'), emergency, trip), false);
   assert.equal(canAccessTrackingSnapshot(identity(String(otherId), 'ADMIN'), emergency, trip), true);
 });
 
-test('previously assigned provider loses tracking access once a trip belongs to another provider', () => {
-  const oldProviderId = objectId();
-  const activeProviderId = objectId();
-  const emergency = { _id: objectId(), userId: objectId(), hospitalId: objectId(), ambulanceProviderId: oldProviderId };
-  const trip = { providerId: activeProviderId, driverId: objectId(), destinationHospitalId: emergency.hospitalId };
-  assert.equal(canAccessTrackingSnapshot(identity(String(oldProviderId), 'AMBULANCE_PROVIDER'), emergency, trip), false);
-  assert.equal(canAccessTrackingSnapshot(identity(String(activeProviderId), 'AMBULANCE_PROVIDER'), emergency, trip), true);
+test('destination hospital and assigned driver can access tracking', () => {
+  const driverId = objectId();
+  const emergency = { _id: objectId(), userId: objectId(), hospitalId: objectId() };
+  const trip = { driverId, destinationHospitalId: emergency.hospitalId };
+  assert.equal(canAccessTrackingSnapshot(identity(String(driverId), 'AMBULANCE_DRIVER'), emergency, trip), true);
 });
 
 test('before acceptance user and destination hospital may see dispatch status, but no driver can read trip tracking', () => {

@@ -48,7 +48,7 @@ const box = 'rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl
 
 const ErrorState = ({ retry }: { retry: () => void }) => (
   <div className="flex items-center justify-between gap-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs text-rose-300">
-    <span>Unable to load hospital operations data.</span>
+    <span>Could not load hospital data.</span>
     <button
       type="button"
       onClick={retry}
@@ -63,13 +63,13 @@ const ErrorState = ({ retry }: { retry: () => void }) => (
 const Loading = () => (
   <div className="p-12 text-center text-xs font-mono text-zinc-500 flex items-center justify-center gap-2">
     <Loader2 className="h-4 w-4 animate-spin text-rose-500" />
-    <span>Loading hospital telemetry…</span>
+    <span>Loading hospital data…</span>
   </div>
 );
 
 const Freshness = ({ value }: { value?: string }) => (
   <p className="text-[11px] font-mono text-zinc-500">
-    {value ? `Updated ${new Date(value).toLocaleTimeString()}` : 'Live Telemetry'}
+    {value ? `Updated ${new Date(value).toLocaleTimeString()}` : 'Live updates'}
   </p>
 );
 
@@ -92,9 +92,9 @@ const PageShell = ({ children }: { children: ReactNode }) => (
 
 const availabilityLabel: Record<string, string> = {
   AVAILABLE: 'Available',
-  LIMITED: 'Limited Capacity',
+  LIMITED: 'Some beds open',
   UNAVAILABLE: 'Unavailable',
-  UNKNOWN: 'Standby',
+  UNKNOWN: 'Waiting',
 };
 
 const statusVariant = (value: string): 'verified' | 'waitTime' | 'neutral' =>
@@ -103,6 +103,7 @@ const statusVariant = (value: string): 'verified' | 'waitTime' | 'neutral' =>
     : value === 'UNAVAILABLE' || value === 'CANCELLED' || value === 'REJECTED'
     ? 'neutral'
     : 'waitTime';
+const statusLabel = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 export const HospitalPage = ({
   tab,
@@ -143,10 +144,10 @@ const HospitalOverviewPage = () => {
   if (!p) return <PageShell><ErrorState retry={() => void profile.refetch()} /></PageShell>;
 
   const metrics = [
-    { label: 'Emergency Availability', value: availabilityLabel[p.emergencyAvailability] ?? p.emergencyAvailability, icon: CircleAlert, color: 'text-emerald-400' },
-    { label: 'Active Queue Requests', value: emergencies.data?.pagination.total ?? 0, icon: Activity, color: 'text-rose-400' },
-    { label: 'Coordinated Inpatients', value: patients.data?.pagination.total ?? 0, icon: UserRound, color: 'text-blue-400' },
-    { label: 'Linked Ambulances', value: ambulances.data?.pagination.total ?? 0, icon: Ambulance, color: 'text-purple-400' },
+    { label: 'Emergency care', value: availabilityLabel[p.emergencyAvailability] ?? p.emergencyAvailability, icon: CircleAlert, color: 'text-emerald-400' },
+    { label: 'Open requests', value: emergencies.data?.pagination.total ?? 0, icon: Activity, color: 'text-rose-400' },
+    { label: 'Patients', value: patients.data?.pagination.total ?? 0, icon: UserRound, color: 'text-blue-400' },
+    { label: 'Ambulances', value: ambulances.data?.pagination.total ?? 0, icon: Ambulance, color: 'text-purple-400' },
   ];
 
   return (
@@ -155,14 +156,14 @@ const HospitalOverviewPage = () => {
         <div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-[10px] font-mono font-bold text-rose-300 uppercase tracking-wider mb-1">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-            <span>Operational Command Hub</span>
+            <span>Hospital home</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-light text-zinc-100 tracking-tight">{p.name}</h1>
           <p className="mt-1 text-xs text-zinc-400 font-light">
-            {p.address ?? 'Jaipur metropolitan jurisdiction'}{p.city ? `, ${p.city}` : ''}
+            {p.address ?? 'Jaipur'}{p.city ? `, ${p.city}` : ''}
           </p>
         </div>
-        <StatusBadge variant={statusVariant(p.verificationStatus)} label={p.verificationStatus} />
+        <StatusBadge variant={statusVariant(p.verificationStatus)} label={statusLabel(p.verificationStatus)} />
       </div>
 
       <div className="mt-6"><HospitalCoordinationInbox /></div>
@@ -193,7 +194,7 @@ const HospitalOverviewPage = () => {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className={box}>
           <header className="border-b border-white/10 p-5 flex items-center justify-between">
-            <h3 className="font-medium text-sm text-zinc-100">Live Intake Feed</h3>
+            <h3 className="font-medium text-sm text-zinc-100">New emergency requests</h3>
             <Freshness value={p.updatedAt} />
           </header>
           {emergencies.isError ? (
@@ -208,24 +209,24 @@ const HospitalOverviewPage = () => {
                         <span className="font-mono text-zinc-400 mr-2">{e.requestCode}</span>
                         {e.situationType}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-400 font-light">{e.location ?? 'Pickup coordinates transmitted'}</p>
+                      <p className="mt-1 text-xs text-zinc-400 font-light">{e.location ?? 'Pickup location shared'}</p>
                     </div>
-                    <StatusBadge variant={statusVariant(e.status)} label={e.status} />
+                    <StatusBadge variant={statusVariant(e.status)} label={statusLabel(e.status)} />
                   </div>
                   <p className="mt-2 text-[11px] font-mono text-zinc-500">
-                    Received {new Date(e.reportedAt).toLocaleTimeString()}{e.etaMinutes !== undefined ? ` · ETA ${e.etaMinutes} min` : ''}
+                    Received {new Date(e.reportedAt).toLocaleTimeString()}{e.etaMinutes !== undefined ? ` · About ${e.etaMinutes} min away` : ''}
                   </p>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="p-8 text-center text-xs font-mono text-zinc-500">No incoming emergency requests in intake.</p>
+            <p className="p-8 text-center text-xs font-mono text-zinc-500">No new emergency requests.</p>
           )}
         </section>
 
         <section className={box}>
           <header className="border-b border-white/10 p-5 flex items-center justify-between">
-            <h3 className="font-medium text-sm text-zinc-100">Active Department Resources</h3>
+            <h3 className="font-medium text-sm text-zinc-100">Available resources</h3>
             <Freshness value={p.updatedAt} />
           </header>
           {Object.keys(p.resourceSummary).length ? (
@@ -240,7 +241,7 @@ const HospitalOverviewPage = () => {
               ))}
             </div>
           ) : (
-            <p className="p-8 text-center text-xs font-mono text-zinc-500">No resource telemetry configured.</p>
+            <p className="p-8 text-center text-xs font-mono text-zinc-500">No resources listed.</p>
           )}
         </section>
       </div>
@@ -282,7 +283,8 @@ const HospitalEmergenciesPage = () => {
   const mutation = useHospitalEmergencyStatusMutation();
   const selectedDetail = useHospitalEmergency(selected ?? '');
   const items = q.data?.items ?? [];
-  const summaryData = summary.data ?? { RECEIVED: 0, REVIEWING: 0, PREPARING: 0, AMBULANCE_COORDINATION: 0, RESOLVED: 0, CANCELLED: 0 };
+  const summaryData = summary.data ?? { RECEIVED: 0, REVIEWING: 0, PREPARING: 0, AMBULANCE_COORDINATION: 0, RESOLVED: 0, CANCELLED: 0, patientsEnRouteByAmbulance: 0 };
+  const liveEmergencyCount = summaryData.RECEIVED + summaryData.REVIEWING + summaryData.PREPARING + summaryData.AMBULANCE_COORDINATION;
 
   const resetFilters = () => {
     setStatus('');
@@ -295,16 +297,40 @@ const HospitalEmergenciesPage = () => {
 
   // Group items by the 4 active kanban stages
   const kanbanStages = [
-    { id: 'RECEIVED', label: 'New / Received', items: items.filter((i) => i.status === 'RECEIVED'), badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-    { id: 'REVIEWING', label: 'Reviewing', items: items.filter((i) => i.status === 'REVIEWING'), badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-    { id: 'PREPARING', label: 'Preparing Bay', items: items.filter((i) => i.status === 'PREPARING'), badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
-    { id: 'AMBULANCE_COORDINATION', label: 'Ambulance Coordination', items: items.filter((i) => i.status === 'AMBULANCE_COORDINATION'), badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+    { id: 'RECEIVED', label: 'New', items: items.filter((i) => i.status === 'RECEIVED'), badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+    { id: 'REVIEWING', label: 'In review', items: items.filter((i) => i.status === 'REVIEWING'), badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    { id: 'PREPARING', label: 'Preparing room', items: items.filter((i) => i.status === 'PREPARING'), badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
+    { id: 'AMBULANCE_COORDINATION', label: 'Ambulance on the way', items: items.filter((i) => i.status === 'AMBULANCE_COORDINATION'), badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
   ];
 
   return (
     <PageShell>
       <div className="space-y-6">
         <HospitalCoordinationInbox />
+        <section className="grid gap-4 sm:grid-cols-2" aria-label="Live emergency totals">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-xl">
+            <p className="text-xs font-mono uppercase tracking-wider text-zinc-400">Live emergency patients</p>
+            <p className="mt-2 text-3xl font-semibold text-zinc-100">
+              {summary.isLoading ? '…' : summary.isError ? '—' : liveEmergencyCount}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">Open cases that are not resolved or cancelled.</p>
+          </div>
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-5 shadow-xl">
+            <p className="text-xs font-mono uppercase tracking-wider text-rose-300">Patients in an ambulance</p>
+            <p className="mt-2 text-3xl font-semibold text-zinc-100">
+              {summary.isLoading ? '…' : summary.isError ? '—' : summaryData.patientsEnRouteByAmbulance}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">Patients picked up and travelling to this hospital.</p>
+          </div>
+          {summary.isError && (
+            <div role="alert" className="sm:col-span-2 flex items-center justify-between gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs text-rose-300">
+              <span>Could not load live patient counts.</span>
+              <button type="button" onClick={() => void summary.refetch()} className="font-semibold underline underline-offset-2">
+                Try again
+              </button>
+            </div>
+          )}
+        </section>
         <IncomingAmbulanceAlertPanel
           emergencies={items}
           onUpdateStatus={(id, status) => mutation.mutate({ id, status })}
@@ -314,12 +340,12 @@ const HospitalEmergenciesPage = () => {
         />
 
         {/* 4-Column Stage Kanban Grid */}
-        <section aria-label="Kanban Coordination Columns" className="space-y-3">
+        <section aria-label="Emergency request steps" className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-400">
-              Live Stage Coordination Board
+              Emergency request steps
             </h2>
-            <span className="text-xs font-mono text-zinc-500">4 Operational Tiers</span>
+            <span className="text-xs font-mono text-zinc-500">4 steps</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -338,7 +364,7 @@ const HospitalEmergenciesPage = () => {
                 <div className="space-y-2.5 min-h-[140px]">
                   {stage.items.length === 0 ? (
                     <div className="h-full flex items-center justify-center p-6 text-center text-xs font-mono text-zinc-600">
-                      Empty stage
+                      Nothing here yet
                     </div>
                   ) : (
                     stage.items.slice(0, 3).map((e) => (
@@ -371,10 +397,7 @@ const HospitalEmergenciesPage = () => {
           <header className="border-b border-white/10 p-6 space-y-4">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-lg font-light text-zinc-100 tracking-tight">Emergency Operations Queue</h2>
-                <p className="mt-1 text-xs text-zinc-400 font-light">
-                  Hospital-owned emergency intake, triage queues, and direct patient transit statuses.
-                </p>
+                <h2 className="text-lg font-light text-zinc-100 tracking-tight">Emergency requests</h2>
               </div>
               <span className="text-xs font-mono text-zinc-500">
                 {q.data ? `Updated ${formatElapsed(q.data.items[0]?.updatedAt ?? new Date().toISOString())}` : 'Synchronizing…'}
@@ -388,22 +411,22 @@ const HospitalEmergenciesPage = () => {
                 <input
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Search request code or patient reference…"
+                  placeholder="Search by request code or patient"
                   className="w-full bg-white/[0.04] border border-white/10 text-zinc-100 placeholder:text-zinc-500 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-rose-500/40 transition"
                 />
               </div>
 
               <select
-                aria-label="Filter status"
+                aria-label="Filter by status"
                 value={status}
                 onChange={(e) => { setStatus(e.target.value); setPage(1); }}
                 className="rounded-xl border border-white/10 bg-zinc-900/90 text-zinc-300 px-3 py-2.5 text-xs outline-none focus:border-rose-500/40"
               >
-                <option value="">All Statuses</option>
+                <option value="">All statuses</option>
                 <option value="RECEIVED">Received</option>
                 <option value="REVIEWING">Reviewing</option>
                 <option value="PREPARING">Preparing</option>
-                <option value="AMBULANCE_COORDINATION">Ambulance Coordination</option>
+                <option value="AMBULANCE_COORDINATION">Ambulance on the way</option>
                 <option value="RESOLVED">Resolved</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
@@ -411,7 +434,7 @@ const HospitalEmergenciesPage = () => {
               <input
                 value={situationType}
                 onChange={(e) => { setSituationType(e.target.value); setPage(1); }}
-                placeholder="Situation type (Trauma, Cardiac…)"
+                placeholder="Emergency type, like injury or heart problem"
                 className="rounded-xl bg-white/[0.04] border border-white/10 px-3.5 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500/40"
               />
 
@@ -421,14 +444,14 @@ const HospitalEmergenciesPage = () => {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.08] transition cursor-pointer"
               >
                 <RefreshCw className="h-3.5 w-3.5 text-rose-400" />
-                <span>Reset Filters</span>
+                <span>Clear filters</span>
               </button>
             </div>
           </header>
 
           {mutation.isError && (
             <div className="border-b border-rose-500/20 bg-rose-500/10 px-5 py-3 text-xs text-rose-300" role="alert">
-              Status update could not be applied. Please retry.
+              Could not save the change. Try again.
             </div>
           )}
 
@@ -453,7 +476,7 @@ const HospitalEmergenciesPage = () => {
               <Pagination page={q.data?.pagination.page ?? 1} totalPages={q.data?.pagination.totalPages ?? 0} onPage={setPage} />
             </>
           ) : (
-            <p className="p-12 text-center text-xs font-mono text-zinc-500">No emergency requests match current filters.</p>
+            <p className="p-12 text-center text-xs font-mono text-zinc-500">No requests found. Try changing the filters.</p>
           )}
 
           {selected && (
@@ -503,45 +526,71 @@ const EmergencyDetail = ({
     <div className="border-t border-white/10 p-6 space-y-6 bg-zinc-950/60 backdrop-blur-xl">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Operational Detail View</p>
+          <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Request details</p>
           <h3 className="mt-1 text-xl font-light text-zinc-100 font-mono">{emergency.requestCode}</h3>
         </div>
-        <StatusBadge variant={statusVariant(emergency.status)} label={emergency.status} />
+        <StatusBadge variant={statusVariant(emergency.status)} label={statusLabel(emergency.status)} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3 bg-white/[0.02] border border-white/5 p-5 rounded-xl text-xs">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 bg-white/[0.02] border border-white/5 p-5 rounded-xl text-xs">
         <div className="space-y-2 font-light">
-          <h4 className="font-semibold text-zinc-200">Incident Details</h4>
-          <p><span className="text-zinc-500">Situation:</span> <strong className="text-zinc-200">{emergency.situationType}</strong></p>
+          <h4 className="font-semibold text-zinc-200">Emergency details</h4>
+          <p><span className="text-zinc-500">Type:</span> <strong className="text-zinc-200">{emergency.situationType}</strong></p>
           <p><span className="text-zinc-500">Reported:</span> {new Date(emergency.reportedAt).toLocaleString()}</p>
-          <p><span className="text-zinc-500">Time Elapsed:</span> {formatElapsed(emergency.reportedAt)}</p>
+          <p><span className="text-zinc-500">Time ago:</span> {formatElapsed(emergency.reportedAt)}</p>
         </div>
 
         <div className="space-y-2 font-light">
-          <h4 className="font-semibold text-zinc-200">Location Telemetry</h4>
-          <p className="truncate">{emergency.location ?? 'Jaipur Metropolitan'}</p>
+          <h4 className="font-semibold text-zinc-200">Patient details</h4>
+          <p className="text-zinc-200">{emergency.patientName || 'Patient details not available'}</p>
+          {emergency.patientPhone ? (
+            <a href={`tel:${emergency.patientPhone.replace(/[^0-9+]/g, '')}`} className="text-rose-300 hover:text-rose-200">
+              Call {emergency.patientPhone}
+            </a>
+          ) : (
+            <p className="text-zinc-500">Phone number not shared</p>
+          )}
+          {(emergency.patientAge !== undefined || emergency.patientGender) && (
+            <p className="text-zinc-400">
+              {[emergency.patientAge !== undefined ? `${emergency.patientAge} years` : null, emergency.patientGender || null]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2 font-light">
+          <h4 className="font-semibold text-zinc-200">Location</h4>
+          <p className="truncate">{emergency.location ?? 'Jaipur'}</p>
           {hasCoordinates && (
             <p className="font-mono text-zinc-400">{emergency.latitude}, {emergency.longitude}</p>
           )}
-          <p><span className="text-zinc-500">Patient Ref:</span> {emergency.patientId ?? 'Anonymous / Walk-in'}</p>
         </div>
 
         <div className="space-y-2 font-light">
-          <h4 className="font-semibold text-zinc-200">Dispatch Coordination</h4>
-          <p><span className="text-zinc-500">Ambulance:</span> {emergency.ambulanceId ?? 'Auto-routing'}</p>
-          <p><span className="text-zinc-500">Driver:</span> {emergency.driverId ?? 'Awaiting dispatch'}</p>
-          <p><span className="text-zinc-500">ETA:</span> {emergency.etaMinutes !== undefined ? `${emergency.etaMinutes} min` : 'Standby'}</p>
+          <h4 className="font-semibold text-zinc-200">Ambulance</h4>
+          <p>{emergency.ambulanceRegistration ?? (emergency.ambulanceId ? 'Assigned, details not available' : 'Not assigned')}</p>
+          {emergency.ambulanceVehicleNumber && <p className="text-zinc-400">{emergency.ambulanceVehicleNumber}</p>}
+          {emergency.ambulanceType && <p className="text-zinc-400">{emergency.ambulanceType}</p>}
+          <p><span className="text-zinc-500">Driver:</span> {emergency.driverName ?? 'Not assigned'}</p>
+          {emergency.driverPhone && (
+            <a href={`tel:${emergency.driverPhone.replace(/[^0-9+]/g, '')}`} className="block text-rose-300 hover:text-rose-200">
+              Call driver: {emergency.driverPhone}
+            </a>
+          )}
+          {emergency.tripStatus && <p><span className="text-zinc-500">Trip:</span> {emergency.tripStatus.replace(/_/g, ' ')}</p>}
+          <p><span className="text-zinc-500">Arrival time:</span> {emergency.etaMinutes !== undefined ? `${emergency.etaMinutes} min` : 'Not known'}</p>
           {nextStatus && (
             <div className="pt-2">
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => {
-                  if (window.confirm(`Move request to ${nextStatus}?`)) onStatus(nextStatus);
+                  if (window.confirm(`Move request to ${statusLabel(nextStatus)}?`)) onStatus(nextStatus);
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-md transition cursor-pointer disabled:opacity-50"
               >
-                {busy ? 'Updating…' : `Advance to ${nextStatus}`}
+                {busy ? 'Saving…' : `Set to ${statusLabel(nextStatus)}`}
               </button>
             </div>
           )}
@@ -556,7 +605,7 @@ const EmergencyDetail = ({
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/80">
           <div className="flex items-center gap-2 border-b border-white/10 bg-zinc-900/60 px-4 py-2.5 text-xs font-mono text-zinc-300">
             <MapPinned className="h-4 w-4 text-rose-500" />
-            <span>Emergency Incident Coordinates &mdash; Google Maps Dark View</span>
+            <span>Emergency location</span>
           </div>
           <div className="h-64">
             <MapView
@@ -604,11 +653,16 @@ const EmergencyRow = ({
               <span className="font-mono text-xs font-bold text-zinc-400 mr-2">{emergency.requestCode}</span>
               {emergency.situationType}
             </p>
-            <p className="mt-1 text-xs text-zinc-400 font-light truncate">{emergency.location ?? 'Jaipur metropolitan jurisdiction'}</p>
+            <p className="mt-1 text-xs text-zinc-400 font-light truncate">{emergency.location ?? 'Jaipur'}</p>
+            <p className="mt-1 text-xs text-zinc-300 font-light truncate">
+              {emergency.patientName || 'Patient details not available'}
+              {emergency.patientPhone ? ` · ${emergency.patientPhone}` : ''}
+              {emergency.ambulanceRegistration ? ` · Ambulance ${emergency.ambulanceRegistration}` : ''}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <span className="text-xs font-mono text-zinc-500">{formatElapsed(emergency.reportedAt)}</span>
-            <StatusBadge variant={statusVariant(emergency.status)} label={emergency.status} />
+            <StatusBadge variant={statusVariant(emergency.status)} label={statusLabel(emergency.status)} />
           </div>
         </div>
       </button>
@@ -624,11 +678,11 @@ const EmergencyRow = ({
               type="button"
               disabled={busy}
               onClick={() => {
-                if (window.confirm(`Advance to ${nextStatus}?`)) onStatus(nextStatus);
+                if (window.confirm(`Set status to ${statusLabel(nextStatus)}?`)) onStatus(nextStatus);
               }}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-xs transition cursor-pointer disabled:opacity-50"
             >
-              {busy ? 'Updating…' : `Advance to ${nextStatus}`}
+              {busy ? 'Saving…' : `Set to ${statusLabel(nextStatus)}`}
             </button>
           )}
         </div>
@@ -648,9 +702,9 @@ const HospitalPatientsPage = () => {
     <PageShell>
       <section className={box}>
         <header className="border-b border-white/10 p-6">
-          <h2 className="text-xl font-light text-zinc-100 tracking-tight">Patient Intake Coordination</h2>
+          <h2 className="text-xl font-light text-zinc-100 tracking-tight">Patients</h2>
           <p className="mt-1 text-xs text-zinc-400 font-light">
-            Operational case telemetry and trauma arrival logs &mdash; zero unrestricted medical data.
+            Emergency cases and patient arrivals. Medical records are not shown here.
           </p>
         </header>
 
@@ -665,10 +719,10 @@ const HospitalPatientsPage = () => {
                 <thead className="bg-white/[0.02] border-b border-white/[0.08] text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                   <tr>
                     <th className="px-6 py-3.5">Case ID</th>
-                    <th>Emergency Type</th>
+                    <th>Emergency type</th>
                     <th>Status</th>
                     <th>ETA</th>
-                    <th>Received Timestamp</th>
+                    <th>Received</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.06]">
@@ -682,7 +736,7 @@ const HospitalPatientsPage = () => {
                     >
                       <td className="px-6 py-4 font-mono font-bold text-zinc-200">{p.caseId}</td>
                       <td className="text-zinc-300 font-light">{p.emergencyType}</td>
-                      <td><StatusBadge variant={statusVariant(p.coordinationStatus)} label={p.coordinationStatus} /></td>
+                      <td><StatusBadge variant={statusVariant(p.coordinationStatus)} label={statusLabel(p.coordinationStatus)} /></td>
                       <td className="font-mono text-zinc-300">{p.etaMinutes !== undefined ? `${p.etaMinutes} min` : '—'}</td>
                       <td className="font-mono text-zinc-500">{new Date(p.receivedAt).toLocaleString()}</td>
                     </tr>
@@ -694,7 +748,7 @@ const HospitalPatientsPage = () => {
           </>
         ) : (
           <div className="p-12 text-center text-xs font-mono text-zinc-500">
-            No patient coordination records currently logged.
+            No patient records yet.
           </div>
         )}
 
@@ -708,7 +762,7 @@ const HospitalPatientsPage = () => {
               <div className="space-y-2">
                 <h3 className="font-medium text-sm text-zinc-200 font-mono">Case {detail.data.caseId}</h3>
                 <p className="text-xs text-zinc-400 font-light">
-                  {detail.data.emergencyType} · Status: <span className="text-rose-300">{detail.data.coordinationStatus}</span>
+                  {detail.data.emergencyType} · Status: <span className="text-rose-300">{statusLabel(detail.data.coordinationStatus)}</span>
                 </p>
               </div>
             ) : null}
@@ -732,18 +786,18 @@ const HospitalAmbulancesPage = () => {
       <section className={box}>
         <header className="flex flex-col gap-3 border-b border-white/10 p-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-xl font-light text-zinc-100 tracking-tight">Ambulance Fleet Coordination</h2>
+            <h2 className="text-xl font-light text-zinc-100 tracking-tight">Ambulances</h2>
             <p className="mt-1 text-xs text-zinc-400 font-light">
-              Emergency transport units linked directly to active hospital admissions.
+              Ambulances linked to this hospital.
             </p>
           </div>
           <select
-            aria-label="Filter status"
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="rounded-xl border border-white/10 bg-zinc-900/90 text-zinc-300 px-3.5 py-2 text-xs outline-none focus:border-rose-500/40"
           >
-            <option value="">All Fleet Statuses</option>
+            <option value="">All ambulance statuses</option>
             <option value="AVAILABLE">Available</option>
             <option value="BUSY">Busy</option>
             <option value="OFFLINE">Offline</option>
@@ -765,8 +819,8 @@ const HospitalAmbulancesPage = () => {
                     <th>Provider</th>
                     <th>Driver</th>
                     <th>Status</th>
-                    <th>Live GPS</th>
-                    <th>Arrival ETA</th>
+                    <th>Live location</th>
+                    <th>Arrival time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.06]">
@@ -784,11 +838,11 @@ const HospitalAmbulancesPage = () => {
                       </td>
                       <td className="text-zinc-300">{a.provider?.name ?? '—'}</td>
                       <td className="text-zinc-300">{a.driver?.name ?? '—'}</td>
-                      <td><StatusBadge variant={statusVariant(a.currentStatus)} label={a.currentStatus} /></td>
+                      <td><StatusBadge variant={statusVariant(a.currentStatus)} label={statusLabel(a.currentStatus)} /></td>
                       <td className="font-mono text-zinc-400">
                         {a.currentLatitude !== undefined && a.currentLongitude !== undefined
                           ? `${a.currentLatitude.toFixed(4)}, ${a.currentLongitude.toFixed(4)}`
-                          : 'Awaiting signal'}
+                          : 'No location yet'}
                       </td>
                       <td className="font-mono text-zinc-300">{a.etaMinutes !== undefined ? `${a.etaMinutes} min` : '—'}</td>
                     </tr>
@@ -800,7 +854,7 @@ const HospitalAmbulancesPage = () => {
           </>
         ) : (
           <p className="p-12 text-center text-xs font-mono text-zinc-500">
-            No active ambulance fleet units connected to hospital dispatch.
+            No ambulances linked to this hospital.
           </p>
         )}
 
@@ -814,7 +868,7 @@ const HospitalAmbulancesPage = () => {
               <div className="space-y-1.5">
                 <h3 className="font-medium text-sm text-zinc-200 font-mono">Ambulance {detail.data.registrationNumber}</h3>
                 <p className="text-xs text-zinc-400 font-light">
-                  {detail.data.ambulanceType} · Provider: {detail.data.provider?.name ?? 'Assigned Partner'}
+                  {detail.data.ambulanceType} · Company: {detail.data.provider?.name ?? 'Not assigned'}
                 </p>
               </div>
             ) : null}
@@ -846,13 +900,13 @@ const HospitalResourcesPage = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-mono font-medium text-teal-300 mb-2">
               <BedDouble className="w-3.5 h-3.5 text-teal-400" />
-              <span>Real-Time Bed & Resource Telemetry</span>
+              <span>Bed and resource list</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-light text-zinc-100 tracking-tight">
-              Hospital Capacity & Operations
+              Hospital beds and services
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1">
-              Configure active ICU beds, trauma bays, and operational department services across sectors.
+              Update the number of open beds and list hospital services.
             </p>
           </div>
           {q.data && <Freshness value={q.data.updatedAt} />}
@@ -880,12 +934,12 @@ const HospitalResourcesPage = () => {
                     {value}
                   </div>
                   <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    Realtime Active
+                    Up to date
                   </span>
                 </div>
 
                 <div className="pt-2 border-t border-white/[0.06] flex items-center gap-2">
-                  <label className="text-xs text-zinc-400 flex-1">Adjust Quantity:</label>
+                  <label className="text-xs text-zinc-400 flex-1">Change number:</label>
                   <input
                     type="number"
                     min="0"
@@ -901,9 +955,9 @@ const HospitalResourcesPage = () => {
           /* Subtle Dark Glass Wireframe Card for Unconfigured Resource States */
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-zinc-500 text-sm space-y-3 shadow-xl backdrop-blur-xl">
             <Layers className="mx-auto h-8 w-8 text-zinc-600" />
-            <p className="font-medium text-zinc-300">No Resource Allocation Configured</p>
+            <p className="font-medium text-zinc-300">No resources listed</p>
             <p className="text-xs max-w-md mx-auto text-zinc-500 font-light">
-              Add operational department beds, trauma bays, or ventilators to broadcast real-time availability across the emergency response network.
+              Add beds, emergency rooms, or breathing machines so others can see what is open.
             </p>
           </div>
         )}
@@ -912,7 +966,7 @@ const HospitalResourcesPage = () => {
         {entries.length > 0 && (
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs font-mono text-zinc-500">
-              Updates reflect immediately on citizen search and ambulance routing engines.
+              Changes show up in search and ambulance routing.
             </span>
             <button
               type="button"
@@ -921,7 +975,7 @@ const HospitalResourcesPage = () => {
               className="px-6 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white shadow-lg shadow-rose-950/40 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              <span>{mutation.isPending ? 'Saving Capacity…' : 'Save Resources'}</span>
+              <span>{mutation.isPending ? 'Saving…' : 'Save resources'}</span>
             </button>
           </div>
         )}
@@ -959,22 +1013,22 @@ const OperationsSettings = ({
   return (
     <section className={`${box} p-6 sm:p-8 space-y-6`}>
       <div className="border-b border-white/10 pb-4">
-        <h3 className="text-lg font-light text-zinc-100 tracking-tight">Operations Configuration</h3>
+        <h3 className="text-lg font-light text-zinc-100 tracking-tight">Hospital services and status</h3>
         <p className="mt-1 text-xs text-zinc-400 font-light">
-          Maintain verified clinical services, emergency capabilities, and global dispatch availability.
+          List your services and choose if you can take emergency patients.
         </p>
       </div>
 
       <div className="space-y-6 max-w-3xl">
         <div className="space-y-2">
           <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block">
-            Clinical Services (Comma Separated)
+            Hospital services (separate with commas)
           </label>
           <input
             value={serviceText}
             onChange={(e) => setServiceText(e.target.value)}
             className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-rose-500/40"
-            placeholder="Emergency Department, Intensive Care Unit, Interventional Cardiology, Radiology"
+            placeholder="Emergency room, heart care, X-rays"
           />
           <button
             type="button"
@@ -986,19 +1040,19 @@ const OperationsSettings = ({
             }
             className="mt-1 px-4 py-2 rounded-xl text-xs font-semibold bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/10 transition cursor-pointer"
           >
-            {serviceMutation.isPending ? 'Saving…' : 'Save Services'}
+            {serviceMutation.isPending ? 'Saving…' : 'Save services'}
           </button>
         </div>
 
         <div className="space-y-2">
           <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block">
-            Trauma & Specialty Capabilities
+            Special care you offer
           </label>
           <input
             value={capabilityText}
             onChange={(e) => setCapabilityText(e.target.value)}
             className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-rose-500/40"
-            placeholder="Level 1 Trauma, Pediatric Emergency, Stroke Center, Burn Unit"
+            placeholder="Injury care, child emergency care, stroke care, burn care"
           />
           <button
             type="button"
@@ -1010,23 +1064,23 @@ const OperationsSettings = ({
             }
             className="mt-1 px-4 py-2 rounded-xl text-xs font-semibold bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/10 transition cursor-pointer"
           >
-            {capabilityMutation.isPending ? 'Saving…' : 'Save Capabilities'}
+            {capabilityMutation.isPending ? 'Saving…' : 'Save care types'}
           </button>
         </div>
 
         <div className="space-y-2">
           <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block">
-            Emergency Admission Status
+            Emergency care status
           </label>
           <select
             value={availability.data?.emergencyAvailability ?? profile.emergencyAvailability}
             onChange={(e) => availabilityMutation.mutate(e.target.value)}
             className="w-full rounded-xl border border-white/10 bg-zinc-900/90 text-zinc-200 px-4 py-3 text-xs outline-none focus:border-rose-500/40"
           >
-            <option value="AVAILABLE">Available & Accepting Emergency Patients</option>
-            <option value="LIMITED">Limited Capacity (Triage Only)</option>
-            <option value="UNAVAILABLE">Unavailable / Full Diversion</option>
-            <option value="UNKNOWN">Standby / Unspecified</option>
+            <option value="AVAILABLE">Open for emergency patients</option>
+            <option value="LIMITED">Limited emergency care</option>
+            <option value="UNAVAILABLE">Not taking emergency patients</option>
+            <option value="UNKNOWN">Not set</option>
           </select>
           <Freshness value={availability.data?.updatedAt ?? profile.updatedAt} />
         </div>
@@ -1087,18 +1141,18 @@ const HospitalProfilePage = () => {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {field('Hospital Name', 'name')}
-            {field('Emergency Phone', 'phone')}
+            {field('Hospital name', 'name')}
+            {field('Phone', 'phone')}
             {field('Address', 'address')}
             {field('City', 'city')}
-            {field('State / Province', 'state')}
+            {field('State', 'state')}
             {field('Country', 'country')}
-            {field('Facility Type', 'hospitalType')}
-            {field('Public Contact', 'publicContactInformation')}
+            {field('Hospital type', 'hospitalType')}
+            {field('Public contact', 'publicContactInformation')}
           </div>
 
           <label className="block space-y-1.5 text-xs">
-            <span className="font-mono uppercase tracking-wider text-zinc-400 block">Operational Description</span>
+            <span className="font-mono uppercase tracking-wider text-zinc-400 block">About this hospital</span>
             <textarea
               value={form.operationalDescription ?? ''}
               onChange={(e) => setForm((current) => ({ ...current, operationalDescription: e.target.value }))}
@@ -1108,7 +1162,7 @@ const HospitalProfilePage = () => {
           </label>
 
           <div className="pt-4 border-t border-white/10 flex items-center justify-between">
-            <StatusBadge variant={statusVariant(p.verificationStatus)} label={`Verification: ${p.verificationStatus}`} />
+            <StatusBadge variant={statusVariant(p.verificationStatus)} label={`Check: ${statusLabel(p.verificationStatus)}`} />
             <button
               type="button"
               disabled={mutation.isPending}
@@ -1116,7 +1170,7 @@ const HospitalProfilePage = () => {
               className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white shadow-lg shadow-rose-950/40 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              <span>{mutation.isPending ? 'Saving…' : 'Save Profile'}</span>
+              <span>{mutation.isPending ? 'Saving…' : 'Save profile'}</span>
             </button>
           </div>
         </section>

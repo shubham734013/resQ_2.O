@@ -49,7 +49,7 @@ export const FacilityCapabilityList = ({
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
             <Layers className="w-3.5 h-3.5 text-rose-400" aria-hidden="true" />
-            <span>Active Departments & Specialties</span>
+            <span>Open departments and care types</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
@@ -70,7 +70,7 @@ export const FacilityCapabilityList = ({
       <div className="space-y-3 pt-2">
         <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
           <Activity className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-          <span>Verified Clinical Capabilities</span>
+          <span>Care we checked</span>
         </div>
 
         <ul className="space-y-2">

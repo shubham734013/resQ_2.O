@@ -40,13 +40,13 @@ export const EmergencySearchState = ({
       <div className="space-y-2 max-w-md">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-          <span>Real-time Triage Query</span>
+          <span>Checking hospital care</span>
         </div>
         <h2 className="text-2xl font-light text-zinc-100 tracking-tight">
           Finding suitable care nearby...
         </h2>
         <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
-          Matching verified facilities with active emergency intake for{' '}
+          Finding trusted hospitals that are taking emergency patients for{' '}
           <strong className="text-rose-300 font-semibold">{situationLabel ?? 'your situation'}</strong>.
         </p>
       </div>
@@ -57,19 +57,19 @@ export const EmergencySearchState = ({
           <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 shrink-0">
             <HeartPulse className="w-4 h-4" aria-hidden="true" />
           </div>
-          <span>Verifying 24/7 intake readiness & capacity</span>
+          <span>Checking if the hospital is open for emergencies</span>
         </div>
         <div className="flex items-center gap-3 text-zinc-300">
           <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
             <ShieldCheck className="w-4 h-4" aria-hidden="true" />
           </div>
-          <span>Confirming specialized clinical capabilities</span>
+          <span>Checking what care the hospital offers</span>
         </div>
         <div className="flex items-center gap-3 text-zinc-300">
           <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 shrink-0">
             <Navigation className="w-4 h-4" aria-hidden="true" />
           </div>
-          <span>Calculating rapid arterial route & driving ETA</span>
+          <span>Finding a driving route and travel time</span>
         </div>
       </div>
     </div>

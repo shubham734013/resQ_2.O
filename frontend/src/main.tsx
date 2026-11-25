@@ -1,6 +1,7 @@
 import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import 'leaflet/dist/leaflet.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import Lenis from 'lenis'

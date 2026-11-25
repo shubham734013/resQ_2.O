@@ -25,14 +25,14 @@ export const RouteOption = ({
       case 'moderate':
         return (
           <span className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded">
-            Moderate traffic
+            Some traffic
           </span>
         );
       case 'heavy':
         return (
           <span className="text-[11px] font-medium text-rose-800 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded flex items-center gap-1">
             <AlertCircle className="w-3 h-3 text-rose-600" />
-            Heavy traffic
+            Lots of traffic
           </span>
         );
     }
@@ -56,11 +56,11 @@ export const RouteOption = ({
           <div className="flex items-center gap-2">
             {route.isRecommended ? (
               <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 bg-blue-100/80 border border-blue-200 px-2 py-0.5 rounded">
-                Recommended
+                Suggested
               </span>
             ) : (
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-                Alternative
+                Other choice
               </span>
             )}
             {getTrafficBadge()}
@@ -96,11 +96,11 @@ export const RouteOption = ({
           <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-2">
             <span className="flex items-center gap-0.5">
               <Clock className="w-3 h-3" />
-              ETA
+              Arrival time
             </span>
             <span className="flex items-center gap-0.5">
               <Navigation className="w-3 h-3" />
-              Direct
+              Direct route
             </span>
           </div>
         </div>

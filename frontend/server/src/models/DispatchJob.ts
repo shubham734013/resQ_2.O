@@ -10,7 +10,7 @@ export interface DispatchAttemptDocument {
   attemptId: string;
   generation: number;
   attemptNumber: number;
-  providerId: Types.ObjectId;
+  providerId?: Types.ObjectId;
   ambulanceId: Types.ObjectId;
   driverId: Types.ObjectId;
   status: DispatchAttemptStatus;

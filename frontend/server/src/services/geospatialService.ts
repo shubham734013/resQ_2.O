@@ -24,12 +24,6 @@ export const listNearbyAmbulances=async(query:NearbyQuery,auth?:AuthenticatedIde
     return {items:items.map(a=>({id:String(a._id),status:a.currentStatus,latitude:a.location?.coordinates[1]??0,longitude:a.location?.coordinates[0]??0,updatedAt:(a.locationUpdatedAt??a.updatedAt).toISOString()})),updatedAt:new Date().toISOString()};
   }
 
-  if(auth.role==='AMBULANCE_PROVIDER'){
-    if(!Types.ObjectId.isValid(auth.id))return {items:[],updatedAt:new Date().toISOString()};
-    const items=await AmbulanceModel.find({providerId:new Types.ObjectId(auth.id),location:{$near:{$geometry:center,$maxDistance:query.radius}},accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).select('location currentStatus locationUpdatedAt updatedAt').limit(query.limit).lean().exec();
-    return {items:items.map(a=>({id:String(a._id),status:a.currentStatus,latitude:a.location?.coordinates[1]??0,longitude:a.location?.coordinates[0]??0,updatedAt:(a.locationUpdatedAt??a.updatedAt).toISOString()})),updatedAt:new Date().toISOString()};
-  }
-
   if(auth.role==='AMBULANCE_DRIVER'){
     if(!Types.ObjectId.isValid(auth.id))return {items:[],updatedAt:new Date().toISOString()};
     const driver=await AmbulanceDriverModel.findById(auth.id).select('assignedAmbulanceId').lean().exec();

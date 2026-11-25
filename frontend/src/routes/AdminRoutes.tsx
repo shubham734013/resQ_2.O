@@ -10,14 +10,12 @@ import {
 import {
   AdminUsersManagementPage,
   AdminHospitalsManagementPage,
-  AdminProvidersManagementPage,
   AdminAmbulancesManagementPage,
   AdminDriversManagementPage,
 } from '../pages/AdminManagementPages';
 import {
   AdminUserDetailPage,
   AdminHospitalDetailPage,
-  AdminProviderDetailPage,
   AdminAmbulanceDetailPage,
   AdminDriverDetailPage,
 } from '../pages/AdminDetailPages';
@@ -35,8 +33,6 @@ export const adminRoutes = (
         <Route path="users/:id" element={<AdminUserDetailPage />} />
         <Route path="hospitals" element={<AdminHospitalsManagementPage />} />
         <Route path="hospitals/:id" element={<AdminHospitalDetailPage />} />
-        <Route path="providers" element={<AdminProvidersManagementPage />} />
-        <Route path="providers/:id" element={<AdminProviderDetailPage />} />
         <Route path="drivers" element={<AdminDriversManagementPage />} />
         <Route path="drivers/:id" element={<AdminDriverDetailPage />} />
         <Route path="ambulances" element={<AdminAmbulancesManagementPage />} />

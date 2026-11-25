@@ -16,10 +16,10 @@ export const NotFoundPage = () => {
           <Compass className="h-8 w-8 text-teal-600 animate-spin" style={{ animationDuration: '8s' }} />
         </div>
 
-        <p className="text-xs font-bold uppercase tracking-wider text-teal-700">HTTP 404</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-950 tracking-tight">Route Not Found</h1>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal-700">Page error</p>
+        <h1 className="mt-2 text-3xl font-black text-slate-950 tracking-tight">Page not found</h1>
         <p className="mt-3 text-sm text-slate-600 leading-relaxed">
-          The requested operational resource or URL does not exist or has been relocated to its dedicated role namespace.
+          We could not find this page. It may have moved or the link may be wrong.
         </p>
 
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -29,7 +29,7 @@ export const NotFoundPage = () => {
             icon={<Home className="h-4 w-4" />}
             className="w-full sm:w-auto"
           >
-            Go to Your Dashboard
+            Go to your home page
           </Button>
 
           <Button
@@ -38,7 +38,7 @@ export const NotFoundPage = () => {
             icon={<LifeBuoy className="h-4 w-4" />}
             className="w-full sm:w-auto"
           >
-            Visit Help Center
+            Get help
           </Button>
         </div>
       </div>

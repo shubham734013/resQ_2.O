@@ -8,7 +8,7 @@ export interface AmbulanceLocation { type: 'Point'; coordinates: [number, number
 export interface AmbulanceDocument {
   registrationNumber: string;
   vehicleNumber: string;
-  providerId: Types.ObjectId;
+  providerId?: Types.ObjectId;
   ambulanceType: string;
   capabilities: string[];
   currentStatus: AmbulanceStatus;
@@ -30,7 +30,7 @@ export interface AmbulanceDocument {
 const schema = new Schema<AmbulanceDocument>({
   registrationNumber: { type: String, required: true, unique: true },
   vehicleNumber: { type: String, required: true, unique: true },
-  providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true },
+  providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: false, index: true },
   ambulanceType: { type: String, required: true },
   capabilities: { type: [String], default: [] },
   currentStatus: { type: String, enum: AMBULANCE_STATUSES, default: 'OFFLINE', index: true },

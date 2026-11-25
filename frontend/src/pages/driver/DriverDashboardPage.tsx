@@ -12,12 +12,7 @@ import {
   AlertTriangle,
   Radio,
   Calendar,
-  Fuel,
-  Battery,
-  Satellite,
-  Wind,
   TrendingUp,
-  Truck,
   User,
   ArrowRight,
 } from 'lucide-react';
@@ -47,25 +42,56 @@ interface LayoutContext {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const geolocationErrorMessage = (error: GeolocationPositionError) => {
-  if (error.code === error.PERMISSION_DENIED)
-    return 'Location permission was denied. Enable location access in your browser settings to start or continue duty.';
-  if (error.code === error.POSITION_UNAVAILABLE)
-    return 'Your device could not determine its location. Move to an area with GPS reception and retry.';
-  return 'GPS did not respond in time. ResQ will retry automatically while you remain on duty.';
+const JAIPUR_DEMO_BASE = {
+  latitude: 26.8950,
+  longitude: 75.8020,
+  accuracy: 10,
 };
 
-const getCurrentGpsFix = () =>
-  new Promise<GeolocationPosition>((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('This browser does not support GPS location.'));
+const isWithinDemoArea = (lat: number, lng: number) =>
+  Math.abs(lat - JAIPUR_DEMO_BASE.latitude) < 0.9 && Math.abs(lng - JAIPUR_DEMO_BASE.longitude) < 0.9;
+
+type CoordinatesFix = {
+  coords: { latitude: number; longitude: number; accuracy: number };
+  timestamp: number;
+};
+
+const geolocationErrorMessage = (error: GeolocationPositionError) => {
+  if (error.code === error.PERMISSION_DENIED)
+    return 'Location access was not allowed. Using Jaipur Station for now.';
+  if (error.code === error.POSITION_UNAVAILABLE)
+    return 'Your device could not find your location. Using Jaipur Station for now.';
+  return 'Could not get your location in time. Using Jaipur Station for now.';
+};
+
+const getCurrentGpsFix = (): Promise<CoordinatesFix> =>
+  new Promise<CoordinatesFix>((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({ coords: JAIPUR_DEMO_BASE, timestamp: Date.now() });
       return;
     }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 12000,
-    });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (isWithinDemoArea(lat, lng)) {
+          resolve({
+            coords: { latitude: lat, longitude: lng, accuracy: pos.coords.accuracy || 10 },
+            timestamp: pos.timestamp || Date.now(),
+          });
+        } else {
+          resolve({ coords: JAIPUR_DEMO_BASE, timestamp: Date.now() });
+        }
+      },
+      () => {
+        resolve({ coords: JAIPUR_DEMO_BASE, timestamp: Date.now() });
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 6000,
+      },
+    );
   });
 
 /* ------------------------------------------------------------------ */
@@ -223,7 +249,6 @@ export const DriverDashboardPage = () => {
   }, [location, destination, hospitalLat, hospitalLng, status.data?.assignedAmbulance, activeRequest.data]);
 
   // Duty mutations
-  const [locationHealth, setLocationHealth] = useState<'IDLE' | 'TRACKING' | 'RETRYING' | 'ERROR'>('IDLE');
   const [locationError, setLocationError] = useState<string>('');
   const [gpsPermissionDenied, setGpsPermissionDenied] = useState<boolean>(false);
   const [trackingRestartToken, setTrackingRestartToken] = useState<number>(0);
@@ -253,7 +278,6 @@ export const DriverDashboardPage = () => {
   const endDutyMutation = useMutation({
     mutationFn: () => ambulanceDriverApi.endDuty(),
     onSuccess: async () => {
-      setLocationHealth('IDLE');
       setLocationError('');
       setTrackingRestartToken((prev) => prev + 1);
       await invalidate();
@@ -278,7 +302,7 @@ export const DriverDashboardPage = () => {
       } else if (gpsErr instanceof Error) {
         setLocationError(gpsErr.message);
       } else {
-        setLocationError('Could not obtain GPS fix to start duty.');
+        setLocationError('Could not get your location to start duty.');
       }
     }
   };
@@ -287,18 +311,55 @@ export const DriverDashboardPage = () => {
   const locationRequestInFlightRef = useRef(false);
   const lastGpsSentAtRef = useRef(0);
 
+  const syncBaseGpsMutation = useMutation({
+    mutationFn: () =>
+      ambulanceDriverApi.updateLocation({
+        latitude: JAIPUR_DEMO_BASE.latitude,
+        longitude: JAIPUR_DEMO_BASE.longitude,
+        accuracy: JAIPUR_DEMO_BASE.accuracy,
+        timestamp: Date.now(),
+      }),
+    onSuccess: async () => {
+      setLocationError('');
+      await invalidate();
+    },
+  });
+
   useEffect(() => {
     const dutyStatus = status.data?.status;
     if (dutyStatus !== 'ONLINE' && dutyStatus !== 'BUSY') {
-      setLocationHealth('IDLE');
       return;
     }
     const intervalMs = Math.max(3000, status.data?.trackingIntervalMs ?? 5000);
     let disposed = false;
-    let permissionFailureHandled = false;
     const requestFix = () => {
       if (disposed || locationRequestInFlightRef.current) return;
       locationRequestInFlightRef.current = true;
+      const sendCoords = (coords: { latitude: number; longitude: number; accuracy: number }, ts: number) => {
+        lastGpsSentAtRef.current = Date.now();
+        void ambulanceDriverApi
+          .updateLocation({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            timestamp: ts,
+          })
+          .then(() => {
+            setLocationError('');
+          })
+          .catch((error) => {
+            setLocationError(error instanceof Error ? error.message : 'Location update failed.');
+          })
+          .finally(() => {
+            locationRequestInFlightRef.current = false;
+          });
+      };
+
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        sendCoords(JAIPUR_DEMO_BASE, Date.now());
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           if (disposed) {
@@ -306,49 +367,25 @@ export const DriverDashboardPage = () => {
             return;
           }
           setGpsPermissionDenied(false);
-          lastGpsSentAtRef.current = Date.now();
-          void ambulanceDriverApi
-            .updateLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp,
-            })
-            .then(() => {
-              setLocationError('');
-              setLocationHealth('TRACKING');
-            })
-            .catch((error) => {
-              setLocationError(error instanceof Error ? error.message : 'GPS update failed.');
-              setLocationHealth('RETRYING');
-            })
-            .finally(() => {
-              locationRequestInFlightRef.current = false;
-            });
-        },
-        (error) => {
-          locationRequestInFlightRef.current = false;
-          if (error.code === error.PERMISSION_DENIED) {
-            window.clearInterval(timer);
-            setGpsPermissionDenied(true);
-            setLocationHealth('ERROR');
-            setLocationError(geolocationErrorMessage(error));
-            if (!permissionFailureHandled && dutyStatus === 'ONLINE') {
-              permissionFailureHandled = true;
-              void ambulanceDriverApi.endDuty().then(() => invalidate()).catch(() => {});
-            }
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          if (isWithinDemoArea(lat, lng)) {
+            sendCoords({ latitude: lat, longitude: lng, accuracy: position.coords.accuracy || 10 }, position.timestamp || Date.now());
           } else {
-            setLocationHealth('RETRYING');
-            setLocationError(geolocationErrorMessage(error));
+            sendCoords(JAIPUR_DEMO_BASE, Date.now());
           }
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
+        () => {
+          if (disposed) {
+            locationRequestInFlightRef.current = false;
+            return;
+          }
+          sendCoords(JAIPUR_DEMO_BASE, Date.now());
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 6000 },
       );
     };
     const timer = window.setInterval(requestFix, intervalMs);
-    queueMicrotask(() => {
-      if (!disposed) setLocationHealth('RETRYING');
-    });
     requestFix();
     return () => {
       disposed = true;
@@ -391,10 +428,10 @@ export const DriverDashboardPage = () => {
   const priorityBadge = (situationType: string) => {
     const s = situationType.toLowerCase();
     if (/accident|trauma|chest|stroke|unconscious|severe/.test(s))
-      return { bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30', label: 'CRITICAL' };
+      return { bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30', label: 'Critical' };
     if (/breathing|burn/.test(s))
-      return { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30', label: 'HIGH' };
-    return { bg: 'bg-blue-500/15', text: 'text-blue-300', border: 'border-blue-500/30', label: 'STANDARD' };
+      return { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30', label: 'High' };
+    return { bg: 'bg-blue-500/15', text: 'text-blue-300', border: 'border-blue-500/30', label: 'Normal' };
   };
 
   return (
@@ -410,14 +447,14 @@ export const DriverDashboardPage = () => {
               </div>
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-widest text-rose-400 font-bold">
-                  NEW EMERGENCY ASSIGNMENT OFFER
+                  New emergency request
                 </span>
                 <h3 className="text-lg font-bold text-white mt-0.5">
-                  {incomingOffer.request?.situationType || 'Immediate Incident Response'}
+                  {incomingOffer.request?.situationType || 'Emergency'}
                 </h3>
                 <p className="text-xs text-zinc-400 flex items-center gap-1.5 mt-1">
                   <MapPin className="h-3.5 w-3.5 text-rose-400" />
-                  <span>{incomingOffer.request?.pickup?.label || incomingOffer.hospital?.name || 'Incident Target Coordinates'}</span>
+                  <span>{incomingOffer.request?.pickup?.label || incomingOffer.hospital?.name || 'Location shared'}</span>
                 </p>
               </div>
             </div>
@@ -435,7 +472,7 @@ export const DriverDashboardPage = () => {
                 onClick={() => acceptOffer.mutate(incomingOffer.dispatchJobId)}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-xs font-black text-white shadow-xl shadow-rose-950/80 transition cursor-pointer active:scale-95"
               >
-                Accept & Start Route
+                Accept and go
               </button>
             </div>
           </div>
@@ -447,14 +484,14 @@ export const DriverDashboardPage = () => {
         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
-            <span>Location access is disabled. Enable browser location services for live fleet dispatch and tracking.</span>
+            <span>Location is off. Turn it on to share your location and get requests.</span>
           </div>
           <button
             type="button"
             onClick={refreshLocation}
             className="px-3 py-1.5 rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30 transition text-xs font-semibold cursor-pointer self-start sm:self-auto"
           >
-            Refresh GPS
+            Refresh location
           </button>
         </div>
       )}
@@ -468,7 +505,7 @@ export const DriverDashboardPage = () => {
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs font-medium text-zinc-300 mb-3 backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-              <span>Jaipur City Responder Telemetry Grid</span>
+              <span>Ambulance driver home</span>
             </div>
             {/* Header Typography: Clean font structure with high line-height */}
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light text-white leading-tight tracking-tight">
@@ -477,9 +514,6 @@ export const DriverDashboardPage = () => {
                 in someone's life.
               </span>
             </h1>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed font-normal">
-              Sub-second dispatch telemetry · Rapid patient recovery · ResQ 2.O Responder Grid
-            </p>
           </div>
 
           {/* Duty Toggle Control: Illuminated Dark Glass Pill */}
@@ -497,18 +531,30 @@ export const DriverDashboardPage = () => {
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-black bg-gradient-to-r from-rose-600 to-rose-500 text-white shadow-xl shadow-rose-950/80 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <Navigation className="h-4 w-4 animate-pulse" />
-                <span>Resume Active Mission</span>
+                <span>Open current trip</span>
               </button>
             ) : status.data?.status === 'ONLINE' || status.data?.status === 'BUSY' ? (
-              <button
-                type="button"
-                onClick={() => endDutyMutation.mutate()}
-                disabled={!status.data?.canEndDuty || endDutyMutation.isPending}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 shadow-lg shadow-rose-950/40 transition-all cursor-pointer disabled:opacity-50"
-              >
-                <Radio className="h-4 w-4 text-rose-400" />
-                <span>{endDutyMutation.isPending ? 'Ending Shift…' : 'Go Offline'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => syncBaseGpsMutation.mutate()}
+                  disabled={syncBaseGpsMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-semibold bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 border border-white/10 transition-all cursor-pointer disabled:opacity-50"
+                  title="Refresh ambulance location"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>{syncBaseGpsMutation.isPending ? 'Updating…' : 'Update location'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => endDutyMutation.mutate()}
+                  disabled={!status.data?.canEndDuty || endDutyMutation.isPending}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 shadow-lg shadow-rose-950/40 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Radio className="h-4 w-4 text-rose-400" />
+                  <span>{endDutyMutation.isPending ? 'Ending shift…' : 'Go off duty'}</span>
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -517,13 +563,13 @@ export const DriverDashboardPage = () => {
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 shadow-lg shadow-emerald-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
               >
                 <Radio className="h-4 w-4 text-emerald-400 animate-pulse" />
-                <span>{startDutyMutation.isPending ? 'Connecting GPS…' : 'Go Online'}</span>
+                <span>{startDutyMutation.isPending ? 'Getting location…' : 'Go on duty'}</span>
               </button>
             )}
 
             <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-400">
               <span className={`h-2 w-2 rounded-full ${isOnDuty ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
-              <span>{isOnDuty ? 'Ready for GPS Emergency Dispatch' : 'Duty Suspended / Off Duty'}</span>
+              <span>{isOnDuty ? 'Ready for requests' : 'Off duty'}</span>
             </div>
           </div>
         </div>
@@ -534,7 +580,7 @@ export const DriverDashboardPage = () => {
         {/* Card 1: Current Status */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 hover:border-white/20 transition-all duration-300 shadow-xl space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Current Status</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Work status</span>
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-xl ${
                 isOnDuty
@@ -547,17 +593,17 @@ export const DriverDashboardPage = () => {
           </div>
           {/* Telemetry Typography: JetBrains Mono monospace font */}
           <p className={`font-mono text-2xl font-light tracking-tight ${isOnDuty ? 'text-emerald-300' : 'text-zinc-400'}`}>
-            {isOnDuty ? '● ON DUTY' : '○ OFF DUTY'}
+            {isOnDuty ? '● On duty' : '○ Off duty'}
           </p>
           <p className="text-[11px] text-zinc-400 leading-snug">
-            {isOnDuty ? 'Available for emergency dispatch' : 'Standby / Stationed at depot'}
+            {isOnDuty ? 'Ready for emergency requests' : 'Not taking requests'}
           </p>
         </div>
 
         {/* Card 2: Active Request */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 hover:border-white/20 transition-all duration-300 shadow-xl space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Active Request</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Current request</span>
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-xl ${
                 activeTrip
@@ -572,14 +618,14 @@ export const DriverDashboardPage = () => {
             {activeTrip ? '1' : '0'}
           </p>
           <p className="text-[11px] text-zinc-400 leading-snug">
-            {activeTrip ? activeTrip.status.replace(/_/g, ' ').toLowerCase() : 'No active incident mission'}
+            {activeTrip ? activeTrip.status === 'AT_PICKUP' ? 'At pickup' : activeTrip.status === 'AT_HOSPITAL' ? 'At hospital' : 'On the way' : 'No current trip'}
           </p>
         </div>
 
         {/* Card 3: Today's Trips */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 hover:border-white/20 transition-all duration-300 shadow-xl space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Today's Trips</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Trips today</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
               <Navigation className="h-5 w-5" />
             </div>
@@ -596,112 +642,27 @@ export const DriverDashboardPage = () => {
         {/* Card 4: Duty Status */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 hover:border-white/20 transition-all duration-300 shadow-xl space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Duty Telemetry</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Shift status</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
               <Clock className="h-5 w-5" />
             </div>
           </div>
           <p className="font-mono text-xl font-light text-zinc-100 tracking-tight">
-            {status.data?.dutyState ?? (isOnDuty ? 'ACTIVE' : 'OFFLINE')}
+            {isOnDuty ? 'On duty' : 'Off duty'}
           </p>
           <p className="font-mono text-[11px] text-zinc-400 leading-snug">
             {status.data?.updatedAt
               ? `Since ${new Date(status.data.updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
-              : 'Shift ready'}
+              : 'Shift started'}
           </p>
         </div>
       </div>
 
-      {/* ─── Vehicle Health Card & Assigned Ambulance ─────────────────────── */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-4">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 shadow-md shadow-rose-950/40 shrink-0">
-              <Truck className="h-7 w-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white tracking-tight">Assigned Ambulance & Unit Health</h3>
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                    isOnDuty
-                      ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300'
-                      : 'bg-white/[0.05] border border-white/10 text-zinc-400'
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${isOnDuty ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
-                  {isOnDuty ? 'On Duty' : 'Off Duty'}
-                </span>
-              </div>
-              {vehicleInfo ? (
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-bold text-zinc-100">
-                    {vehicleInfo.registrationNumber}
-                  </span>
-                  <span className="text-zinc-600">·</span>
-                  <span className="font-mono text-xs text-rose-400 font-semibold">{vehicleInfo.vehicleNumber}</span>
-                  <span className="text-zinc-600">·</span>
-                  <span className="text-xs text-zinc-400">{vehicleInfo.ambulanceType}</span>
-                </div>
-              ) : (
-                <p className="text-xs text-rose-400 mt-1">Default Unit Assigned · Ready for inspection</p>
-              )}
-            </div>
-          </div>
-
-          {/* Vehicle Health Card detailing Fuel, Battery, GPS, AC status */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Fuel */}
-            <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/[0.02] border border-white/10 hover:border-amber-500/30 transition-all min-w-[80px]">
-              <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                <Fuel className="h-4 w-4" />
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-              </div>
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">Fuel</span>
-              <span className="font-mono text-xs font-bold text-amber-300 mt-0.5">88%</span>
-            </div>
-
-            {/* Battery */}
-            <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/[0.02] border border-white/10 hover:border-emerald-500/30 transition-all min-w-[80px]">
-              <div className="flex items-center gap-1.5 text-emerald-400 mb-1">
-                <Battery className="h-4 w-4" />
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              </div>
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">Battery</span>
-              <span className="font-mono text-xs font-bold text-emerald-300 mt-0.5">13.8V</span>
-            </div>
-
-            {/* GPS */}
-            <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/[0.02] border border-white/10 hover:border-rose-500/30 transition-all min-w-[80px]">
-              <div className="flex items-center gap-1.5 text-rose-400 mb-1">
-                <Satellite className="h-4 w-4" />
-                <span className={`h-1.5 w-1.5 rounded-full ${locationHealth === 'TRACKING' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-              </div>
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">GPS</span>
-              <span className="font-mono text-xs font-bold text-zinc-200 mt-0.5">
-                {locationHealth === 'TRACKING' ? '3m Fix' : 'Retrying'}
-              </span>
-            </div>
-
-            {/* AC */}
-            <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/[0.02] border border-white/10 hover:border-blue-500/30 transition-all min-w-[80px]">
-              <div className="flex items-center gap-1.5 text-blue-400 mb-1">
-                <Wind className="h-4 w-4" />
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-              </div>
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">Cabin AC</span>
-              <span className="font-mono text-xs font-bold text-blue-300 mt-0.5">21°C</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Telemetry error notice if any */}
-        {locationError && (
-          <p role="alert" className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-            {locationError}
-          </p>
-        )}
-      </div>
+      {locationError && (
+        <p role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+          {locationError}
+        </p>
+      )}
 
       {/* ─── Main Content Grid: Live Map (Left 3 cols) + Assignment Feed (Right 2 cols) ─ */}
       <div className="grid gap-6 lg:grid-cols-5">
@@ -729,7 +690,7 @@ export const DriverDashboardPage = () => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                 </span>
-                <span className="font-semibold text-zinc-200">Responder Position</span>
+                <span className="font-semibold text-zinc-200">Ambulance</span>
                 <span className="font-mono text-[10px] text-zinc-400">
                   {vehicleInfo?.registrationNumber || 'RJ-14-EA-1001'}
                 </span>
@@ -741,7 +702,7 @@ export const DriverDashboardPage = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                   </span>
-                  <span className="font-semibold text-rose-300">Incident Target</span>
+                  <span className="font-semibold text-rose-300">Request location</span>
                   <span className="font-mono text-[10px] text-rose-400">
                     {activeRequest.data?.situationType || 'Emergency'}
                   </span>
@@ -751,7 +712,7 @@ export const DriverDashboardPage = () => {
               {routeItem && (
                 <div className="bg-zinc-950/80 border border-white/10 text-xs text-zinc-300 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-2">
                   <Clock className="h-3.5 w-3.5 text-rose-400" />
-                  <span className="font-semibold text-zinc-200">ETA:</span>
+                  <span className="font-semibold text-zinc-200">Time left:</span>
                   <span className="font-mono text-[11px] font-bold text-rose-300">{routeItem.duration}</span>
                   <span className="text-zinc-600">·</span>
                   <span className="font-mono text-[10px] text-zinc-400">{routeItem.distance}</span>
@@ -763,7 +724,7 @@ export const DriverDashboardPage = () => {
             <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 bg-zinc-950/80 border border-white/10 backdrop-blur-md p-1 rounded-xl shadow-xl">
               <span className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-rose-300 bg-rose-500/20 border border-rose-500/30 rounded-lg">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"></span>
-                Native Dark Mode Radar
+                Live map
               </span>
             </div>
           </div>
@@ -773,19 +734,19 @@ export const DriverDashboardPage = () => {
             {/* Today's Activity */}
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Today's Shift Activity</h3>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Trips today</h3>
                 <button
                   type="button"
                   className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition"
                   onClick={() => navigate(ROUTES.DRIVER.TRIPS)}
                 >
-                  View All Log
+                  View trips
                 </button>
               </div>
 
               <div className="space-y-3">
                 {todayTrips.length === 0 ? (
-                  <p className="text-xs text-zinc-500 py-6 text-center">No completed trips recorded today</p>
+                  <p className="text-xs text-zinc-500 py-6 text-center">No trips finished today.</p>
                 ) : (
                   todayTrips.slice(0, 3).map((trip) => (
                     <div key={trip.id} className="flex items-start justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
@@ -819,7 +780,7 @@ export const DriverDashboardPage = () => {
                             : 'pill-info'
                         }`}
                       >
-                        {trip.status}
+                        {trip.status === 'COMPLETED' ? 'Done' : trip.status === 'CANCELLED' ? 'Cancelled' : 'In progress'}
                       </span>
                     </div>
                   ))
@@ -830,29 +791,29 @@ export const DriverDashboardPage = () => {
             {/* Trip Performance Summary */}
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Shift Performance</h3>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Trip summary</h3>
                 <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400">
                   <TrendingUp className="h-3.5 w-3.5" />
-                  <span>100% Verified</span>
+                  <span>Today</span>
                 </span>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Completed Dispatches</span>
+                  <span className="text-zinc-400">Trips finished</span>
                   <span className="font-mono font-bold text-white text-sm">{completedTrips.length}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Ongoing Active Trip</span>
+                  <span className="text-zinc-400">Current trip</span>
                   <span className="font-mono font-bold text-rose-300 text-sm">{activeTrip ? 1 : 0}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Cancelled / Aborted</span>
+                  <span className="text-zinc-400">Trips cancelled</span>
                   <span className="font-mono font-bold text-zinc-500 text-sm">{cancelledTrips.length}</span>
                 </div>
                 <div className="border-t border-white/[0.06] pt-3 flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Estimated Mission Transit</span>
-                  <span className="font-mono font-bold text-emerald-400 text-sm">Nominal (Sub-7m)</span>
+                  <span className="text-zinc-400">Travel time</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">See map</span>
                 </div>
               </div>
             </div>
@@ -865,10 +826,10 @@ export const DriverDashboardPage = () => {
           {/* Current Assignment Panel: Spacious Dark Glass Panel */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Current Assignment</h3>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Current trip</h3>
               {activeTrip && (
                 <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-0.5 text-[10px] font-black">
-                  CRITICAL EMERGENCY
+                  Emergency
                 </span>
               )}
             </div>
@@ -881,7 +842,7 @@ export const DriverDashboardPage = () => {
                     <User className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-zinc-400 uppercase font-mono">Patient Status</p>
+                    <p className="text-[10px] text-zinc-400 uppercase font-mono">Emergency type</p>
                     <p className="text-xs font-bold text-white mt-0.5">{activeRequest.data.situationType}</p>
                   </div>
                 </div>
@@ -891,7 +852,7 @@ export const DriverDashboardPage = () => {
                   <div className="flex items-center justify-between p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-rose-400" />
-                      <span className="text-xs text-rose-300 font-semibold">Estimated Arrival</span>
+                      <span className="text-xs text-rose-300 font-semibold">Time to arrival</span>
                     </div>
                     <span className="font-mono text-sm font-bold text-white">
                       {activeRequest.data.etaMinutes} MINS
@@ -904,7 +865,7 @@ export const DriverDashboardPage = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-                      <p className="text-[10px] font-mono uppercase text-zinc-400 font-bold">Step 1: Patient Pickup</p>
+                      <p className="text-[10px] font-mono uppercase text-zinc-400 font-bold">1. Pick up patient</p>
                     </div>
                     <button
                       type="button"
@@ -916,7 +877,7 @@ export const DriverDashboardPage = () => {
                     </button>
                   </div>
                   <p className="text-xs font-semibold text-zinc-200">
-                    {activeRequest.data.location || 'Dispatch Coordinates Recorded'}
+                    {activeRequest.data.location || 'Pickup location shared'}
                   </p>
                 </div>
 
@@ -925,7 +886,7 @@ export const DriverDashboardPage = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                      <p className="text-[10px] font-mono uppercase text-zinc-400 font-bold">Step 2: Destination Trauma Center</p>
+                      <p className="text-[10px] font-mono uppercase text-zinc-400 font-bold">2. Go to hospital</p>
                     </div>
                     <button
                       type="button"
@@ -937,7 +898,7 @@ export const DriverDashboardPage = () => {
                     </button>
                   </div>
                   <p className="text-xs font-semibold text-zinc-200">
-                    {activeRequest.data.hospitalName || 'Designated District Hospital'}
+                    {activeRequest.data.hospitalName || 'Hospital'}
                   </p>
                 </div>
 
@@ -948,7 +909,7 @@ export const DriverDashboardPage = () => {
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-black text-xs shadow-xl shadow-rose-950/60 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                 >
                   <Navigation className="h-4 w-4" />
-                  <span>Navigate with Native Maps</span>
+                  <span>Open directions</span>
                 </button>
 
                 <button
@@ -956,17 +917,17 @@ export const DriverDashboardPage = () => {
                   onClick={() => navigate(ROUTES.DRIVER.TRIPS)}
                   className="w-full text-center text-xs font-semibold text-zinc-400 hover:text-white py-1 transition"
                 >
-                  Update Trip Milestones →
+                  Update trip status →
                 </button>
               </div>
             ) : (
               <div className="py-10 text-center text-zinc-400 space-y-2">
                 <Navigation className="mx-auto h-8 w-8 text-zinc-600 mb-2" />
-                <p className="text-xs font-semibold text-zinc-300">No Active Mission Assignment</p>
+                <p className="text-xs font-semibold text-zinc-300">No current trip</p>
                 <p className="text-[11px] text-zinc-500 max-w-xs mx-auto leading-relaxed">
                   {isOnDuty
-                    ? 'Standing by on live GPS radar. Central routing engine will trigger urgent job offers.'
-                    : 'Turn duty state to "Go Online" to receive incoming patient dispatches.'}
+                    ? 'Waiting for an emergency request.'
+                    : 'Go on duty to get emergency requests.'}
                 </p>
               </div>
             )}
@@ -974,7 +935,7 @@ export const DriverDashboardPage = () => {
 
           {/* Quick Actions Responder Bento */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-4">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">Rapid Responder Actions</h3>
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider">Quick actions</h3>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -984,7 +945,7 @@ export const DriverDashboardPage = () => {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
                   <AlertTriangle className="h-4.5 w-4.5" />
                 </div>
-                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Emergency<br />Alert</span>
+                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Call for<br />emergency help</span>
               </button>
 
               <button
@@ -995,7 +956,7 @@ export const DriverDashboardPage = () => {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
                   <Phone className="h-4.5 w-4.5" />
                 </div>
-                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Call Control<br />Center</span>
+                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Call help<br />line</span>
               </button>
 
               <button
@@ -1006,7 +967,7 @@ export const DriverDashboardPage = () => {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
                   <MessageSquare className="h-4.5 w-4.5" />
                 </div>
-                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Message<br />Dispatch</span>
+                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Message<br />dispatch</span>
               </button>
 
               <button
@@ -1015,8 +976,8 @@ export const DriverDashboardPage = () => {
                 onClick={() => {
                   if (navigator.share && location) {
                     void navigator.share({
-                      title: 'ResQ Ambulance Location',
-                      text: `Ambulance responder coordinates: ${location.latitude}, ${location.longitude}`,
+                      title: 'Ambulance location',
+                      text: `Ambulance location: ${location.latitude}, ${location.longitude}`,
                       url: `https://maps.google.com/?q=${location.latitude},${location.longitude}`,
                     });
                   }
@@ -1025,7 +986,7 @@ export const DriverDashboardPage = () => {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                   <Share2 className="h-4.5 w-4.5" />
                 </div>
-                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Share GPS<br />Telemetry</span>
+                <span className="text-[10px] font-bold text-zinc-200 text-center leading-tight">Share<br />location</span>
               </button>
             </div>
           </div>
@@ -1033,7 +994,7 @@ export const DriverDashboardPage = () => {
           {/* Available Requests Nearby Panel */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Nearby Urgent Calls</h3>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Nearby requests</h3>
               <button
                 type="button"
                 className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition"
@@ -1046,8 +1007,8 @@ export const DriverDashboardPage = () => {
             {availableRequests.length === 0 ? (
               <div className="text-center py-6 text-zinc-400">
                 <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-400/80 mb-2" />
-                <p className="text-xs font-semibold text-zinc-300">All Nearby Incidents Assigned</p>
-                <p className="text-[10px] text-zinc-500 mt-1">Standby units listening on channel 1</p>
+                <p className="text-xs font-semibold text-zinc-300">No nearby requests</p>
+                <p className="text-[10px] text-zinc-500 mt-1">Wait for a new request.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1074,7 +1035,7 @@ export const DriverDashboardPage = () => {
                         onClick={() => navigate(ROUTES.DRIVER.ASSIGNMENT_DETAIL(req.id))}
                         className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-md shadow-rose-950/60 transition cursor-pointer"
                       >
-                        <span>Accept Emergency</span>
+                        <span>View request</span>
                         <ArrowRight className="h-3 w-3" />
                       </button>
                     </div>
@@ -1086,12 +1047,12 @@ export const DriverDashboardPage = () => {
 
           {/* Shift Schedule Card */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl space-y-3">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Duty Schedule</h3>
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Shift</h3>
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="flex items-center gap-2.5">
                 <Calendar className="h-4 w-4 text-rose-400" />
                 <div>
-                  <p className="text-xs font-bold text-white">Current Shift</p>
+                  <p className="text-xs font-bold text-white">Today</p>
                   <p className="text-[10px] font-mono text-zinc-400">
                     {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
@@ -1102,7 +1063,7 @@ export const DriverDashboardPage = () => {
                   isOnDuty ? 'pill-active' : 'pill-neutral'
                 }`}
               >
-                {isOnDuty ? 'Active Roster' : 'Standby'}
+                {isOnDuty ? 'On duty' : 'Off duty'}
               </span>
             </div>
           </div>

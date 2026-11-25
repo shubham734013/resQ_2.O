@@ -13,10 +13,10 @@ const validateQuery=(schema:z.ZodType)=>(req:Request,res:Response,next:NextFunct
   next();
 };
 
-export const emergencyRouter=Router();
-emergencyRouter.use(authenticate,authorizeRole('USER'));
-emergencyRouter.get('/discovery',validateQuery(emergencyDiscoveryQuerySchema),discoverEmergencyHospitals);
-emergencyRouter.post('/',validateBody(createEmergencyRequestSchema),createEmergency);
-emergencyRouter.get('/',validateQuery(userEmergencyListQuerySchema),listEmergencies);
-emergencyRouter.get('/:id',getEmergency);
-emergencyRouter.post('/:id/cancel',validateBody(cancelEmergencySchema),cancelEmergency);
+export const emergencyRouter = Router();
+emergencyRouter.use(authenticate);
+emergencyRouter.get('/discovery', validateQuery(emergencyDiscoveryQuerySchema), discoverEmergencyHospitals);
+emergencyRouter.post('/', authorizeRole('USER'), validateBody(createEmergencyRequestSchema), createEmergency);
+emergencyRouter.get('/', validateQuery(userEmergencyListQuerySchema), listEmergencies);
+emergencyRouter.get('/:id', authorizeRole('USER'), getEmergency);
+emergencyRouter.post('/:id/cancel', authorizeRole('USER'), validateBody(cancelEmergencySchema), cancelEmergency);

@@ -54,7 +54,7 @@ describe('DATA-01C.3: Cross-Tenant Isolation and Emergency Workflow Verification
   let hospital1Id: string;
   let hospital2Id: string;
   let providerAId: string;
-  let providerBId: string;
+  // let providerBId: string;
   let driverAId: string;
   let driverBId: string;
   let ambulanceAId: string;
@@ -165,7 +165,7 @@ describe('DATA-01C.3: Cross-Tenant Isolation and Emergency Workflow Verification
       accountStatus: 'ACTIVE',
       verificationStatus: 'VERIFIED',
     });
-    providerBId = provB._id.toString();
+    // providerBId = provB._id.toString();
     createdProviderIds.push(provB._id);
 
     // 4. Create Ambulances
@@ -910,7 +910,7 @@ describe('DATA-01C.3: Cross-Tenant Isolation and Emergency Workflow Verification
         id: providerAId,
         email: 'prova@test.local',
         name: 'Provider A',
-        role: 'AMBULANCE_PROVIDER',
+        role: 'AMBULANCE_DRIVER',
         accountStatus: 'ACTIVE',
       };
 
@@ -1040,14 +1040,6 @@ describe('DATA-01C.3: Cross-Tenant Isolation and Emergency Workflow Verification
         );
       });
 
-      // 3. Authorized Provider
-      assert.doesNotThrow(() => {
-        assertEmergencyCoordinationAccess(
-          { id: providerAId, role: 'AMBULANCE_PROVIDER', email: 'pa@t.l', name: 'PA', accountStatus: 'ACTIVE' },
-          emergencyContext
-        );
-      });
-
       // 4. Authorized Driver
       assert.doesNotThrow(() => {
         assertEmergencyCoordinationAccess(
@@ -1086,18 +1078,7 @@ describe('DATA-01C.3: Cross-Tenant Isolation and Emergency Workflow Verification
         /Hospital is not assigned to this emergency coordination/
       );
 
-      // 8. Unrelated Provider (REJECTED)
-      assert.throws(
-        () => {
-          assertEmergencyCoordinationAccess(
-            { id: providerBId, role: 'AMBULANCE_PROVIDER', email: 'pb@t.l', name: 'PB', accountStatus: 'ACTIVE' },
-            emergencyContext
-          );
-        },
-        /Provider is not assigned to this emergency dispatch/
-      );
-
-      // 9. Unrelated Driver (REJECTED)
+      // 8. Unrelated Driver (REJECTED)
       assert.throws(
         () => {
           assertEmergencyCoordinationAccess(
@@ -1126,14 +1107,12 @@ describe('DATA-01C.3: Cross-Tenant Isolation and Emergency Workflow Verification
       // Authorized actors
       assert.equal(canAccessTrackingSnapshot({ id: user1Id, role: 'USER', email: 'u1@t.l', name: 'U1', accountStatus: 'ACTIVE' }, emergency, trip), true);
       assert.equal(canAccessTrackingSnapshot({ id: hospital1Id, role: 'HOSPITAL', email: 'h1@t.l', name: 'H1', accountStatus: 'ACTIVE' }, emergency, trip), true);
-      assert.equal(canAccessTrackingSnapshot({ id: providerAId, role: 'AMBULANCE_PROVIDER', email: 'pa@t.l', name: 'PA', accountStatus: 'ACTIVE' }, emergency, trip), true);
       assert.equal(canAccessTrackingSnapshot({ id: driverAId, role: 'AMBULANCE_DRIVER', email: 'da@t.l', name: 'DA', accountStatus: 'ACTIVE' }, emergency, trip), true);
       assert.equal(canAccessTrackingSnapshot({ id: new Types.ObjectId().toString(), role: 'ADMIN', email: 'ad@t.l', name: 'Admin', accountStatus: 'ACTIVE' }, emergency, trip), true);
 
       // Unauthorized actors
       assert.equal(canAccessTrackingSnapshot({ id: user2Id, role: 'USER', email: 'u2@t.l', name: 'U2', accountStatus: 'ACTIVE' }, emergency, trip), false);
       assert.equal(canAccessTrackingSnapshot({ id: hospital2Id, role: 'HOSPITAL', email: 'h2@t.l', name: 'H2', accountStatus: 'ACTIVE' }, emergency, trip), false);
-      assert.equal(canAccessTrackingSnapshot({ id: providerBId, role: 'AMBULANCE_PROVIDER', email: 'pb@t.l', name: 'PB', accountStatus: 'ACTIVE' }, emergency, trip), false);
       assert.equal(canAccessTrackingSnapshot({ id: driverBId, role: 'AMBULANCE_DRIVER', email: 'db@t.l', name: 'DB', accountStatus: 'ACTIVE' }, emergency, trip), false);
     });
   });

@@ -1,4 +1,4 @@
-export type AdminRole = 'USER' | 'HOSPITAL' | 'AMBULANCE_PROVIDER' | 'AMBULANCE_DRIVER' | 'ADMIN';
+export type AdminRole = 'USER' | 'HOSPITAL' | 'AMBULANCE_DRIVER' | 'ADMIN';
 export type AdminAccountStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED';
 export type AdminVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 

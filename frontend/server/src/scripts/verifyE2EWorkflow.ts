@@ -258,7 +258,12 @@ export const runE2EVerification = async () => {
     assert.ok(emergencyId, 'Emergency ID must be returned');
     assert.equal(emergencyResult.status, 'AMBULANCE_COORDINATION');
     assert.ok(emergencyResult.requestCode.startsWith('RSQ-'), 'Valid request code generated');
+    assert.ok(emergencyResult.pickupOtp, '6-digit numeric Pickup OTP must be generated');
+    assert.equal(emergencyResult.pickupOtp.length, 6, 'Pickup OTP must be exactly 6 digits');
+    assert.equal(emergencyResult.severity, 'CRITICAL', 'Chest pain must map to CRITICAL severity');
+    assert.ok(emergencyResult.patientName, 'Patient name must be populated');
     console.log(`✅ Emergency created: ${emergencyResult.requestCode} (ID: ${emergencyId}) - Status: ${emergencyResult.status}`);
+    console.log(`   -> Generated Pickup OTP: ${emergencyResult.pickupOtp}, Patient: ${emergencyResult.patientName}, Severity: ${emergencyResult.severity}`);
 
     // Verify linked hospital patient record
     const patientRecord = await HospitalPatientModel.findOne({ emergencyId }).lean().exec();
@@ -324,12 +329,37 @@ export const runE2EVerification = async () => {
     console.log('  -> Status transition: AT_PICKUP');
 
     // 7b: Patient onboard (transitions through PATIENT_ONBOARD to TO_HOSPITAL)
-    const onboardResult = await patientPickedUp(String(driver._id), tripId);
+    // First test invalid OTP rejection
+    let otpFailed = false;
+    try {
+      await patientPickedUp(String(driver._id), tripId, { otp: '000000' });
+    } catch (e: unknown) {
+      if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'INVALID_PICKUP_OTP') {
+        otpFailed = true;
+      }
+    }
+    assert.equal(otpFailed, true, 'Incorrect OTP must be rejected with INVALID_PICKUP_OTP');
+    console.log('  -> Invalid OTP correctly rejected');
+
+    // Now verify with correct OTP
+    const onboardResult = await patientPickedUp(String(driver._id), tripId, { otp: emergencyResult.pickupOtp });
     assert.equal(onboardResult.status, 'TO_HOSPITAL');
+    assert.equal(onboardResult.pickupOtpVerified, true, 'pickupOtpVerified must be true');
     assert.ok(onboardResult.patientPickedUpAt, 'patientPickedUpAt timestamp must be recorded');
     const onboardTripInDb = await TripModel.findById(tripId).lean().exec();
     assert.ok(onboardTripInDb?.statusHistory?.some((s) => s.status === 'PATIENT_ONBOARD'), 'statusHistory must include PATIENT_ONBOARD');
-    console.log('  -> Status transition: PATIENT_ONBOARD -> TO_HOSPITAL');
+    console.log('  -> Verified OTP & Status transition: PATIENT_ONBOARD -> TO_HOSPITAL');
+
+    // Hospital live coordination telemetry check
+    const { getHospitalCoordinationDetail } = await import('../services/hospitalCoordinationService.js');
+    const hospitalDetail = await getHospitalCoordinationDetail(String(hospital._id), emergencyId);
+    assert.equal(hospitalDetail.emergency.patientName, emergencyResult.patientName);
+    assert.equal(hospitalDetail.emergency.severity, 'CRITICAL');
+    assert.equal(hospitalDetail.emergency.pickupOtpVerified, true);
+    assert.ok(hospitalDetail.trip?.driver?.name, 'Driver name must be available to hospital');
+    assert.ok(hospitalDetail.trip?.driver?.phone, 'Driver phone must be available to hospital');
+    assert.ok(hospitalDetail.ambulance, 'Ambulance telemetry must be available to hospital');
+    console.log('  -> Hospital dashboard telemetry verified: clinical data, driver details, live ambulance coordinates');
 
     // Verify route target switches to HOSPITAL when patient is onboard
     const onboardSnapshot = await getEmergencyTrackingSnapshot(userAuth, emergencyId);

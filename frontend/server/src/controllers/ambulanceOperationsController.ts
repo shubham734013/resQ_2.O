@@ -49,7 +49,7 @@ export const driverReject=async(req:Request,res:Response)=>sendSuccess(res,await
 export const driverTrips=async(req:Request,res:Response)=>sendSuccess(res,await service.listDriverTrips(authId(req,'AMBULANCE_DRIVER'),q(res)));
 export const driverTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.getDriverTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const arrivedPickup=async(req:Request,res:Response)=>sendSuccess(res,await service.arrivedPickup(authId(req,'AMBULANCE_DRIVER'),id(req)));
-export const patientPickedUp=async(req:Request,res:Response)=>sendSuccess(res,await service.patientPickedUp(authId(req,'AMBULANCE_DRIVER'),id(req)));
+export const patientPickedUp=async(req:Request,res:Response)=>sendSuccess(res,await service.patientPickedUp(authId(req,'AMBULANCE_DRIVER'),id(req),req.body));
 export const arrivedHospital=async(req:Request,res:Response)=>sendSuccess(res,await service.arrivedHospital(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const completeTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.completeTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));
 export const cancelTrip=async(req:Request,res:Response)=>sendSuccess(res,await service.cancelTrip(authId(req,'AMBULANCE_DRIVER'),id(req)));

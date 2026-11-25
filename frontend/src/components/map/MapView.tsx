@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { LocateFixed, Minus, Plus, RefreshCw, Layers, Compass, MapPin } from 'lucide-react';
+import { LocateFixed, Minus, Plus, Layers, Compass } from 'lucide-react';
 import type { MapViewProps } from '../../types/route';
 import type { GoogleMapInstance, GoogleMarkerOverlay, GoogleOverlayView, GooglePolyline, GoogleTrafficLayer, GoogleMapsApi } from '../../types/googleMaps';
 import { loadGoogleMaps } from '../../services/googleMapsLoader';
 import { DEFAULT_JAIPUR_COORDINATES } from '../../types/maps';
 import { darkMapStyle, type GoogleMapStyleItem } from './darkMapStyle';
+import { LeafletMapView } from './LeafletMapView';
 
 export { darkMapStyle, type GoogleMapStyleItem };
 export const DARK_MAP_STYLE = darkMapStyle;
@@ -81,7 +82,7 @@ const createHospitalMarkerElement = (name: string, isEmergency = true): HTMLElem
     <div class="mb-1 px-2.5 py-1 rounded-xl bg-slate-950/95 text-white text-[11px] font-bold shadow-xl border border-slate-800 flex items-center gap-1.5 whitespace-nowrap">
       <span class="h-2 w-2 rounded-full ${isEmergency ? 'bg-rose-500 animate-pulse' : 'bg-blue-500'}"></span>
       <span class="max-w-[130px] truncate">${escapeHtml(name)}</span>
-      <span class="text-[9px] font-mono text-emerald-400 bg-emerald-950/80 px-1 py-0.5 rounded">24/7 ER</span>
+      <span class="text-[9px] font-mono text-emerald-400 bg-emerald-950/80 px-1 py-0.5 rounded">Emergency room</span>
     </div>
     <div class="relative h-9 w-9 rounded-2xl ${isEmergency ? 'bg-gradient-to-b from-rose-500 to-rose-700' : 'bg-gradient-to-b from-blue-600 to-indigo-700'} text-white shadow-2xl border-2 border-white flex items-center justify-center">
       <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -173,24 +174,25 @@ const createOverlayMarker = (
   return overlay;
 };
 
-export const MapView = ({
-  center,
-  zoom = 14,
-  userLocation,
-  destination,
-  markers = [],
-  activeRoute = null,
-  alternativeRoutes = [],
-  onSelectRoute,
-  interactive = true,
-  isNavigating = false,
-  currentStepIndex = 0,
-  onRecenter,
-  recenterTrigger = 0,
-  className = '',
-  styles,
-  options,
-}: MapViewProps) => {
+export const MapView = (props: MapViewProps) => {
+  const {
+    center,
+    zoom = 14,
+    userLocation,
+    destination,
+    markers = [],
+    activeRoute = null,
+    alternativeRoutes = [],
+    onSelectRoute,
+    interactive = true,
+    isNavigating = false,
+    currentStepIndex = 0,
+    onRecenter,
+    recenterTrigger = 0,
+    className = '',
+    styles,
+    options,
+  } = props;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
   const markersRef = useRef<GoogleMarkerOverlay[]>([]);
@@ -202,23 +204,26 @@ export const MapView = ({
   const validMapId = hasValidMapId ? rawMapId : undefined;
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(zoom);
   const [showTraffic, setShowTraffic] = useState(false);
   const [is3D, setIs3D] = useState(false);
+
+  useEffect(() => {
+    const win = window as unknown as { gm_authFailure?: () => void };
+    const prev = win.gm_authFailure;
+    win.gm_authFailure = () => {
+      prev?.();
+      setStatus('error');
+    };
+    return () => {
+      win.gm_authFailure = prev;
+    };
+  }, []);
 
   const fallbackCenter = (isValidCoordinate(center) ? center : undefined)
     ?? (isValidCoordinate(userLocation) ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : undefined)
     ?? (isValidCoordinate(destination) ? { latitude: destination.latitude, longitude: destination.longitude } : undefined)
     ?? DEFAULT_JAIPUR_COORDINATES;
-
-  const [retryNonce, setRetryNonce] = useState(0);
-
-  const retryMap = useCallback(() => {
-    setStatus('loading');
-    setError(null);
-    setRetryNonce((prev) => prev + 1);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,18 +249,15 @@ export const MapView = ({
         });
         setZoomLevel(zoom);
         setStatus('ready');
-        setError(null);
-      } catch (reason) {
+      } catch {
         if (!cancelled) {
           setStatus('error');
-          setError(reason instanceof Error ? reason.message : 'MAPS_API_LOAD_FAILED');
         }
       }
     };
     void initialize();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retryNonce]);
+  }, [fallbackCenter.latitude, fallbackCenter.longitude, hasValidMapId, is3D, isNavigating, options, styles, validMapId, zoom]);
 
   useEffect(() => {
     if (!mapRef.current || status !== 'ready') return;
@@ -528,106 +530,19 @@ export const MapView = ({
     }
   }, [recenterTrigger, status, recenter]);
 
+  if (status === 'error') {
+    return <LeafletMapView {...props} />;
+  }
+
   return (
-    <div className={`relative w-full min-w-0 min-h-[400px] h-full overflow-hidden bg-slate-950 ${className}`} role="region" aria-label="Google Maps">
+    <div className={`relative w-full min-w-0 min-h-[400px] h-full overflow-hidden bg-slate-950 ${className}`} role="region" aria-label="Map">
       <div ref={containerRef} className="absolute inset-0" />
 
       {status === 'loading' && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-xs z-10">
           <div className="flex flex-col items-center gap-2">
             <div className="h-7 w-7 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-semibold text-slate-200">Initializing Navigation Map…</p>
-          </div>
-        </div>
-      )}
-
-      {status === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-950/95 text-white z-10 overflow-y-auto">
-          {/* Subtle radar background grid */}
-          <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
-
-          <div className="relative max-w-lg w-full rounded-2xl border border-slate-800 bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 shadow-2xl text-center space-y-4">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-400">
-              <Compass className="h-6 w-6 animate-pulse" />
-            </div>
-
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-semibold uppercase tracking-wider mb-2 border border-slate-700">
-                <MapPin className="h-3 w-3 text-rose-400" />
-                <span>Jaipur Regional GIS Radar (Offline Fallback)</span>
-              </div>
-              <h3 className="text-base font-bold text-white">Interactive Map in Resilient Mode</h3>
-              <p className="mt-1 text-xs text-slate-400 max-w-sm mx-auto">
-                {error === 'MAPS_API_KEY_MISSING'
-                  ? 'Google Maps API key is not configured. Displaying database-verified healthcare and ambulance coordinates anchored to Jaipur, Rajasthan.'
-                  : 'Google Maps could not be reached. Utilizing high-precision cached coordinates for Jaipur jurisdiction.'}
-              </p>
-            </div>
-
-            <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 text-left text-xs space-y-1.5">
-              <div className="flex items-center justify-between text-slate-300">
-                <span className="font-semibold text-slate-400">Active Coordinates:</span>
-                <span className="font-mono text-emerald-400">
-                  {fallbackCenter.latitude.toFixed(4)}° N, {fallbackCenter.longitude.toFixed(4)}° E
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-slate-300">
-                <span className="font-semibold text-slate-400">Regional Coverage:</span>
-                <span className="text-slate-200">Jaipur Metropolitan (SMS / Fortis / EHCC)</span>
-              </div>
-              {markers.length > 0 && (
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="font-semibold text-slate-400">Active Mapped Facilities:</span>
-                  <span className="font-bold text-blue-400">{markers.length} facility marker(s)</span>
-                </div>
-              )}
-            </div>
-
-            {markers.length > 0 && (
-              <div className="text-left space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  Nearby Facilities ({markers.length}) — Click to Select:
-                </p>
-                <div className="grid grid-cols-1 gap-1.5">
-                  {markers.slice(0, 4).map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => m.onClick?.()}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-left transition cursor-pointer group"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="text-xs font-semibold text-white truncate group-hover:text-teal-300 transition-colors">
-                          {m.title}
-                        </p>
-                        <p className="text-[10px] text-slate-400 truncate">
-                          {m.subtitle || `${m.latitude.toFixed(3)}, ${m.longitude.toFixed(3)}`}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                        {m.isEmergency ? '24/7 ER' : 'Available'}
-                      </span>
-                    </button>
-                  ))}
-                  {markers.length > 4 && (
-                    <p className="text-[10px] text-center text-slate-500 pt-0.5">
-                      + {markers.length - 4} more facilities listed in directory
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={retryMap}
-                className="inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition cursor-pointer active:scale-95"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Retry Map Connection
-              </button>
-            </div>
+            <p className="text-xs font-semibold text-slate-200">Loading map…</p>
           </div>
         </div>
       )}
@@ -637,11 +552,11 @@ export const MapView = ({
           {/* Re-center / Locate */}
           <button
             type="button"
-            aria-label="Center on my location"
+            aria-label="Move map to my location"
             onClick={recenter}
             disabled={!userLocation}
             className="rounded-2xl bg-zinc-950/85 hover:bg-zinc-900 text-zinc-200 p-2.5 shadow-xl border border-white/10 backdrop-blur-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
-            title="Recenter"
+            title="Show my location"
           >
             <LocateFixed className="h-4 w-4 text-rose-500" />
           </button>
@@ -650,14 +565,14 @@ export const MapView = ({
           {hasValidMapId && (
             <button
               type="button"
-              aria-label="Toggle 3D View"
+              aria-label={is3D ? 'Use 2D view' : 'Use 3D view'}
               onClick={toggle3D}
               className={`rounded-2xl p-2.5 shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
                 is3D
                   ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-rose-950/30'
                   : 'bg-zinc-950/85 hover:bg-zinc-900 text-zinc-300 border-white/10'
               }`}
-              title={is3D ? 'Switch to 2D' : 'Switch to 3D Perspective'}
+              title={is3D ? 'Use 2D view' : 'Use 3D view'}
             >
               <Compass className="h-4 w-4" />
             </button>
@@ -666,7 +581,7 @@ export const MapView = ({
           {/* Live Traffic Layer Toggle */}
           <button
             type="button"
-            aria-label="Toggle Live Traffic"
+            aria-label={showTraffic ? 'Hide traffic' : 'Show traffic'}
             onClick={() => setShowTraffic((prev) => !prev)}
             className={`rounded-2xl p-2.5 shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
               showTraffic
@@ -703,7 +618,7 @@ export const MapView = ({
       {/* Alternative Routes Selector (Dark Glass Floating Bar) */}
       {status === 'ready' && alternativeRoutes.length > 0 && !isNavigating && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-2xl bg-zinc-950/90 backdrop-blur-md px-3.5 py-2 shadow-2xl border border-white/10 text-xs text-white">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Routes:</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Ways to go:</span>
           {activeRoute && (
             <span className="font-bold text-rose-300 px-2.5 py-0.5 rounded-lg bg-rose-500/20 border border-rose-500/30">
               {activeRoute.name || 'Fastest'} ({activeRoute.duration})

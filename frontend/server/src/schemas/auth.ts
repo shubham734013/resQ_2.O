@@ -80,7 +80,7 @@ export const ambulanceDriverRegistrationSchema = z.object({
     ...data,
     fullName: resolvedFullName,
     licenseNumber: resolvedLicense,
-    providerId: resolvedProviderId,
+    providerId: resolvedProviderId || undefined,
     assignedAmbulanceId: resolvedAmbulanceId,
   };
 }).superRefine((data, ctx) => {
@@ -90,18 +90,15 @@ export const ambulanceDriverRegistrationSchema = z.object({
   if (!data.licenseNumber || data.licenseNumber.length < 3) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'License number is required and must be at least 3 characters', path: ['licenseNumber'] });
   }
-  if (!data.providerId || !/^[0-9a-fA-F]{24}$/.test(data.providerId)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provider ID is required and must be a 24-character hex ID', path: ['providerId'] });
-  }
 });
 export const loginSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
-  roleHint: z.enum(['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER']).optional(),
+  roleHint: z.enum(['USER', 'HOSPITAL', 'AMBULANCE_DRIVER']).optional(),
 });
 export const socialAuthSchema = z.object({
   credential: z.string().min(20).max(10000),
-  roleHint: z.enum(['USER', 'AMBULANCE_PROVIDER']).optional(),
+  roleHint: z.enum(['USER']).optional(),
 });
 export const providerProfileSchema = z.object({
   name: z.string().trim().min(2).max(100),

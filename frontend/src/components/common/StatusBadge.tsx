@@ -33,7 +33,7 @@ export const StatusBadge = ({
           className={`inline-flex items-center font-medium bg-rose-50 text-rose-800 border border-rose-200/80 rounded-md tracking-tight ${sizeClasses} ${className}`}
         >
           {icon && <Flame className="w-3 h-3 text-rose-600 shrink-0" aria-hidden="true" />}
-          <span>{label ?? '24/7 Emergency'}</span>
+          <span>{label ?? 'Emergency help, day and night'}</span>
         </span>
       );
 
@@ -43,7 +43,7 @@ export const StatusBadge = ({
           className={`inline-flex items-center font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/70 rounded-md ${sizeClasses} ${className}`}
         >
           {icon && <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" aria-hidden="true" />}
-          <span>{label ?? 'Verified'}</span>
+          <span>{label ?? 'Checked'}</span>
         </span>
       );
 
@@ -82,7 +82,7 @@ export const StatusBadge = ({
         <span
           className={`inline-flex items-center font-medium bg-blue-50 text-blue-800 border border-blue-200/70 rounded-md ${sizeClasses} ${className}`}
         >
-          <span>{label ?? 'Urgent Care'}</span>
+          <span>{label ?? 'Urgent help'}</span>
         </span>
       );
 

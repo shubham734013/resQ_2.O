@@ -4,7 +4,6 @@ import { startSession, Types, type QueryFilter } from 'mongoose';
 import { DispatchJobModel, type DispatchJobDocument, type DispatchJobStatus, type DispatchAttemptDocument, type DispatchAttemptStatus } from '../models/DispatchJob.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { TripModel } from '../models/Trip.js';
-import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel, type AmbulanceDocument } from '../models/Ambulance.js';
 import { AmbulanceDriverModel, type AmbulanceDriverDocument } from '../models/AmbulanceDriver.js';
 import { HospitalModel } from '../models/Hospital.js';
@@ -26,8 +25,8 @@ export const DISPATCH_ALLOWED_TRANSITIONS = {
 export const isAllowedDispatchTransition = (from: keyof typeof DISPATCH_ALLOWED_TRANSITIONS, to: string) =>
   (DISPATCH_ALLOWED_TRANSITIONS[from] as readonly string[]).includes(to);
 
-export const DISPATCH_OFFER_TIMEOUT_MS = 25_000;
-export const DISPATCH_LOCATION_FRESHNESS_MS = env.DRIVER_LOCATION_STALE_AFTER_MS;
+export const DISPATCH_OFFER_TIMEOUT_MS = env.NODE_ENV !== 'production' ? 120_000 : 25_000;
+export const DISPATCH_LOCATION_FRESHNESS_MS = Math.max(env.DRIVER_LOCATION_STALE_AFTER_MS, 300_000);
 export const DISPATCH_SEARCH_RADIUS_METERS = 100_000;
 export const DISPATCH_ROUTE_CANDIDATE_LIMIT = 30;
 export const DISPATCH_ACTIVE_TRIP_STATUSES = ['ASSIGNED', 'ACCEPTED', 'TO_PICKUP', 'AT_PICKUP', 'PATIENT_ONBOARD', 'TO_HOSPITAL', 'AT_HOSPITAL'] as const;
@@ -37,7 +36,7 @@ const DRIVER_LOCATION_MAX_FUTURE_SKEW_MS = 5_000;
 type Coordinates = { latitude: number; longitude: number };
 type RouteRank = { source: 'DRIVING' | 'STRAIGHT_LINE_FALLBACK'; distanceMeters: number; etaSeconds?: number };
 export type DispatchCandidate = {
-  providerId: Types.ObjectId;
+  providerId?: Types.ObjectId;
   ambulanceId: Types.ObjectId;
   driverId: Types.ObjectId;
   coordinates: Coordinates;
@@ -114,7 +113,16 @@ const hospitalEligibleForJob = async (job: DispatchJobLean) => {
 };
 
 const attemptFor = (job: DispatchJobLean, attemptId: string) => job.attempts.find((attempt) => attempt.attemptId === attemptId);
-export const isDispatchLocationFresh = (updatedAt: Date | undefined, now: Date) => Boolean(updatedAt && updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS && updatedAt.getTime() >= now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS);
+export const isDispatchLocationFresh = (updatedAt: Date | undefined, now: Date) => {
+  const allowedFreshness = env.NODE_ENV !== 'production'
+    ? Math.max(DISPATCH_LOCATION_FRESHNESS_MS, 900_000)
+    : DISPATCH_LOCATION_FRESHNESS_MS;
+  return Boolean(
+    updatedAt &&
+    updatedAt.getTime() <= now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS &&
+    updatedAt.getTime() >= now.getTime() - allowedFreshness
+  );
+};
 const isFresh = isDispatchLocationFresh;
 export const isDispatchOfferAcceptable = (status: string, deadlineAt: Date | undefined, now: Date) => status === 'OFFERED' && Boolean(deadlineAt && deadlineAt.getTime() > now.getTime());
 const appendEvent = (event: string, reason?: string, actorId?: Types.ObjectId, actorRole: 'SYSTEM' | 'ADMIN' | 'AMBULANCE_DRIVER' | 'USER' = 'SYSTEM', attemptId?: string) => ({
@@ -140,23 +148,23 @@ const releaseReservationInSession = async (jobId: Types.ObjectId, ambulanceId?: 
 
 const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types.ObjectId): Promise<DispatchCandidate[]> => {
   const now = new Date();
-  const providerIds = (await AmbulanceProviderModel.find({ accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).select('_id').lean().exec()).map((provider) => provider._id);
-  if (!providerIds.length) return [];
   const reservationAvailable = { $or: [
     { dispatchReservationId: { $exists: false } },
     { dispatchReservationId: null },
     { dispatchReservationExpiresAt: { $lte: now } },
   ] };
+  const freshnessWindow = env.NODE_ENV !== 'production'
+    ? Math.max(DISPATCH_LOCATION_FRESHNESS_MS, 900_000)
+    : DISPATCH_LOCATION_FRESHNESS_MS;
   const ambulanceBaseFilter: QueryFilter<AmbulanceDocument> = {
-    providerId: { $in: providerIds },
     accountStatus: 'ACTIVE',
     verificationStatus: 'VERIFIED',
     currentStatus: 'AVAILABLE',
-    locationUpdatedAt: { $gte: new Date(now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS), $lte: new Date(now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS) },
+    locationUpdatedAt: { $gte: new Date(now.getTime() - freshnessWindow), $lte: new Date(now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS) },
   };
   const ambulanceFilter: QueryFilter<AmbulanceDocument> = { ...ambulanceBaseFilter, ...reservationAvailable };
   type AmbulanceCandidateRecord = {
-    _id: Types.ObjectId; providerId: Types.ObjectId; currentLatitude?: number; currentLongitude?: number;
+    _id: Types.ObjectId; providerId?: Types.ObjectId; currentLatitude?: number; currentLongitude?: number;
     location?: { coordinates?: number[] }; locationUpdatedAt?: Date; currentStatus?: string;
     accountStatus?: string; verificationStatus?: string; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
   };
@@ -202,7 +210,6 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
   const driverFilter: QueryFilter<AmbulanceDriverDocument> = {
     _id: exactDriverId ?? { $exists: true },
     assignedAmbulanceId: { $in: ambulanceIds },
-    providerId: { $in: providerIds },
     accountStatus: 'ACTIVE',
     licenseVerificationStatus: 'VERIFIED',
     availabilityStatus: 'ONLINE',
@@ -220,7 +227,7 @@ const eligibleCandidatePool = async (job: DispatchJobLean, exactDriverId?: Types
   const ambiguousAmbulances = new Set<string>();
   for (const driver of drivers) {
     const ambulanceId = driver.assignedAmbulanceId ? String(driver.assignedAmbulanceId) : '';
-    if (!ambulanceId || String(driver.providerId) !== String(ambulances.find((ambulance) => String(ambulance._id) === ambulanceId)?.providerId)) continue;
+    if (!ambulanceId) continue;
     if (driversByAmbulance.has(ambulanceId)) {
       ambiguousAmbulances.add(ambulanceId);
       driversByAmbulance.delete(ambulanceId);
@@ -290,10 +297,8 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
       if (!hospital || !hospitalMatchesDispatchCategory(hospital, currentJob.category)) {
         throw new AppError('HOSPITAL_NO_LONGER_ELIGIBLE', 'Selected hospital is no longer eligible for this emergency. Dispatch stopped; operations must coordinate a new destination.', 409);
       }
-      const provider = await AmbulanceProviderModel.findOne({ _id: candidate.providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).session(session).lean().exec();
       const driver = await AmbulanceDriverModel.findOne({
         _id: candidate.driverId,
-        providerId: candidate.providerId,
         assignedAmbulanceId: candidate.ambulanceId,
         accountStatus: 'ACTIVE',
         licenseVerificationStatus: 'VERIFIED',
@@ -302,14 +307,13 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
       }).session(session).lean().exec();
       const ambulance = await AmbulanceModel.findOne({
         _id: candidate.ambulanceId,
-        providerId: candidate.providerId,
         accountStatus: 'ACTIVE',
         verificationStatus: 'VERIFIED',
         currentStatus: 'AVAILABLE',
         locationUpdatedAt: { $gte: new Date(now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS), $lte: new Date(now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS) },
         $or: [{ dispatchReservationId: { $exists: false } }, { dispatchReservationId: null }, { dispatchReservationExpiresAt: { $lte: now } }],
       }).session(session).lean().exec();
-      if (!provider || !driver || !ambulance || !isFresh(ambulance.locationUpdatedAt, now) || !ambulanceCoordinates(ambulance)) {
+      if (!driver || !ambulance || !isFresh(ambulance.locationUpdatedAt, now) || !ambulanceCoordinates(ambulance)) {
         throw new AppError('DISPATCH_CANDIDATE_UNAVAILABLE', 'Candidate eligibility changed before reservation; searching for another driver', 409);
       }
       const activeTrip = await TripModel.exists({
@@ -320,7 +324,6 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
 
       const reservedAmbulance = await AmbulanceModel.findOneAndUpdate({
         _id: candidate.ambulanceId,
-        providerId: candidate.providerId,
         currentStatus: 'AVAILABLE',
         accountStatus: 'ACTIVE',
         verificationStatus: 'VERIFIED',
@@ -329,7 +332,6 @@ export const reserveAndOffer = async (job: DispatchJobLean, candidate: DispatchC
       if (!reservedAmbulance) throw new AppError('DISPATCH_RESERVATION_CONFLICT', 'Ambulance was reserved by another dispatch', 409);
       const reservedDriver = await AmbulanceDriverModel.findOneAndUpdate({
         _id: candidate.driverId,
-        providerId: candidate.providerId,
         assignedAmbulanceId: candidate.ambulanceId,
         accountStatus: 'ACTIVE',
         licenseVerificationStatus: 'VERIFIED',
@@ -450,6 +452,14 @@ const searchAndOffer = async (job: DispatchJobLean) => {
       }).exec();
       return;
     }
+    if (env.NODE_ENV !== 'production' && job.generation < 5) {
+      await DispatchJobModel.updateOne({ _id: job._id, status: 'SEARCHING', leaseToken: job.leaseToken }, {
+        $set: { status: 'PENDING', generation: job.generation + 1, nextAttemptAt: new Date(Date.now() + 4_000) },
+        $unset: { leaseUntil: 1, leaseToken: 1 },
+        $push: { events: appendEvent('SEARCH_RETRY_SCHEDULED', 'Demo mode: Re-checking candidate drivers for emergency dispatch.') },
+      }).exec();
+      return;
+    }
   }
 
   await markExhausted(job, candidates.length ? 'All ranked candidates became unavailable before reservation.' : 'No eligible on-duty driver with a fresh location and an available verified ambulance was found.');
@@ -505,21 +515,19 @@ const expireOrReleaseOffer = async (job: DispatchJobLean, reason: string, outcom
 
 const candidateStillEligible = async (job: DispatchJobLean, attempt: DispatchAttemptDocument) => {
   const now = new Date();
-  const [provider, driver, ambulance, activeTrip] = await Promise.all([
-    AmbulanceProviderModel.exists({ _id: attempt.providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }),
+  const [driver, ambulance, activeTrip] = await Promise.all([
     AmbulanceDriverModel.findOne({
-      _id: attempt.driverId, providerId: attempt.providerId, assignedAmbulanceId: attempt.ambulanceId,
+      _id: attempt.driverId, assignedAmbulanceId: attempt.ambulanceId,
       accountStatus: 'ACTIVE', licenseVerificationStatus: 'VERIFIED', availabilityStatus: 'ONLINE',
       dispatchReservationId: job._id, dispatchReservationExpiresAt: { $gt: now },
     }).select('_id').lean().exec(),
     AmbulanceModel.findOne({
-      _id: attempt.ambulanceId, providerId: attempt.providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
+      _id: attempt.ambulanceId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
       currentStatus: 'AVAILABLE', dispatchReservationId: job._id, dispatchReservationExpiresAt: { $gt: now },
-      locationUpdatedAt: { $gte: new Date(now.getTime() - DISPATCH_LOCATION_FRESHNESS_MS), $lte: new Date(now.getTime() + DRIVER_LOCATION_MAX_FUTURE_SKEW_MS) },
-    }).select('_id').lean().exec(),
+    }).select('_id locationUpdatedAt').lean().exec(),
     TripModel.exists({ status: { $in: DISPATCH_ACTIVE_TRIP_STATUSES }, $or: [{ ambulanceId: attempt.ambulanceId }, { driverId: attempt.driverId }] }),
   ]);
-  return Boolean(provider && driver && ambulance && !activeTrip);
+  return Boolean(driver && ambulance && isFresh(ambulance.locationUpdatedAt, now) && !activeTrip);
 };
 
 let lastOrphanRecoveryAt = 0;
@@ -630,12 +638,11 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
       if (!job) throw new AppError('DISPATCH_OFFER_NOT_ACTIVE', 'Offer expired or was consumed by another action', 409);
       const request = await EmergencyRequestModel.findOne({ _id: job.emergencyRequestId, hospitalId: job.hospitalId, status: 'AMBULANCE_COORDINATION', ambulanceId: { $exists: false } }).session(session).lean().exec();
       if (!request) throw new AppError('EMERGENCY_NOT_DISPATCHABLE', 'Emergency request was cancelled, assigned, or changed', 409);
-      const [provider, driver, ambulance] = await Promise.all([
-        AmbulanceProviderModel.findOne({ _id: attempt.providerId, accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED' }).session(session).lean().exec(),
-        AmbulanceDriverModel.findOne({ _id: did, providerId: attempt.providerId, assignedAmbulanceId: attempt.ambulanceId, accountStatus: 'ACTIVE', licenseVerificationStatus: 'VERIFIED', availabilityStatus: 'ONLINE', dispatchReservationId: jid, dispatchReservationExpiresAt: { $gt: new Date() } }).session(session).lean().exec(),
-        AmbulanceModel.findOne({ _id: attempt.ambulanceId, providerId: attempt.providerId, currentStatus: 'AVAILABLE', accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED', dispatchReservationId: jid, dispatchReservationExpiresAt: { $gt: new Date() }, locationUpdatedAt: { $gte: new Date(Date.now() - DISPATCH_LOCATION_FRESHNESS_MS) } }).session(session).lean().exec(),
+      const [driver, ambulance] = await Promise.all([
+        AmbulanceDriverModel.findOne({ _id: did, assignedAmbulanceId: attempt.ambulanceId, accountStatus: 'ACTIVE', licenseVerificationStatus: 'VERIFIED', availabilityStatus: 'ONLINE', dispatchReservationId: jid, dispatchReservationExpiresAt: { $gt: new Date() } }).session(session).lean().exec(),
+        AmbulanceModel.findOne({ _id: attempt.ambulanceId, currentStatus: 'AVAILABLE', accountStatus: 'ACTIVE', verificationStatus: 'VERIFIED', dispatchReservationId: jid, dispatchReservationExpiresAt: { $gt: new Date() }, locationUpdatedAt: { $gte: new Date(Date.now() - DISPATCH_LOCATION_FRESHNESS_MS) } }).session(session).lean().exec(),
       ]);
-      if (!provider || !driver || !ambulance || !isFresh(ambulance.locationUpdatedAt, new Date()) || !ambulanceCoordinates(ambulance)) {
+      if (!driver || !ambulance || !isFresh(ambulance.locationUpdatedAt, new Date()) || !ambulanceCoordinates(ambulance)) {
         throw new AppError('DISPATCH_CANDIDATE_UNAVAILABLE', 'Driver or ambulance no longer satisfies dispatch eligibility', 409);
       }
       const activeTrip = await TripModel.exists({ status: { $in: DISPATCH_ACTIVE_TRIP_STATUSES }, $or: [{ ambulanceId: attempt.ambulanceId }, { driverId: did }] }).session(session).exec();
@@ -653,6 +660,8 @@ export const acceptDispatchOffer = async (driverId: string, dispatchJobId: strin
         destinationHospitalId: job.hospitalId,
         status: 'ACCEPTED',
         acceptedAt: now,
+        pickupOtp: request.pickupOtp,
+        pickupOtpVerified: false,
         statusHistory: [{ status: 'ACCEPTED', changedAt: now, actorId: did, actorRole: 'AMBULANCE_DRIVER' }],
       });
       await trip.save({ session });

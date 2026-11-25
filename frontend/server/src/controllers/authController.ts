@@ -7,14 +7,11 @@ import {
   logout,
   refreshAuthentication,
   registerAmbulanceDriver,
-  registerAmbulanceProvider,
   registerHospital,
   registerUser,
   socialLogin,
   linkSocialAccount,
   updateDriverProfile,
-  updateProviderProfile,
-  getActiveProvidersForRegistration,
   initiatePasswordReset,
   completePasswordReset,
   verifyAdminMfaLogin,
@@ -27,13 +24,11 @@ import { clearAuthCookies, getCookie, REFRESH_TOKEN_COOKIE, setAuthCookies } fro
 import { sendSuccess } from '../utils/apiResponse.js';
 import type {
   AmbulanceDriverRegistrationInput,
-  AmbulanceProviderRegistrationInput,
   HospitalRegistrationInput,
   LoginInput,
   UserRegistrationInput,
   SocialAuthInput,
   DriverProfileInput,
-  ProviderProfileInput,
   ForgotPasswordInput,
   ResetPasswordInput,
   AdminMfaVerifyLoginInput,
@@ -47,9 +42,7 @@ export const registerUserController = async (req: Request, res: Response) => {
   sendSuccess(res, { ...result.user, user: result.user }, 201);
 };
 export const registerHospitalController=async(req:Request,res:Response)=>{sendSuccess(res,await registerHospital(req.body as HospitalRegistrationInput),201);};
-export const registerAmbulanceProviderController=async(req:Request,res:Response)=>{sendSuccess(res,await registerAmbulanceProvider(req.body as AmbulanceProviderRegistrationInput),201);};
 export const registerAmbulanceDriverController=async(req:Request,res:Response)=>{sendSuccess(res,await registerAmbulanceDriver(req.body as AmbulanceDriverRegistrationInput),201);};
-export const listActiveProvidersController=async(_req:Request,res:Response)=>{sendSuccess(res,await getActiveProvidersForRegistration());};
 const sendLoginResponse=(res:Response,result:Awaited<ReturnType<typeof login>>)=>{setAuthCookies(res,result.accessToken,result.refreshToken);sendSuccess(res,{user:result.user});};
 export const loginController=async(req:Request,res:Response)=>sendLoginResponse(res,await login(req.body as LoginInput));
 export const adminLoginController = async (req: Request, res: Response) => {
@@ -117,7 +110,6 @@ export const meController=async(req:AuthenticatedRequest,res:Response)=>sendSucc
 export const logoutController=async(req:Request,res:Response)=>{await logout(getCookie(req,REFRESH_TOKEN_COOKIE));clearAuthCookies(res);sendSuccess(res,{loggedOut:true});};
 export const refreshController=async(req:Request,res:Response)=>{const token=getCookie(req,REFRESH_TOKEN_COOKIE);if(!token){res.status(401).json({success:false,error:{code:'UNAUTHORIZED',message:'Refresh session is required'}});return;}const result=await refreshAuthentication(token);setAuthCookies(res,result.accessToken,result.refreshToken);sendSuccess(res,{user:result.user});};
 export const driverProfileController=async(req:AuthenticatedRequest,res:Response)=>sendSuccess(res,await updateDriverProfile(req.auth!,req.body as DriverProfileInput));
-export const providerProfileController=async(req:AuthenticatedRequest,res:Response)=>sendSuccess(res,await updateProviderProfile(req.auth!,req.body as ProviderProfileInput));
 export const forgotPasswordController = async (req: Request, res: Response): Promise<void> => {
   const { email } = (req.body as ForgotPasswordInput);
   await initiatePasswordReset(email);

@@ -27,14 +27,14 @@ export const UserSettingsPage = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto w-full space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-slate-950">Citizen Account & Safety Settings</h1>
-        <p className="text-xs text-slate-500">Configure emergency contacts, notification channels, and privacy preferences</p>
+        <h1 className="text-2xl font-black text-slate-950">Account and safety settings</h1>
+        <p className="text-xs text-slate-500">Choose your emergency contacts, alerts, and privacy settings.</p>
       </div>
 
       {saved && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3 text-xs text-emerald-800">
           <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-          <span>Your safety preferences and emergency contacts were saved successfully.</span>
+          <span>Your safety settings and emergency contacts were saved.</span>
         </div>
       )}
 
@@ -43,15 +43,15 @@ export const UserSettingsPage = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
           <div className="flex items-center gap-2.5 text-slate-950 font-bold mb-4">
             <HeartHandshake className="h-5 w-5 text-rose-600" />
-            <h2 className="text-base font-bold">Primary Emergency Contact (SOS ICE)</h2>
+            <h2 className="text-base font-bold">Main emergency contact</h2>
           </div>
           <p className="text-xs text-slate-500 mb-4">
-            When you trigger Emergency SOS, this contact will receive automated SMS notifications with your live hospital destination and ambulance status.
+            When you ask for emergency help, ResQ may text this person with hospital and ambulance updates.
           </p>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="text-xs font-semibold text-slate-700">
-              Contact Full Name
+              Full name
               <input
                 type="text"
                 required
@@ -73,7 +73,7 @@ export const UserSettingsPage = () => {
             </label>
 
             <label className="text-xs font-semibold text-slate-700">
-              Relationship
+              How do you know them?
               <input
                 type="text"
                 required
@@ -89,7 +89,7 @@ export const UserSettingsPage = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center gap-2.5 text-slate-950 font-bold mb-2">
             <Shield className="h-5 w-5 text-teal-600" />
-            <h2 className="text-base font-bold">Safety & Data Consent</h2>
+            <h2 className="text-base font-bold">Safety and data choices</h2>
           </div>
 
           <div className="space-y-3 pt-2">
@@ -101,8 +101,8 @@ export const UserSettingsPage = () => {
                 className="mt-1 rounded text-teal-600 focus:ring-teal-500"
               />
               <div>
-                <p className="text-xs font-bold text-slate-900">Share Live Tracking Link with Family</p>
-                <p className="text-[11px] text-slate-500">Generates a secure, time-limited live tracking URL accessible to emergency contacts during an active SOS.</p>
+                <p className="text-xs font-bold text-slate-900">Share your live location with family</p>
+                <p className="text-[11px] text-slate-500">Makes a link that works for a short time. Share it with your emergency contacts while an SOS is open.</p>
               </div>
             </label>
 
@@ -114,8 +114,8 @@ export const UserSettingsPage = () => {
                 className="mt-1 rounded text-teal-600 focus:ring-teal-500"
               />
               <div>
-                <p className="text-xs font-bold text-slate-900">Hospital Pre-Arrival Medical Transmission</p>
-                <p className="text-[11px] text-slate-500">Allows paramedical crew to transmit emergency situation details directly to the destination trauma center triage desk.</p>
+                <p className="text-xs font-bold text-slate-900">Send health details to the hospital</p>
+                <p className="text-[11px] text-slate-500">If turned on, the ambulance team can send details about the emergency to the hospital before you arrive.</p>
               </div>
             </label>
 
@@ -127,8 +127,8 @@ export const UserSettingsPage = () => {
                 className="mt-1 rounded text-teal-600 focus:ring-teal-500"
               />
               <div>
-                <p className="text-xs font-bold text-slate-900">High-Precision GPS Location Fixes</p>
-                <p className="text-[11px] text-slate-500">Enables device satellite positioning for sub-10-meter ambulance pickup accuracy.</p>
+                <p className="text-xs font-bold text-slate-900">Share your phone's location</p>
+                <p className="text-[11px] text-slate-500">Lets your phone share its location to help the ambulance find you.</p>
               </div>
             </label>
           </div>
@@ -136,7 +136,7 @@ export const UserSettingsPage = () => {
 
         <div className="flex justify-end">
           <Button type="submit" variant="primary">
-            Save Preferences
+            Save settings
           </Button>
         </div>
       </form>

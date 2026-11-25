@@ -43,7 +43,7 @@ export const FacilityList = ({
       <div className={`space-y-4 py-2 ${className}`}>
         <div className="flex items-center gap-2.5 text-xs text-zinc-400 py-1 font-mono">
           <Loader2 className="w-4 h-4 animate-spin text-rose-500 shrink-0" />
-          <span>Locating verified healthcare facilities…</span>
+          <span>Finding trusted hospitals and clinics…</span>
         </div>
         {[1, 2, 3].map((n) => (
           <div
@@ -62,7 +62,7 @@ export const FacilityList = ({
         role="alert"
         className={`p-8 text-center bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-3.5 backdrop-blur-md ${className}`}
       >
-        <h4 className="font-semibold text-rose-300 text-sm">Unable to load healthcare facilities</h4>
+        <h4 className="font-semibold text-rose-300 text-sm">We could not load hospitals and clinics</h4>
         <p className="text-xs text-rose-400/90 leading-relaxed max-w-sm mx-auto">{errorMessage}</p>
         {onRetry && (
           <button

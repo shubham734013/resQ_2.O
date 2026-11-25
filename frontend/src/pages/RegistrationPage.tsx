@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   User,
   Building2,
-  Ambulance,
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
@@ -20,10 +19,9 @@ import {
   Navigation,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { authApi, AuthApiError } from '../services/authApi';
+import { AuthApiError } from '../services/authApi';
 import type {
   AmbulanceDriverRegistrationRequest,
-  AmbulanceProviderRegistrationRequest,
   AuthUser,
   HospitalRegistrationRequest,
   UserRegistrationRequest,
@@ -31,7 +29,7 @@ import type {
 import { ROUTES, ROLE_HOMES } from '../routes/routePaths';
 import { SocialAuthButtons } from '../components/auth/SocialAuthButtons';
 
-export type RegistrationKind = 'user' | 'hospital' | 'ambulance-provider' | 'ambulance-driver';
+export type RegistrationKind = 'user' | 'hospital' | 'ambulance-driver';
 
 export interface RegistrationPageProps {
   kind?: RegistrationKind;
@@ -79,8 +77,8 @@ const initialForm: FormState = {
   state: 'Rajasthan',
   country: 'India',
   registrationNumber: '',
-  hospitalType: 'Trauma & Emergency Center',
-  services: 'Emergency, ICU, Cardiac Care',
+  hospitalType: 'Trauma and emergency care hospital',
+  services: 'Emergency care, intensive care, heart care',
   capabilities: 'Level 1 Trauma, Cath Lab, 24/7 ER',
   serviceType: 'Private Advanced Life Support (ALS)',
   licenseNumber: '',
@@ -95,19 +93,19 @@ const getErrorMessage = (error: unknown): string => {
   if (error instanceof AuthApiError) {
     if (error.code === 'EMAIL_ALREADY_EXISTS') return 'An account with this email already exists.';
     if (error.code === 'PHONE_ALREADY_EXISTS') return 'An account with this phone number already exists.';
-    if (error.code === 'REGISTRATION_NUMBER_ALREADY_EXISTS') return 'This registration number is already in use.';
+    if (error.code === 'REGISTRATION_NUMBER_ALREADY_EXISTS') return 'This sign-up number is already in use.';
     if (error.code === 'LICENSE_NUMBER_ALREADY_EXISTS') return 'This license number is already in use.';
-    if (error.code === 'PROVIDER_NOT_FOUND') return 'No ambulance provider was found for this Provider ID.';
-    if (error.code === 'PROVIDER_NOT_OPERATIONAL') return 'This provider is not yet approved. Driver registration requires an ACTIVE provider.';
-    if (error.code === 'AMBULANCE_NOT_FOUND') return 'The assigned ambulance was not found under this provider.';
-    if (error.code === 'VALIDATION_ERROR') return error.message || 'Some registration details are missing or invalid.';
-    if (error.status === 404) return 'The registration endpoint was not found on the running API.';
-    if (error.status === 400 || error.status === 409 || error.status === 422) return error.message;
-    if (error.status >= 500) return 'ResQ is temporarily unavailable. Please try again.';
+    if (error.code === 'PROVIDER_NOT_FOUND') return 'We could not find this ambulance service.';
+    if (error.code === 'PROVIDER_NOT_OPERATIONAL') return 'This ambulance service is not approved yet. Please contact ResQ support.';
+    if (error.code === 'AMBULANCE_NOT_FOUND') return 'We could not find this ambulance under this service.';
+    if (error.code === 'VALIDATION_ERROR') return 'Some details are missing or not right. Please check them.';
+    if (error.status === 404) return 'We could not complete your sign-up. Please try again later.';
+    if (error.status === 400 || error.status === 409 || error.status === 422) {
+      return 'Some details are missing or already in use. Please check them and try again.';
+    }
+    if (error.status >= 500) return 'ResQ is not working right now. Please try again.';
   }
-  return error instanceof Error && error.message
-    ? error.message
-    : 'Registration could not be completed. Please review your details and try again.';
+  return 'We could not sign you up. Check your details and try again.';
 };
 
 const calculateStrength = (password: string) => {
@@ -157,36 +155,12 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
   const [geoStatus, setGeoStatus] = useState<'idle' | 'detecting' | 'granted' | 'denied'>('idle');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Provider list for driver role
-  const [providers, setProviders] = useState<
-    Array<{ id: string; name: string; registrationNumber: string; city?: string; state?: string }>
-  >([]);
-
   useEffect(() => {
     if (propKind) {
       setActiveKind(propKind);
       setSelectedRoleGroup(propKind === 'user' ? 'citizen' : 'responder');
     }
   }, [propKind]);
-
-  useEffect(() => {
-    if (activeKind === 'ambulance-driver') {
-      authApi
-        .listActiveAmbulanceProviders()
-        .then((res) => {
-          if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-            setProviders(res.data);
-            setForm((cur) => ({
-              ...cur,
-              providerId: cur.providerId || res.data[0].id,
-            }));
-          }
-        })
-        .catch(() => {
-          /* ignore */
-        });
-    }
-  }, [activeKind]);
 
   const update = (field: keyof FormState, value: string) =>
     setForm((current) => ({ ...current, [field]: value }));
@@ -215,19 +189,19 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
     setError('');
     const nameField = activeKind === 'ambulance-driver' ? form.fullName : form.name;
     if (!nameField.trim()) {
-      setError('Please enter your full name or entity name.');
+      setError('Enter your full name or your group’s name.');
       return;
     }
     if (!form.email.trim() || !form.email.includes('@')) {
-      setError('Please provide a valid email address.');
+      setError('Enter a working email address.');
       return;
     }
     if (form.password.length < 8) {
-      setError('Password must contain at least 8 characters.');
+      setError('Your password must be at least 8 characters long.');
       return;
     }
     if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match. Please verify.');
+      setError('The passwords do not match. Please check them.');
       return;
     }
     setSlideDirection(1);
@@ -260,19 +234,12 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
     capabilities: splitList(form.capabilities),
   });
 
-  const buildProviderPayload = (): AmbulanceProviderRegistrationRequest => ({
-    ...buildUserPayload(),
-    registrationNumber: form.registrationNumber.trim(),
-    serviceType: form.serviceType.trim(),
-  });
-
   const buildDriverPayload = (): AmbulanceDriverRegistrationRequest => ({
     email: form.email.trim(),
     password: form.password,
     phone: form.phone.trim(),
     fullName: form.fullName.trim(),
     licenseNumber: form.licenseNumber.trim(),
-    providerId: form.providerId.trim(),
     assignedAmbulanceId: form.assignedAmbulanceId.trim() || undefined,
     address: form.address.trim() || undefined,
     city: form.city.trim() || undefined,
@@ -287,23 +254,19 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
     setCreatedUser(null);
 
     if (!form.phone.trim()) {
-      setError('Contact phone number is required.');
+      setError('Enter a phone number.');
       return;
     }
 
     if (activeKind === 'ambulance-driver') {
       if (!form.licenseNumber.trim()) {
-        setError('Driver license number is required.');
-        return;
-      }
-      if (!/^[a-fA-F0-9]{24}$/.test(form.providerId.trim())) {
-        setError('Provider ID must be the provider’s 24-character MongoDB ID.');
+        setError('Enter the driver’s license number.');
         return;
       }
     }
 
-    if ((activeKind === 'hospital' || activeKind === 'ambulance-provider') && !form.registrationNumber.trim()) {
-      setError('Operational registration number is required.');
+    if (activeKind === 'hospital' && !form.registrationNumber.trim()) {
+      setError('Enter the hospital registration number.');
       return;
     }
 
@@ -317,7 +280,6 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
 
       let user: AuthUser;
       if (activeKind === 'hospital') user = await register.hospital(buildHospitalPayload());
-      else if (activeKind === 'ambulance-provider') user = await register.ambulanceProvider(buildProviderPayload());
       else user = await register.ambulanceDriver(buildDriverPayload());
 
       setCreatedUser(user);
@@ -374,7 +336,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
           to={ROUTES.PUBLIC.LOGIN}
           className="text-xs font-mono text-zinc-400 hover:text-white transition-colors"
         >
-          Already registered? <span className="text-rose-400 font-semibold underline">Sign In</span>
+          Have an account? <span className="text-rose-400 font-semibold underline">Sign in</span>
         </Link>
       </div>
 
@@ -383,12 +345,12 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
 
         {/* Wizard Header */}
         <div className="mb-10 text-center">
-          <p className="overline text-rose-400 mb-2">Onboarding & Security Clearance</p>
+          <p className="overline text-rose-400 mb-2">Sign up safely</p>
           <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-3">
-            Join the Crisis Response Fabric
+            Join ResQ
           </h1>
           <p className="text-sm text-zinc-400 font-light max-w-md mx-auto leading-relaxed">
-            Create your high-security credential to access rapid emergency coordination and live trauma telemetry.
+            Make an account to ask for emergency help or join the ResQ care team.
           </p>
 
           {/* 2-Step Progress Indicator */}
@@ -404,7 +366,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                 {currentStep === 2 ? <Check className="h-3.5 w-3.5" /> : '1'}
               </span>
               <span className={`text-xs font-medium ${currentStep === 1 ? 'text-white' : 'text-zinc-400'}`}>
-                Account & Credentials
+                Account details
               </span>
             </div>
 
@@ -421,7 +383,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                 2
               </span>
               <span className={`text-xs font-medium ${currentStep === 2 ? 'text-white' : 'text-zinc-500'}`}>
-                Emergency & Location
+                Emergency details
               </span>
             </div>
           </div>
@@ -449,17 +411,17 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
             <div className="h-14 w-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto mb-5">
               <CheckCircle2 className="h-7 w-7" />
             </div>
-            <h3 className="text-xl font-medium text-white mb-2">Registration Submitted</h3>
+            <h3 className="text-xl font-medium text-white mb-2">Sign-up sent</h3>
             <p className="text-sm text-zinc-300 leading-relaxed max-w-md mx-auto mb-8 font-light">
               {createdUser.accountStatus === 'PENDING'
-                ? 'Your operational account has been queued for verification by a ResQ administrator. You will receive activation notice once approved.'
-                : 'Your emergency credentials have been successfully created. You can now access your citizen portal.'}
+                ? 'The ResQ team will check your account. We will let you know when it is approved.'
+                : 'Your account is ready. You can now sign in to ResQ.'}
             </p>
             <Link
               to={ROUTES.PUBLIC.LOGIN}
               className="inline-flex items-center justify-center px-8 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-lg shadow-rose-600/30 transition-all"
             >
-              Proceed to Sign In
+              Sign in
             </Link>
           </motion.div>
         ) : (
@@ -478,7 +440,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                 {/* Role Selector: Large, airy selection cards */}
                 <div>
                   <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-3">
-                    Select Account Role
+                    Choose your account type
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     
@@ -511,9 +473,9 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                           </span>
                         )}
                       </div>
-                      <h4 className="text-base font-semibold text-white mb-1">Citizen / General User</h4>
+                      <h4 className="text-base font-semibold text-white mb-1">Person</h4>
                       <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                        1-tap SOS beacon, automated emergency contact dispatch, and hospital care tracking.
+                        Ask for help with one tap, tell someone you trust, and follow your care.
                       </p>
                     </button>
 
@@ -546,9 +508,9 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                           </span>
                         )}
                       </div>
-                      <h4 className="text-base font-semibold text-white mb-1">Responder / Organization</h4>
+                      <h4 className="text-base font-semibold text-white mb-1">Care team or service</h4>
                       <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                        Trauma facilities, certified ambulance operators, and paramedic responders.
+                        Hospitals, ambulance teams, and emergency helpers.
                       </p>
                     </button>
 
@@ -561,8 +523,8 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                       animate={{ opacity: 1, height: 'auto' }}
                       className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/10"
                     >
-                      <p className="text-xs font-mono text-zinc-400 mb-2.5">Specific Operational Domain:</p>
-                      <div className="grid grid-cols-3 gap-2">
+                      <p className="text-xs font-mono text-zinc-400 mb-2.5">Choose your team:</p>
+                      <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setActiveKind('hospital')}
@@ -574,19 +536,6 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                         >
                           <Building2 className="h-3.5 w-3.5 text-amber-400" />
                           <span>Hospital</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveKind('ambulance-provider')}
-                          className={`py-2.5 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-                            activeKind === 'ambulance-provider'
-                              ? 'bg-white/10 text-white border-rose-400/50 shadow-xs'
-                              : 'text-zinc-400 border-white/5 hover:text-white'
-                          }`}
-                        >
-                          <Ambulance className="h-3.5 w-3.5 text-rose-400" />
-                          <span>Provider</span>
                         </button>
 
                         <button
@@ -613,12 +562,12 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
                       {activeKind === 'ambulance-driver'
-                        ? 'Full Legal Name'
+                        ? 'Full name as shown on your license'
                         : activeKind === 'user'
-                        ? 'Full Name'
+                        ? 'Your full name'
                         : activeKind === 'hospital'
-                        ? 'Hospital / Facility Name'
-                        : 'Fleet Provider Name'}
+                        ? 'Hospital or care center name'
+                        : 'Ambulance service name'}
                     </label>
                     <div className="relative">
                       <input
@@ -632,7 +581,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                           )
                         }
                         placeholder={
-                          activeKind === 'user' ? 'e.g. Dr. Siddharth Verma' : 'e.g. Apex Trauma & ICU'
+                          activeKind === 'user' ? 'e.g. Sam Patel' : 'e.g. City Care Hospital'
                         }
                         className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                       />
@@ -642,7 +591,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                   {/* Email */}
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                      Official Email Address
+                      Email
                     </label>
                     <div className="relative">
                       <input
@@ -671,13 +620,14 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                           autoComplete="new-password"
                           value={form.password}
                           onChange={(e) => update('password', e.target.value)}
-                          placeholder="Min 8 characters"
+                          placeholder="At least 8 characters"
                           className="w-full h-12 px-4 pr-10 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -697,7 +647,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                         </div>
                         {form.password && (
                           <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                            <span>Strength:</span>
+                            <span>Password strength:</span>
                             <span className="font-semibold text-zinc-200">
                               {strengthLabels[passwordScore]}
                             </span>
@@ -708,7 +658,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
 
                     <div>
                       <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Confirm Password
+                        Type your password again
                       </label>
                       <div className="relative">
                         <input
@@ -718,13 +668,14 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                           autoComplete="new-password"
                           value={form.confirmPassword}
                           onChange={(e) => update('confirmPassword', e.target.value)}
-                          placeholder="Repeat password"
+                          placeholder="Type password again"
                           className="w-full h-12 px-4 pr-10 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                         />
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           className="absolute right-3 top-3.5 text-zinc-500 hover:text-zinc-300"
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                         >
                           {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -751,15 +702,15 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                     onClick={handleProceedToStep2}
                     className="w-full h-13 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-sm shadow-xl shadow-rose-600/30 btn-shimmer flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer"
                   >
-                    <span>Proceed to Emergency Profile & Geo-Access</span>
+                    <span>Next: emergency details</span>
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </div>
 
-                {/* 1-Tap Social Registration (Citizen & Provider) */}
-                {(activeKind === 'user' || activeKind === 'ambulance-provider') && (
+                {/* 1-Tap Social Registration (Citizen) */}
+                {activeKind === 'user' && (
                   <SocialAuthButtons
-                    roleHint={activeKind === 'ambulance-provider' ? 'AMBULANCE_PROVIDER' : 'USER'}
+                    roleHint="USER"
                     onSuccess={(user) => {
                       navigate(ROLE_HOMES[user.role] ?? ROUTES.USER.DASHBOARD, { replace: true });
                     }}
@@ -784,7 +735,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                 {/* Contact Phone */}
                 <div>
                   <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                    Primary Emergency Phone (SMS Alerts)
+                    Your phone number (for text alerts)
                   </label>
                   <div className="relative">
                     <input
@@ -803,19 +754,19 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Emergency Contact Name
+                        Trusted contact’s name
                       </label>
                       <input
                         type="text"
                         value={form.emergencyContactName}
                         onChange={(e) => update('emergencyContactName', e.target.value)}
-                        placeholder="e.g. Sunita Verma (Spouse)"
+                        placeholder="e.g. Alex Patel"
                         className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 text-white text-sm outline-none transition-all placeholder:text-zinc-600"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Emergency Contact Phone
+                        Trusted contact’s phone
                       </label>
                       <input
                         type="tel"
@@ -834,7 +785,7 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Hospital Registration Number
+                          Hospital sign-up number
                         </label>
                         <input
                           required
@@ -852,48 +803,19 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                           required
                           value={form.hospitalType}
                           onChange={(e) => update('hospitalType', e.target.value)}
-                          placeholder="e.g. Tertiary Trauma Center"
+                          placeholder="e.g. Emergency care hospital"
                           className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 text-white text-sm outline-none"
                         />
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Key Trauma Services
+                        Care your hospital offers
                       </label>
                       <input
                         value={form.services}
                         onChange={(e) => update('services', e.target.value)}
-                        placeholder="Emergency, ICU, Cardiac, Burns"
-                        className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 text-white text-sm outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {activeKind === 'ambulance-provider' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Fleet Registration Number
-                      </label>
-                      <input
-                        required
-                        value={form.registrationNumber}
-                        onChange={(e) => update('registrationNumber', e.target.value)}
-                        placeholder="e.g. FLEET-RJ-1049"
-                        className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 text-white text-sm outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                        Service Class
-                      </label>
-                      <input
-                        required
-                        value={form.serviceType}
-                        onChange={(e) => update('serviceType', e.target.value)}
-                        placeholder="Private ALS Fleet / NGO"
+                        placeholder="Emergency care, heart care, burns"
                         className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 text-white text-sm outline-none"
                       />
                     </div>
@@ -902,47 +824,17 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
 
                 {activeKind === 'ambulance-driver' && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Commercial Driver License #
-                        </label>
-                        <input
-                          required
-                          value={form.licenseNumber}
-                          onChange={(e) => update('licenseNumber', e.target.value)}
-                          placeholder="e.g. RJ-14-2019-0098"
-                          className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 text-white text-sm outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
-                          Assigned Fleet Provider
-                        </label>
-                        {providers.length > 0 ? (
-                          <select
-                            value={form.providerId}
-                            onChange={(e) => update('providerId', e.target.value)}
-                            className="w-full h-12 px-4 rounded-xl bg-zinc-900 border border-white/10 text-white text-sm outline-none focus:border-rose-500"
-                            required
-                          >
-                            <option value="" disabled>Select approved provider</option>
-                            {providers.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} ({p.city || p.registrationNumber})
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            required
-                            value={form.providerId}
-                            onChange={(e) => update('providerId', e.target.value)}
-                            placeholder="24-char MongoDB ID"
-                            className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 text-white text-sm outline-none"
-                          />
-                        )}
-                      </div>
+                    <div>
+                      <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
+                        Driver’s license number
+                      </label>
+                      <input
+                        required
+                        value={form.licenseNumber}
+                        onChange={(e) => update('licenseNumber', e.target.value)}
+                        placeholder="e.g. RJ-14-2019-0098"
+                        className="w-full h-12 px-4 rounded-xl bg-white/[0.03] border border-white/10 focus:border-rose-500 text-white text-sm outline-none"
+                      />
                     </div>
                   </div>
                 )}
@@ -982,10 +874,10 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                       </div>
                       <div>
                         <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                          Emergency Geolocation Authorization
+                          Allow ResQ to use your location
                         </h4>
                         <p className="text-xs text-zinc-400 font-light mt-0.5">
-                          Enables instant sub-meter GPS dispatch when triggering SOS without vocal address friction.
+                          This helps ResQ send help to the right place when you ask for it.
                         </p>
                       </div>
                     </div>
@@ -1004,13 +896,13 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                         ? 'Detecting…'
                         : geoStatus === 'granted'
                         ? '✓ Authorized'
-                        : 'Authorize GPS'}
+                        : 'Allow location'}
                     </button>
                   </div>
 
                   {coords && (
                     <div className="mt-3 pt-3 border-t border-white/[0.06] text-[11px] font-mono text-zinc-400 flex items-center justify-between">
-                      <span>Coordinates:</span>
+                      <span>Your location:</span>
                       <span className="text-emerald-400">
                         {coords.lat.toFixed(4)}° N, {coords.lng.toFixed(4)}° E
                       </span>
@@ -1037,12 +929,12 @@ export const RegistrationPage = ({ kind: propKind }: RegistrationPageProps) => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Initializing Credential…</span>
+                        <span>Creating account…</span>
                       </>
                     ) : (
                       <>
                         <ShieldCheck className="h-4 w-4" />
-                        <span>Complete Registration</span>
+                        <span>Finish sign-up</span>
                       </>
                     )}
                   </button>

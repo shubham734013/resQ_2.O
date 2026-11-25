@@ -1,5 +1,6 @@
 import { Types, startSession } from 'mongoose';
 import { randomUUID } from 'node:crypto';
+import { UserModel } from '../models/User.js';
 import { HospitalModel } from '../models/Hospital.js';
 import { EmergencyRequestModel } from '../models/EmergencyRequest.js';
 import { HospitalPatientModel } from '../models/HospitalPatient.js';
@@ -12,6 +13,7 @@ import { broadcastEvent } from './realtimeService.js';
 import { recordHospitalCoordinationEvent } from './hospitalCoordinationService.js';
 import { AppError } from '../utils/AppError.js';
 import { calculateGoogleRoutes } from './mapsService.js';
+import { env } from '../config/env.js';
 import type { z } from 'zod';
 import type { createEmergencyRequestSchema, emergencyDiscoveryQuerySchema } from '../schemas/emergency.js';
 import type { EmergencyRequestDocument, HospitalEmergencyStatus } from '../models/EmergencyRequest.js';
@@ -68,6 +70,14 @@ const output = (request: EmergencyRecord) => ({
   patientId: request.patientId ? String(request.patientId) : undefined,
   etaMinutes: request.etaMinutes,
   routeDistanceMeters: request.routeDistanceMeters,
+  patientName: request.patientName,
+  patientPhone: request.patientPhone,
+  patientAge: request.patientAge,
+  patientGender: request.patientGender,
+  severity: request.severity,
+  pickupOtp: request.pickupOtp,
+  pickupOtpVerified: request.pickupOtpVerified,
+  pickupOverrideReason: request.pickupOverrideReason,
   createdAt: request.createdAt,
   updatedAt: request.updatedAt,
 });
@@ -91,6 +101,27 @@ type EmergencyHospitalCandidate = {
   latitude?: number;
   longitude?: number;
   distanceMeters?: number;
+};
+
+type RankedEmergencyHospital<T extends { _id: unknown }> = {
+  hospital: T;
+  straightLineDistanceMeters: number;
+};
+
+export const rankEmergencyHospitalCandidates = <T extends { _id: unknown }>(
+  candidates: RankedEmergencyHospital<T>[],
+  limit: number,
+  demoHospitalId?: string,
+) => {
+  const ranked = [...candidates].sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters);
+  if (demoHospitalId) {
+    const demoIndex = ranked.findIndex(({ hospital }) => String(hospital._id) === demoHospitalId);
+    if (demoIndex > 0) {
+      const [demoHospital] = ranked.splice(demoIndex, 1);
+      if (demoHospital) ranked.unshift(demoHospital);
+    }
+  }
+  return ranked.slice(0, limit);
 };
 
 const situationTerms: Record<string, RegExp> = {
@@ -199,7 +230,29 @@ export const discoverEmergencyHospitals = async (userId: string, query: Emergenc
     const distance = haversineMeters(origin, coordinates);
     if (distance <= query.radiusMeters && !byId.has(String(hospital._id))) byId.set(String(hospital._id), { hospital, straightLineDistanceMeters: distance });
   }
-  const ranked = [...byId.values()].sort((a, b) => a.straightLineDistanceMeters - b.straightLineDistanceMeters).slice(0, query.limit);
+  let demoHospitalId: string | undefined;
+  if (env.NODE_ENV !== 'production') {
+    const demoHospital = await HospitalModel.findOne({
+      email: 'demo.hospital@resq.local',
+      accountStatus: 'ACTIVE',
+      verificationStatus: 'VERIFIED',
+      emergencyAvailability: { $in: ['AVAILABLE', 'LIMITED'] },
+    })
+      .select('name hospitalType services capabilities address city state country phone location latitude longitude verificationStatus accountStatus emergencyAvailability updatedAt')
+      .lean()
+      .exec() as unknown as EmergencyHospitalCandidate | null;
+    const coordinates = demoHospital ? hospitalCoordinate(demoHospital) : null;
+    if (demoHospital && coordinates && hospitalMatchesSituation(demoHospital, query.category)) {
+      demoHospitalId = String(demoHospital._id);
+      if (!byId.has(demoHospitalId)) {
+        byId.set(demoHospitalId, {
+          hospital: demoHospital,
+          straightLineDistanceMeters: haversineMeters(origin, coordinates),
+        });
+      }
+    }
+  }
+  const ranked = rankEmergencyHospitalCandidates([...byId.values()], query.limit, demoHospitalId);
   const items = await Promise.all(ranked.map(async ({ hospital, straightLineDistanceMeters }) => {
     const destination = hospitalCoordinate(hospital);
     const route = destination && query.includeRoutes ? await safeRoute(origin, destination) : null;
@@ -221,6 +274,7 @@ export const discoverEmergencyHospitals = async (userId: string, query: Emergenc
       distanceType: route ? 'DRIVING' as const : 'STRAIGHT_LINE' as const,
       etaMinutes: route?.etaMinutes ?? null,
       estimatedTime: route ? route.etaMinutes + ' min' : null,
+      isTestHospital: Boolean(demoHospitalId && String(hospital._id) === demoHospitalId),
       emergencyAvailability: hospital.emergencyAvailability,
       verified: hospital.verificationStatus === 'VERIFIED',
       lastUpdated: hospital.updatedAt.toISOString(),
@@ -262,6 +316,17 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
 
   const route = await safeRoute({ latitude: input.latitude, longitude: input.longitude }, destination);
   const now = new Date();
+  const requestingUser = await UserModel.findById(userObjectId).select('name phone').lean().exec();
+  const patientName = requestingUser?.name || 'Emergency Patient';
+  const patientPhone = requestingUser?.phone || 'Emergency Contact';
+  const patientAge = 34;
+  const patientGender = 'Male';
+  const severity: 'CRITICAL' | 'URGENT' | 'STANDARD' = ['accident_injury', 'chest_pain', 'stroke_symptoms', 'unconscious_person'].includes(requestedCategory)
+    ? 'CRITICAL'
+    : ['severe_bleeding', 'breathing_difficulty', 'burn'].includes(requestedCategory)
+      ? 'URGENT'
+      : 'STANDARD';
+  const pickupOtp = Math.floor(100000 + Math.random() * 900000).toString();
   const session = await startSession();
   let linked: EmergencyRecord | null = null;
   try {
@@ -288,6 +353,13 @@ export const createEmergencyRequest = async (userId: string, input: CreateEmerge
         longitude: input.longitude,
         etaMinutes: route?.etaMinutes,
         routeDistanceMeters: route?.distanceMeters,
+        patientName,
+        patientPhone,
+        patientAge,
+        patientGender,
+        severity,
+        pickupOtp,
+        pickupOtpVerified: false,
         status: 'RECEIVED',
         statusHistory: [{ status: 'RECEIVED', changedAt: now, actorId: userObjectId, actorRole: 'USER' }],
       });

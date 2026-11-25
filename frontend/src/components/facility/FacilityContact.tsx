@@ -42,7 +42,7 @@ export const FacilityContact = ({
           <div className="flex items-start gap-3">
             <Building2 className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
-              <span className="text-zinc-500 block text-[11px] font-mono uppercase">Facility Address</span>
+              <span className="text-zinc-500 block text-[11px] font-mono uppercase">Address</span>
               <span className="font-medium text-zinc-200 leading-snug mt-0.5 block">
                 {facility.address}
               </span>
@@ -52,7 +52,7 @@ export const FacilityContact = ({
           <button
             type="button"
             onClick={handleCopyAddress}
-            aria-label="Copy address"
+            aria-label="Copy this address"
             className="p-2 text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-xl shrink-0 cursor-pointer transition-all"
           >
             {copied ? (
@@ -67,7 +67,7 @@ export const FacilityContact = ({
         <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
           <Phone className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <span className="text-zinc-500 block text-[11px] font-mono uppercase">Direct Department Line</span>
+            <span className="text-zinc-500 block text-[11px] font-mono uppercase">Department phone</span>
             <a
               href={`tel:${facility.phone.replace(/[^0-9+]/g, '')}`}
               className="font-mono font-medium text-rose-300 hover:text-rose-200 hover:underline mt-0.5 block"
@@ -81,7 +81,7 @@ export const FacilityContact = ({
         <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
           <Clock className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <span className="text-zinc-500 block text-[11px] font-mono uppercase">Intake Hours</span>
+            <span className="text-zinc-500 block text-[11px] font-mono uppercase">Open hours</span>
             <span className="font-medium text-zinc-200 mt-0.5 block">
               {facility.openStatus}
             </span>

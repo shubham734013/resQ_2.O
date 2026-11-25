@@ -29,11 +29,11 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
                   ResQ Health Technologies™
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
-                  ENTERPRISE
+                  FOR HEALTH TEAMS
                 </span>
               </div>
               <p className="text-xs text-slate-300">
-                Real-Time Clinical Triage, Fleet CAD & Emergency Logistics Platform
+                Tools for hospitals, ambulance teams, and emergency help
               </p>
             </div>
           </div>
@@ -41,7 +41,7 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            aria-label="Close dialog"
+            aria-label="Close this box"
           >
             <X className="w-5 h-5" />
           </button>
@@ -52,10 +52,10 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
           {/* Executive Overview */}
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-teal-800">
-              Corporate Mission & Architecture
+              About ResQ
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              ResQ Health Technologies is a cloud-native healthcare infrastructure company providing synchronized, double-blind coordination between citizens, hospital emergency triage centers, and certified ambulance fleets. Our platform bridges the critical 15-minute emergency care gap with authoritative geospatial routing and automated clinical matching.
+              ResQ helps people, hospitals, and approved ambulance teams work together during emergencies. It can share a person’s location and health details, help find an ambulance, and let a hospital get ready before it arrives.
             </p>
           </div>
 
@@ -64,40 +64,40 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1.5">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
                 <Ambulance className="w-4 h-4 text-teal-600" />
-                <span>Enterprise Fleet CAD</span>
+                <span>Ambulance team tools</span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Computer-Aided Dispatch (CAD) engine utilizing sub-second driver reservation locks, live telemetry streaming, and automated failover.
+                ResQ helps find an available ambulance, send directions, and share trip updates. If one way to send updates fails, it can try another.
               </p>
             </div>
 
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1.5">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
                 <Building2 className="w-4 h-4 text-teal-600" />
-                <span>Hospital Triage Command</span>
+                Hospital emergency care
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Emergency department pre-arrival notifications, live bed/ICU telemetry, and double-blind intake verification.
+                Hospitals can learn when an ambulance is coming and check which beds are open, including intensive care beds.
               </p>
             </div>
 
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1.5">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
                 <ShieldCheck className="w-4 h-4 text-teal-600" />
-                <span>Verified Facility Directory</span>
+                Checked hospital list
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                100% verified clinical directory with declared specialties (Trauma, STEMI Cardiac, Stroke, Pediatric) and real-time intake telemetry.
+                Find hospitals that have been checked by ResQ. Hospital teams can list the care they offer, such as injury, heart, stroke, or child care.
               </p>
             </div>
 
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1.5">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
                 <Lock className="w-4 h-4 text-teal-600" />
-                <span>Clinical Interoperability</span>
+                Safe health information
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                HL7 FHIR v4 compatibility, end-to-end audit logging, and zero-compromise separation between emergency SOS and routine clinic appointments.
+                ResQ follows HL7 FHIR, a set of health data rules. It keeps emergency help separate from regular clinic visits and records when health details are used.
               </p>
             </div>
           </div>
@@ -106,14 +106,14 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
           <div className="p-4 rounded-xl border border-teal-200/80 bg-teal-50/40 space-y-2.5">
             <div className="flex items-center gap-2 text-xs font-bold text-teal-950 uppercase tracking-wider">
               <Award className="w-4 h-4 text-teal-700" />
-              <span>Enterprise Compliance & Security Standards</span>
+              <span>Health and safety rules</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               {[
-                { name: 'HIPAA Ready', desc: 'Protected Health Info' },
-                { name: 'HL7 FHIR v4', desc: 'Clinical Data Standard' },
-                { name: 'ISO 27001', desc: 'InfoSec Certified' },
-                { name: 'NABH Aligned', desc: 'Hospital Quality' },
+                { name: 'HIPAA Ready', desc: 'Health privacy rules' },
+                { name: 'HL7 FHIR v4', desc: 'Health data rules' },
+                { name: 'ISO 27001', desc: 'Data safety rules' },
+                { name: 'NABH Aligned', desc: 'Hospital care rules' },
               ].map((badge) => (
                 <div key={badge.name} className="bg-white p-2.5 rounded-lg border border-teal-200/70 text-center">
                   <span className="font-bold text-slate-900 block text-[11px]">{badge.name}</span>
@@ -126,8 +126,8 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
           {/* Partner & Hospital Integration Contact */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
             <div>
-              <p className="font-semibold text-slate-900">Hospital & Fleet Network Onboarding</p>
-              <p className="text-slate-500">Contact enterprise partnerships to connect your hospital or fleet.</p>
+              <p className="font-semibold text-slate-900">Join ResQ</p>
+              <p className="text-slate-500">Contact us to connect your hospital or ambulance service.</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -136,14 +136,14 @@ export const EnterpriseAboutModal = ({ isOpen, onClose }: EnterpriseAboutModalPr
                 icon={<Phone className="w-3.5 h-3.5 text-teal-600" />}
                 onClick={() => { window.location.href = 'tel:112'; }}
               >
-                Dispatch: 112
+                Call 112
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={onClose}
               >
-                Close Overview
+                Close
               </Button>
             </div>
           </div>

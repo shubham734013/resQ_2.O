@@ -20,15 +20,15 @@ export const ResetPasswordPage = () => {
     e.preventDefault();
     setError('');
     if (!token) {
-      setError('This reset link is missing its security token. Please request a new reset link.');
+      setError('This reset link is missing a safety code. Please ask for a new link.');
       return;
     }
     if (password.length < 8) {
-      setError('Password must contain at least 8 characters.');
+      setError('Your password must be at least 8 characters long.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('The passwords do not match.');
       return;
     }
     setSubmitting(true);
@@ -37,9 +37,9 @@ export const ResetPasswordPage = () => {
       setSuccess(true);
     } catch (err) {
       if (err instanceof AuthApiError && err.code === 'INVALID_RESET_TOKEN') {
-        setError('This reset link is invalid or has expired. Please request a new one.');
+        setError('This reset link is not valid or has expired. Please ask for a new one.');
       } else {
-        setError('We could not update your password right now. Please try again in a moment.');
+        setError('We could not change your password. Please try again soon.');
       }
     } finally {
       setSubmitting(false);
@@ -73,7 +73,7 @@ export const ResetPasswordPage = () => {
           </div>
           <div>
             <p className="text-sm font-bold tracking-tight text-white">ResQ 2.O</p>
-            <p className="text-[10px] tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>Identity & Security</p>
+            <p className="text-[10px] tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>Account safety</p>
           </div>
         </div>
 
@@ -97,9 +97,9 @@ export const ResetPasswordPage = () => {
               >
                 <CheckCircle2 className="h-7 w-7" style={{ color: '#34d399' }} />
               </div>
-              <h1 className="text-2xl font-light tracking-tight text-white mb-3">Password Updated</h1>
+              <h1 className="text-2xl font-light tracking-tight text-white mb-3">Password changed</h1>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                Your password has been successfully updated. You may now sign in to your role portal.
+                Your password has changed. You can now sign in.
               </p>
               <div className="mt-8">
                 <button
@@ -111,7 +111,7 @@ export const ResetPasswordPage = () => {
                     boxShadow: '0 4px 20px rgba(244,63,94,0.30)',
                   }}
                 >
-                  Proceed to Sign In
+                  Sign in
                 </button>
               </div>
             </div>
@@ -125,9 +125,9 @@ export const ResetPasswordPage = () => {
                 >
                   <Lock className="h-5 w-5" style={{ color: '#f43f5e' }} />
                 </div>
-                <h1 className="text-2xl font-light tracking-tight text-white mb-2">Set New Password</h1>
+                <h1 className="text-2xl font-light tracking-tight text-white mb-2">Choose a new password</h1>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  Choose a strong password to secure your ResQ account.
+                  Choose a strong password to keep your ResQ account safe.
                 </p>
               </div>
 
@@ -145,7 +145,7 @@ export const ResetPasswordPage = () => {
 
                 {/* New Password */}
                 <div className="space-y-2">
-                  <label className="overline block">New Password</label>
+                  <label className="overline block">New password</label>
                   <div className="relative">
                     <input
                       required
@@ -153,7 +153,7 @@ export const ResetPasswordPage = () => {
                       minLength={8}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="At least 8 characters"
+                      placeholder="Use 8 or more characters"
                       className="input-dark h-12 w-full px-4 pr-12 text-sm"
                     />
                     <button
@@ -189,7 +189,7 @@ export const ResetPasswordPage = () => {
 
                 {/* Confirm Password */}
                 <div className="space-y-2">
-                  <label className="overline block">Confirm New Password</label>
+                  <label className="overline block">Type the new password again</label>
                   <div className="relative">
                     <input
                       required
@@ -197,7 +197,7 @@ export const ResetPasswordPage = () => {
                       minLength={8}
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Repeat new password"
+                      placeholder="Type it again"
                       className="input-dark h-12 w-full px-4 pr-12 text-sm"
                       style={
                         confirmPassword && confirmPassword !== password
@@ -238,7 +238,7 @@ export const ResetPasswordPage = () => {
                       Updating…
                     </>
                   ) : (
-                    'Update Password'
+                    'Change password'
                   )}
                 </button>
 
@@ -251,7 +251,7 @@ export const ResetPasswordPage = () => {
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; }}
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
-                    Back to Sign In
+                    Back to sign in
                   </Link>
                 </div>
               </form>
@@ -260,7 +260,7 @@ export const ResetPasswordPage = () => {
         </div>
 
         <p className="mt-8 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          ResQ 2.O · Identity & Security · End-to-end encrypted
+          ResQ 2.O · Your account is protected
         </p>
       </div>
     </main>

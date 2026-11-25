@@ -45,16 +45,16 @@ export const ArrivalState = ({
       {/* Arrival Header */}
       <div className="space-y-1">
         <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full inline-block">
-          Destination Reached
+          Route ended
         </span>
         <h2
           id="arrival-dialog-title"
           className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight"
         >
-          You Have Arrived
+          Check your place
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
-          Welcome to <strong className="text-slate-900">{facility.name}</strong>.
+          Make sure you are at <strong className="text-slate-900">{facility.name}</strong>.
         </p>
       </div>
 
@@ -74,7 +74,7 @@ export const ArrivalState = ({
           {facility.emergencyAvailable && (
             <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-1">
               <Flame className="w-3 h-3 text-rose-600" />
-              Emergency Intake
+              Emergency care listed
             </span>
           )}
         </div>
@@ -83,14 +83,14 @@ export const ArrivalState = ({
           <div className="p-2.5 bg-rose-50 border border-rose-200/80 rounded-lg text-xs text-rose-900 flex items-center gap-2">
             <Navigation className="w-4 h-4 text-rose-600 shrink-0" />
             <span className="font-medium text-[11px]">
-              Proceed directly to North Emergency Intake bay for emergency reception.
+              Follow signs to emergency care. Ask hospital staff if you need help.
             </span>
           </div>
         ) : (
           <div className="p-2.5 bg-blue-50 border border-blue-200/80 rounded-lg text-xs text-blue-900 flex items-center gap-2">
             <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="font-medium text-[11px]">
-              Visitor and outpatient parking is available at the main facility parking deck.
+              Ask the hospital where you can park.
             </span>
           </div>
         )}
@@ -104,10 +104,10 @@ export const ArrivalState = ({
             size="lg"
             icon={<Phone className="w-4 h-4" />}
             onClick={handleCall}
-            aria-label={`Call facility at ${facility.phone}`}
+            aria-label={`Call the hospital at ${facility.phone}`}
             className="flex-1"
           >
-            Call Desk
+            Call hospital
           </Button>
 
           <Button
@@ -115,10 +115,10 @@ export const ArrivalState = ({
             size="lg"
             icon={<ExternalLink className="w-4 h-4" />}
             onClick={onViewFacility}
-            aria-label="View facility details"
+            aria-label="View hospital details"
             className="flex-1 font-semibold"
           >
-            Facility Details
+            Hospital details
           </Button>
         </div>
 
@@ -128,10 +128,10 @@ export const ArrivalState = ({
           fullWidth
           icon={<Home className="w-4 h-4" />}
           onClick={onEndTrip}
-          aria-label="End trip and return to home"
+          aria-label="End trip and go home"
           className="font-bold"
         >
-          End Trip & Return Home
+          End trip and go home
         </Button>
       </div>
     </div>

@@ -33,6 +33,14 @@ export interface EmergencyRequestDocument {
   patientId?: Types.ObjectId;
   etaMinutes?: number;
   routeDistanceMeters?: number;
+  patientName?: string;
+  patientPhone?: string;
+  patientAge?: number;
+  patientGender?: string;
+  severity?: 'CRITICAL' | 'URGENT' | 'STANDARD';
+  pickupOtp?: string;
+  pickupOtpVerified?: boolean;
+  pickupOverrideReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +72,14 @@ const schema = new Schema<EmergencyRequestDocument>({
   patientId: { type: Schema.Types.ObjectId, ref: 'HospitalPatient', index: true },
   etaMinutes: Number,
   routeDistanceMeters: Number,
+  patientName: String,
+  patientPhone: String,
+  patientAge: Number,
+  patientGender: String,
+  severity: { type: String, enum: ['CRITICAL', 'URGENT', 'STANDARD'], default: 'STANDARD' },
+  pickupOtp: String,
+  pickupOtpVerified: { type: Boolean, default: false },
+  pickupOverrideReason: String,
 }, { timestamps: true });
 
 schema.index({ idempotencyKey: 1 }, { unique: true, sparse: true, name: 'emergency_idempotency_key_unique' });

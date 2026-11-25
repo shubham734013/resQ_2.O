@@ -35,7 +35,7 @@ export const AboutPage = () => {
             className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/[0.04] backdrop-blur-xl border border-white/10 text-xs text-rose-300 font-mono mb-8"
           >
             <HeartPulse className="h-4 w-4 text-rose-500 animate-pulse" />
-            <span>Sovereign Healthcare & Crisis Infrastructure</span>
+            <span>Health and emergency help</span>
           </motion.div>
 
           <motion.h1
@@ -44,9 +44,9 @@ export const AboutPage = () => {
             transition={{ duration: 0.7, delay: 0.1 }}
             className="text-4xl sm:text-6xl font-light tracking-tight text-white leading-[1.12] mb-8"
           >
-            Building the Next-Generation{' '}
+            Making emergency care{' '}
             <span className="font-semibold block mt-1 text-gradient-crimson">
-              Emergency Infrastructure.
+              easier to reach.
             </span>
           </motion.h1>
 
@@ -56,7 +56,7 @@ export const AboutPage = () => {
             transition={{ duration: 0.7, delay: 0.2 }}
             className="text-lg sm:text-xl text-zinc-400 font-light leading-relaxed max-w-3xl mx-auto mb-12"
           >
-            ResQ 2.O eliminates departmental fragmentation across emergency medical response—synchronizing citizen SOS distress beacons, paramedic navigation, and hospital trauma command into a unified, zero-latency network.
+            ResQ 2.O helps people, ambulance teams, and hospitals work together when someone needs urgent medical care.
           </motion.p>
 
           <motion.div
@@ -70,7 +70,7 @@ export const AboutPage = () => {
               className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-xl shadow-rose-600/30 btn-shimmer transition-all"
             >
               <HeartPulse className="h-4 w-4 animate-pulse" />
-              <span>Trigger Emergency SOS</span>
+              <span>Ask for emergency help</span>
               <ArrowRight className="h-4 w-4 opacity-75" />
             </Link>
 
@@ -79,7 +79,7 @@ export const AboutPage = () => {
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-sm font-semibold text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 transition-all"
             >
               <Compass className="h-4 w-4 text-amber-400" />
-              <span>Explore Live Facility Network</span>
+              <span>Find a hospital</span>
             </Link>
           </motion.div>
 
@@ -91,9 +91,9 @@ export const AboutPage = () => {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="overline text-rose-400 mb-2">Core Mandate</p>
+            <p className="overline text-rose-400 mb-2">Our goal</p>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white">
-              The Guiding Purpose of ResQ 2.O
+              Why we made ResQ
             </h2>
           </div>
 
@@ -105,21 +105,21 @@ export const AboutPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-8">
                   <Zap className="h-6 w-6" />
                 </div>
-                <p className="overline text-rose-400 mb-2">Immediate Execution</p>
+                <p className="overline text-rose-400 mb-2">What we do</p>
                 <h3 className="text-2xl sm:text-3xl font-light tracking-tight text-white mb-5">
                   Our Mission
                 </h3>
                 <p className="text-base text-zinc-300 leading-relaxed font-light mb-6">
-                  To eliminate preventable trauma, cardiac, and stroke mortalities by compressing emergency response latency to under 3 minutes.
+                  We help people get care sooner after a serious injury, heart problem, or stroke.
                 </p>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  We replace cumbersome phone dispatches with algorithmic geospatial matching, giving paramedics green-corridor priority and trauma teams real-time patient vitals before the ambulance arrives.
+                  ResQ helps find an available ambulance, share directions, and tell the hospital about the person’s health before the ambulance arrives.
                 </p>
               </div>
 
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center gap-3 text-xs font-mono text-zinc-400">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <span>Zero redundant voice friction</span>
+                <span>Fast help with fewer phone calls</span>
               </div>
             </div>
 
@@ -129,21 +129,21 @@ export const AboutPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-8">
                   <Compass className="h-6 w-6" />
                 </div>
-                <p className="overline text-amber-400 mb-2">Systemic Horizon</p>
+                <p className="overline text-amber-400 mb-2">What we hope for</p>
                 <h3 className="text-2xl sm:text-3xl font-light tracking-tight text-white mb-5">
                   Our Vision
                 </h3>
                 <p className="text-base text-zinc-300 leading-relaxed font-light mb-6">
-                  A seamless national crisis response grid where no healthcare facility is a digital island, no ambulance is stalled, and every citizen is protected.
+                  We want people, hospitals, and ambulance teams across India to work well together so everyone can get help.
                 </p>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  By standardizing hospital bed telemetry, municipal traffic signals, and first-responder GPS tracking under an interoperable protocol, ResQ turns municipal healthcare into a synchronized, resilient shield.
+                  ResQ can share open bed details, ambulance locations, and traffic updates to help care teams get ready.
                 </p>
               </div>
 
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center gap-3 text-xs font-mono text-zinc-400">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <span>Autonomous regional emergency fabric</span>
+                <span>Care teams working together</span>
               </div>
             </div>
 
@@ -157,12 +157,12 @@ export const AboutPage = () => {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           
           <div className="text-center max-w-3xl mx-auto mb-20">
-            <p className="overline text-rose-400 mb-2">Real-Time Data Pipeline</p>
+            <p className="overline text-rose-400 mb-2">How it works</p>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
-              How ResQ Orchestrates Live Crisis Signals
+              How ResQ helps in an emergency
             </h2>
             <p className="text-sm sm:text-base text-zinc-400 font-light leading-relaxed">
-              Every emergency trigger executes a sub-second state machine, securely coordinating citizen sensors, nearest fleets, and trauma bays.
+              When someone asks for help, ResQ shares their location with nearby ambulance teams and hospitals.
             </p>
           </div>
 
@@ -174,20 +174,20 @@ export const AboutPage = () => {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <span className="font-mono text-xs font-bold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20">
-                    STAGE 01
+                    STEP 1
                   </span>
-                  <span className="font-mono text-[11px] text-zinc-500">&lt; 200ms</span>
+                  <span className="font-mono text-[11px] text-zinc-500">Under 1 second</span>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-rose-400 mb-4 border border-white/[0.06]">
                   <Radio className="h-5 w-5" />
                 </div>
-                <h4 className="text-lg font-medium text-white mb-2">Signal Beacon Capture</h4>
+                <h4 className="text-lg font-medium text-white mb-2">Ask for help</h4>
                 <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                  Citizen triggers SOS. High-accuracy GPS coordinates, user medical profile (blood type, allergies), and pre-set emergency contacts are broadcast through edge brokers.
+                  A person asks for help. ResQ can send their location, saved health details, and trusted contacts.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-white/[0.06] text-[11px] font-mono text-zinc-500">
-                Protocol: WSS Secure Ingest
+                Safe data link
               </div>
             </div>
 
@@ -196,20 +196,20 @@ export const AboutPage = () => {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                    STAGE 02
+                    STEP 2
                   </span>
-                  <span className="font-mono text-[11px] text-zinc-500">&lt; 30s</span>
+                  <span className="font-mono text-[11px] text-zinc-500">Under 30 seconds</span>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-amber-400 mb-4 border border-white/[0.06]">
                   <Ambulance className="h-5 w-5" />
                 </div>
-                <h4 className="text-lg font-medium text-white mb-2">Geospatial Fleet Lock</h4>
+                <h4 className="text-lg font-medium text-white mb-2">Find an ambulance</h4>
                 <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                  Our spatial heuristic algorithm calculates live road congestion and vehicle capability (ALS/BLS), auto-locking the nearest available unit with turn-by-turn routing.
+                  ResQ looks for a nearby available ambulance that can give the right kind of care. It can share directions with the driver.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-white/[0.06] text-[11px] font-mono text-zinc-500">
-                Engine: PostGIS + Vector Routing
+                Map and directions
               </div>
             </div>
 
@@ -218,20 +218,20 @@ export const AboutPage = () => {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
-                    STAGE 03
+                    STEP 3
                   </span>
-                  <span className="font-mono text-[11px] text-zinc-500">In-Transit</span>
+                  <span className="font-mono text-[11px] text-zinc-500">                  On the way</span>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-blue-400 mb-4 border border-white/[0.06]">
                   <Cpu className="h-5 w-5" />
                 </div>
-                <h4 className="text-lg font-medium text-white mb-2">Paramedic Telematics</h4>
+                <h4 className="text-lg font-medium text-white mb-2">Share health updates</h4>
                 <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                  Paramedics enter on-scene triage notes and stream vitals directly into the receiving hospital's command dashboard, establishing pre-arrival clinical readiness.
+                  The ambulance team can share health signs and notes with the hospital, so the care team can get ready.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-white/[0.06] text-[11px] font-mono text-zinc-500">
-                Sync: HL7 / FHIR Standard
+                Health data rules: HL7 / FHIR
               </div>
             </div>
 
@@ -240,20 +240,20 @@ export const AboutPage = () => {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                    STAGE 04
+                    STEP 4
                   </span>
                   <span className="font-mono text-[11px] text-zinc-500">Arrival</span>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-emerald-400 mb-4 border border-white/[0.06]">
                   <Building2 className="h-5 w-5" />
                 </div>
-                <h4 className="text-lg font-medium text-white mb-2">Clinical Bay Scrubbed</h4>
+                <h4 className="text-lg font-medium text-white mb-2">Hospital gets ready</h4>
                 <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                  Trauma bay is prepared, blood matched, and surgical squad positioned before the vehicle arrives. Patient undergoes immediate, zero-delay clinical transfer.
+                  The hospital can prepare a room and care team before the ambulance arrives.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-white/[0.06] text-[11px] font-mono text-zinc-500">
-                Outcome: Instant Trauma Hand-off
+                Ready to give care
               </div>
             </div>
 
@@ -267,9 +267,9 @@ export const AboutPage = () => {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="overline text-rose-400 mb-2">Verified Real-World Benchmark</p>
+            <p className="overline text-rose-400 mb-2">ResQ numbers</p>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white">
-              Metrics That Translate to Lives Saved
+              How ResQ is used
             </h2>
           </div>
 
@@ -277,13 +277,13 @@ export const AboutPage = () => {
             
             <div className="spotlight-card p-10 text-center">
               <span className="font-mono text-4xl lg:text-5xl font-light text-white block mb-2 tracking-tight">
-                &lt; 2.4m
+                Under 2.4 minutes
               </span>
               <p className="text-xs font-mono uppercase tracking-wider text-rose-400 mb-2">
-                Mean Dispatch Time
+                Average time to send help
               </p>
               <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                62% faster than conventional emergency telephone routing lines.
+                62% faster than regular emergency phone calls.
               </p>
             </div>
 
@@ -292,10 +292,10 @@ export const AboutPage = () => {
                 99.99%
               </span>
               <p className="text-xs font-mono uppercase tracking-wider text-emerald-400 mb-2">
-                Platform Uptime SLA
+                Time ResQ is working
               </p>
               <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                Continuous high-availability redundant edge nodes across Jaipur metro.
+                ResQ aims to work 99.99% of the time in Jaipur.
               </p>
             </div>
 
@@ -304,10 +304,10 @@ export const AboutPage = () => {
                 140+
               </span>
               <p className="text-xs font-mono uppercase tracking-wider text-amber-400 mb-2">
-                Trauma & ICU Centers
+                Hospitals for serious injury and intensive care
               </p>
               <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                Connected facilities streaming real-time critical bed telemetry.
+                Hospitals share live updates about open beds.
               </p>
             </div>
 
@@ -316,10 +316,10 @@ export const AboutPage = () => {
                 12,800+
               </span>
               <p className="text-xs font-mono uppercase tracking-wider text-blue-400 mb-2">
-                Crisis Interventions
+                Emergency calls helped
               </p>
               <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                Emergency incidents successfully coordinated with zero dropped telemetry.
+                Emergency calls where teams shared updates.
               </p>
             </div>
 
@@ -338,9 +338,9 @@ export const AboutPage = () => {
               <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 mb-5">
                 <Lock className="h-5 w-5" />
               </div>
-              <h3 className="text-base font-semibold text-white mb-2">Zero-Trust Clinical Security</h3>
+              <h3 className="text-base font-semibold text-white mb-2">Keep health details safe</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Every packet of patient telemetry is encrypted with AES-256 in transit and at rest. Strict role-based isolation guarantees that medical records remain inaccessible to unauthorized fleet personnel.
+                ResQ locks health details when it sends or saves them. Only people who need these details for care can see them.
               </p>
             </div>
 
@@ -348,9 +348,9 @@ export const AboutPage = () => {
               <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 mb-5">
                 <Wifi className="h-5 w-5" />
               </div>
-              <h3 className="text-base font-semibold text-white mb-2">Mesh Edge Survivability</h3>
+              <h3 className="text-base font-semibold text-white mb-2">Help when service is weak</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Designed to operate under extreme cellular congestion or power outages. Emergency beacons fall back automatically to municipal IoT mesh signals and cached SMS relays.
+                ResQ can try to send an emergency message by text if phone data is not working. This may not work everywhere. Call 112 if someone needs help now.
               </p>
             </div>
 
@@ -358,9 +358,9 @@ export const AboutPage = () => {
               <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-5">
                 <Layers className="h-5 w-5" />
               </div>
-              <h3 className="text-base font-semibold text-white mb-2">ABDM & Open Interoperability</h3>
+              <h3 className="text-base font-semibold text-white mb-2">Follow health data rules</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Built strictly to Ayushman Bharat Digital Mission (ABDM) guidelines and HL7 / FHIR clinical communication specifications for effortless integration with state health ministries.
+                ResQ follows India's Ayushman Bharat Digital Mission (ABDM), India's health data program, and HL7 / FHIR rules for sharing health details safely.
               </p>
             </div>
 

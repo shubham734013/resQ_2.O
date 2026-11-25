@@ -4,7 +4,6 @@ import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { env } from '../config/env.js';
 import { UserModel } from '../models/User.js';
 import { HospitalModel } from '../models/Hospital.js';
-import { AmbulanceProviderModel } from '../models/AmbulanceProvider.js';
 import { AmbulanceModel } from '../models/Ambulance.js';
 import { AmbulanceDriverModel } from '../models/AmbulanceDriver.js';
 import { HospitalAppointmentAvailabilityModel } from '../models/HospitalAppointmentAvailability.js';
@@ -124,17 +123,17 @@ export const seedDemoData = async () => {
       latitude: 26.8917,
       longitude: 75.8155,
       location: { type: 'Point' as const, coordinates: [75.8155, 26.8917] as [number, number] },
-      hospitalType: 'Government Multispeciality & Trauma',
+      hospitalType: 'Government Multispeciality & Trauma (Demo)',
       services: ['Emergency', 'Trauma', 'Cardiology', 'Neurology', 'Pediatric', 'ICU', 'Burn Care', 'Orthopedics', 'General Medicine'],
       capabilities: ['24/7 Trauma Unit', 'Cath Lab', 'Emergency Surgery', 'Cardiac ICU', 'Pediatric ICU'],
       resourceSummary: new Map([['icuBeds', 12], ['emergencyBeds', 24], ['ventilators', 8], ['operationTheatres', 6]]),
       emergencyAvailability: 'AVAILABLE' as const,
-      publicContactInformation: '24/7 Emergency Line: +91-141-2560291',
-      operationalDescription: 'Level 1 Trauma Center with 24/7 active emergency intake and resuscitation teams.',
+      publicContactInformation: '24/7 Emergency Line: +91-141-2560291 (Demo Simulation Only)',
+      operationalDescription: 'Demonstration account for Level 1 Trauma Center with 24/7 active emergency intake.',
       appointmentDepartments: ['General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Neurology', 'Emergency'],
     },
     {
-      name: 'Fortis Escorts Hospital (Jaipur)',
+      name: 'Fortis Escorts Hospital (Demo - Jaipur)',
       registrationNumber: 'HOSP-DEMO-FORTIS-02',
       email: 'fortis.jaipur@resq.local',
       phone: '9876543214',
@@ -145,17 +144,17 @@ export const seedDemoData = async () => {
       latitude: 26.8521,
       longitude: 75.8078,
       location: { type: 'Point' as const, coordinates: [75.8078, 26.8521] as [number, number] },
-      hospitalType: 'Private Multispeciality & Cardiology Super-Specialty',
+      hospitalType: 'Private Multispeciality & Cardiology Super-Specialty (Demo)',
       services: ['Emergency', 'Cardiology', 'Cardiac Surgery', 'Neurology', 'Orthopedics', 'ICU', 'Critical Care', 'Pulmonology'],
       capabilities: ['24/7 Cardiac Emergency', 'Cath Lab', 'Advanced ICU', 'Emergency Resuscitation', 'Stroke Center'],
       resourceSummary: new Map([['icuBeds', 20], ['emergencyBeds', 30], ['ventilators', 12], ['operationTheatres', 8]]),
       emergencyAvailability: 'AVAILABLE' as const,
-      publicContactInformation: '24/7 Emergency: +91-141-2547000',
-      operationalDescription: 'JCI and NABH accredited tertiary cardiac and critical care super-specialty hospital.',
+      publicContactInformation: '24/7 Emergency: +91-141-2547000 (Demo Simulation Only)',
+      operationalDescription: 'Demonstration account for tertiary cardiac and critical care super-specialty hospital.',
       appointmentDepartments: ['Cardiology', 'Cardiac Surgery', 'Neurology', 'Orthopedics', 'Pulmonology'],
     },
     {
-      name: 'Eternal Heart Care Centre & Hospital (EHCC)',
+      name: 'Eternal Heart Care Centre & Hospital (Demo - EHCC)',
       registrationNumber: 'HOSP-DEMO-EHCC-03',
       email: 'ehcc.jaipur@resq.local',
       phone: '9876543215',
@@ -166,17 +165,17 @@ export const seedDemoData = async () => {
       latitude: 26.8458,
       longitude: 75.8035,
       location: { type: 'Point' as const, coordinates: [75.8035, 26.8458] as [number, number] },
-      hospitalType: 'Heart & Multispeciality Tertiary Care Hospital',
+      hospitalType: 'Heart & Multispeciality Tertiary Care Hospital (Demo)',
       services: ['Emergency', 'Cardiology', 'Heart Transplant', 'Trauma', 'Vascular Surgery', 'Radiology', 'Critical Care'],
       capabilities: ['24/7 Heart Attack Response', 'Advanced Cath Lab', 'CCU', 'ECMO Unit', 'Emergency Cardiac Unit'],
       resourceSummary: new Map([['icuBeds', 16], ['emergencyBeds', 20], ['ventilators', 10], ['operationTheatres', 5]]),
       emergencyAvailability: 'AVAILABLE' as const,
-      publicContactInformation: '24/7 Hotline: +91-141-3966000',
-      operationalDescription: 'Dedicated Heart Hospital and Tertiary Care Center equipped with advanced ECMO and Cath Labs.',
+      publicContactInformation: '24/7 Hotline: +91-141-3966000 (Demo Simulation Only)',
+      operationalDescription: 'Demonstration account for dedicated Heart Hospital equipped with advanced ECMO and Cath Labs.',
       appointmentDepartments: ['Cardiology', 'Vascular Surgery', 'Radiology', 'Critical Care'],
     },
     {
-      name: 'Apex Hospital (Mansarovar)',
+      name: 'Apex Hospital (Demo - Mansarovar)',
       registrationNumber: 'HOSP-DEMO-APEX-04',
       email: 'apex.jaipur@resq.local',
       phone: '9876543216',
@@ -187,17 +186,17 @@ export const seedDemoData = async () => {
       latitude: 26.8570,
       longitude: 75.7680,
       location: { type: 'Point' as const, coordinates: [75.7680, 26.8570] as [number, number] },
-      hospitalType: 'Super Speciality Hospital & Trauma Care',
+      hospitalType: 'Super Speciality Hospital & Trauma Care (Demo)',
       services: ['Emergency', 'Trauma', 'Orthopaedics', 'Neurology', 'Pediatric', 'General Surgery', 'Nephrology'],
       capabilities: ['24/7 Trauma Service', 'Level 2 Trauma Care', 'Dialysis Unit', 'Pediatric ICU'],
       resourceSummary: new Map([['icuBeds', 14], ['emergencyBeds', 18], ['ventilators', 6], ['operationTheatres', 4]]),
       emergencyAvailability: 'AVAILABLE' as const,
-      publicContactInformation: '24/7 Helpline: +91-141-2784920',
-      operationalDescription: 'Leading super-specialty trauma and surgical care facility in Southwest Jaipur.',
+      publicContactInformation: '24/7 Helpline: +91-141-2784920 (Demo Simulation Only)',
+      operationalDescription: 'Demonstration account for trauma and surgical care facility in Southwest Jaipur.',
       appointmentDepartments: ['Trauma', 'Orthopaedics', 'Pediatric', 'General Surgery', 'Nephrology'],
     },
     {
-      name: 'Narayana Multispeciality Hospital',
+      name: 'Narayana Multispeciality Hospital (Demo - Sanganer)',
       registrationNumber: 'HOSP-DEMO-NARAYANA-05',
       email: 'narayana.jaipur@resq.local',
       phone: '9876543217',
@@ -208,17 +207,17 @@ export const seedDemoData = async () => {
       latitude: 26.7995,
       longitude: 75.8234,
       location: { type: 'Point' as const, coordinates: [75.8234, 26.7995] as [number, number] },
-      hospitalType: 'Multispeciality Hospital',
+      hospitalType: 'Multispeciality Hospital (Demo)',
       services: ['Emergency', 'Cardiology', 'Oncology', 'Neurology', 'Nephrology', 'Maternity', 'Pediatric', 'Urgent Care'],
       capabilities: ['24/7 Emergency Care', 'Oncology Care', 'Comprehensive Stroke Center', 'NICU / PICU', 'Maternity Unit'],
       resourceSummary: new Map([['icuBeds', 18], ['emergencyBeds', 25], ['ventilators', 8], ['operationTheatres', 6]]),
       emergencyAvailability: 'AVAILABLE' as const,
-      publicContactInformation: '24/7 Desk: +91-141-7122222',
-      operationalDescription: 'Comprehensive cancer, cardiac, maternal and neonatal emergency tertiary care hospital.',
+      publicContactInformation: '24/7 Desk: +91-141-7122222 (Demo Simulation Only)',
+      operationalDescription: 'Demonstration account for cancer, cardiac, and neonatal emergency care.',
       appointmentDepartments: ['Cardiology', 'Maternity', 'Pediatric', 'Oncology', 'Neurology', 'Urgent Care'],
     },
     {
-      name: 'Manipal Hospital (Vidhyadhar Nagar)',
+      name: 'Manipal Hospital (Demo - Vidhyadhar Nagar)',
       registrationNumber: 'HOSP-DEMO-MANIPAL-06',
       email: 'manipal.jaipur@resq.local',
       phone: '9876543218',
@@ -229,13 +228,13 @@ export const seedDemoData = async () => {
       latitude: 26.9667,
       longitude: 75.7761,
       location: { type: 'Point' as const, coordinates: [75.7761, 26.9667] as [number, number] },
-      hospitalType: 'Tertiary Care Multispeciality Hospital',
+      hospitalType: 'Tertiary Care Multispeciality Hospital (Demo)',
       services: ['Emergency', 'Trauma', 'Urgent Care', 'Cardiology', 'Maternity', 'Orthopaedics', 'Pediatric', 'General'],
       capabilities: ['24/7 Acute Care', 'Trauma ICU', 'Maternity Emergency', 'Advanced Life Support', 'Laparoscopic Surgery'],
       resourceSummary: new Map([['icuBeds', 15], ['emergencyBeds', 22], ['ventilators', 7], ['operationTheatres', 5]]),
       emergencyAvailability: 'AVAILABLE' as const,
-      publicContactInformation: '24/7 Helpline: +91-141-5164000',
-      operationalDescription: 'Premier acute emergency, orthopedic and maternal trauma care hospital in North Jaipur.',
+      publicContactInformation: '24/7 Helpline: +91-141-5164000 (Demo Simulation Only)',
+      operationalDescription: 'Demonstration account for acute emergency, orthopedic and maternal trauma care in North Jaipur.',
       appointmentDepartments: ['Emergency', 'Urgent Care', 'Maternity', 'Orthopaedics', 'General'],
     },
   ];
@@ -322,72 +321,14 @@ export const seedDemoData = async () => {
   console.log(`⏳ Pending Hospital ready for Admin Review: ${pendingHospital.name} (${pendingHospital.email})`);
 
   // -------------------------------------------------------------------------
-  // 5. Seed Ambulance Providers (1 Verified, 1 Pending)
-  // -------------------------------------------------------------------------
-  const provider1Email = 'demo.provider@resq.local';
-  const verifiedProvider = await AmbulanceProviderModel.findOneAndUpdate(
-    { email: provider1Email },
-    {
-      $set: {
-        name: 'Apex LifeCare Ambulances (Demo)',
-        registrationNumber: 'PRV-DEMO-001',
-        email: provider1Email,
-        phone: '9876543211',
-        passwordHash,
-        authProvider: 'LOCAL',
-        profileCompletionStatus: 'COMPLETE',
-        serviceType: 'Emergency 24x7 ALS & BLS Fleet',
-        address: 'Tonk Road, Lal Kothi',
-        city: 'Jaipur',
-        state: 'Rajasthan',
-        country: 'India',
-        latitude: 26.8850,
-        longitude: 75.8010,
-        verificationStatus: 'VERIFIED',
-        accountStatus: 'ACTIVE',
-      },
-    },
-    { upsert: true, returnDocument: 'after' },
-  );
-  console.log(`✅ Verified Provider ready: ${verifiedProvider.name} (${verifiedProvider.email})`);
-
-  const pendingProviderEmail = 'pending.provider@resq.local';
-  const pendingProvider = await AmbulanceProviderModel.findOneAndUpdate(
-    { email: pendingProviderEmail },
-    {
-      $set: {
-        name: 'Marwar Emergency Fleet (Pending Review)',
-        registrationNumber: 'PRV-PENDING-002',
-        email: pendingProviderEmail,
-        phone: '9876543231',
-        passwordHash,
-        authProvider: 'LOCAL',
-        profileCompletionStatus: 'COMPLETE',
-        serviceType: 'Regional Ambulance Network',
-        address: 'Ajmer Road, 200 Feet Bypass',
-        city: 'Jaipur',
-        state: 'Rajasthan',
-        country: 'India',
-        latitude: 26.8880,
-        longitude: 75.7350,
-        verificationStatus: 'PENDING',
-        accountStatus: 'PENDING',
-      },
-    },
-    { upsert: true, returnDocument: 'after' },
-  );
-  console.log(`⏳ Pending Provider ready for Admin Review: ${pendingProvider.name} (${pendingProvider.email})`);
-
-  // -------------------------------------------------------------------------
-  // 6. Seed Ambulance Fleet (ALS, BLS, and Pending)
+  // 5. Seed Ambulance Fleet (ALS, BLS, and Pending) - Direct Operational Fleet
   // -------------------------------------------------------------------------
   const amb1 = await AmbulanceModel.findOneAndUpdate(
-    { registrationNumber: 'AMB-DEMO-ALS-01' },
+    { vehicleNumber: 'RJ-14-EA-1001' },
     {
       $set: {
         registrationNumber: 'AMB-DEMO-ALS-01',
         vehicleNumber: 'RJ-14-EA-1001',
-        providerId: verifiedProvider._id,
         ambulanceType: 'ALS',
         capabilities: ['ICU', 'Ventilator', 'Defibrillator', 'Oxygen', 'Cardiac Monitor', 'Suction Unit'],
         currentStatus: 'AVAILABLE',
@@ -404,15 +345,14 @@ export const seedDemoData = async () => {
     },
     { upsert: true, returnDocument: 'after' },
   );
-  console.log(`✅ Verified ALS Ambulance ready: ${amb1.vehicleNumber} (${amb1.registrationNumber})`);
+  console.log(`✅ Verified ALS Ambulance 1 ready: ${amb1.vehicleNumber} (${amb1.registrationNumber})`);
 
   const amb2 = await AmbulanceModel.findOneAndUpdate(
-    { registrationNumber: 'AMB-DEMO-BLS-02' },
+    { vehicleNumber: 'RJ-14-EA-1002' },
     {
       $set: {
         registrationNumber: 'AMB-DEMO-BLS-02',
         vehicleNumber: 'RJ-14-EA-1002',
-        providerId: verifiedProvider._id,
         ambulanceType: 'BLS',
         capabilities: ['Oxygen', 'First Aid Kit', 'Stretcher', 'Basic Monitor', 'BP Apparatus'],
         currentStatus: 'AVAILABLE',
@@ -429,23 +369,70 @@ export const seedDemoData = async () => {
     },
     { upsert: true, returnDocument: 'after' },
   );
-  console.log(`✅ Verified BLS Ambulance ready: ${amb2.vehicleNumber} (${amb2.registrationNumber})`);
+  console.log(`✅ Verified BLS Ambulance 2 ready: ${amb2.vehicleNumber} (${amb2.registrationNumber})`);
 
-  const ambPending = await AmbulanceModel.findOneAndUpdate(
-    { registrationNumber: 'AMB-PENDING-03' },
+  const amb3 = await AmbulanceModel.findOneAndUpdate(
+    { vehicleNumber: 'RJ-14-EA-1003' },
     {
       $set: {
-        registrationNumber: 'AMB-PENDING-03',
+        registrationNumber: 'AMB-DEMO-ALS-03',
+        vehicleNumber: 'RJ-14-EA-1003',
+        ambulanceType: 'ALS',
+        capabilities: ['ICU', 'Ventilator', 'Advanced Defibrillator', 'Oxygen', 'Infusion Pump'],
+        currentStatus: 'AVAILABLE',
+        currentLatitude: 26.8570,
+        currentLongitude: 75.7680,
+        location: { type: 'Point', coordinates: [75.7680, 26.8570] },
+        locationUpdatedAt: new Date(),
+        locationSourceTimestamp: new Date(),
+        locationAccuracyMeters: 6,
+        serviceArea: 'Mansarovar & Southwest Jaipur',
+        verificationStatus: 'VERIFIED',
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  console.log(`✅ Verified ALS Ambulance 3 ready: ${amb3.vehicleNumber} (${amb3.registrationNumber})`);
+
+  const amb4 = await AmbulanceModel.findOneAndUpdate(
+    { vehicleNumber: 'RJ-14-EA-1004' },
+    {
+      $set: {
+        registrationNumber: 'AMB-DEMO-BLS-04',
+        vehicleNumber: 'RJ-14-EA-1004',
+        ambulanceType: 'BLS',
+        capabilities: ['Oxygen', 'First Aid Kit', 'Stretcher', 'Pulse Oximeter'],
+        currentStatus: 'AVAILABLE',
+        currentLatitude: 26.9015,
+        currentLongitude: 75.7420,
+        location: { type: 'Point', coordinates: [75.7420, 26.9015] },
+        locationUpdatedAt: new Date(),
+        locationSourceTimestamp: new Date(),
+        locationAccuracyMeters: 8,
+        serviceArea: 'Vaishali Nagar & West Jaipur',
+        verificationStatus: 'VERIFIED',
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  console.log(`✅ Verified BLS Ambulance 4 ready: ${amb4.vehicleNumber} (${amb4.registrationNumber})`);
+
+  const ambPending = await AmbulanceModel.findOneAndUpdate(
+    { vehicleNumber: 'RJ-14-EA-9999' },
+    {
+      $set: {
+        registrationNumber: 'AMB-PENDING-05',
         vehicleNumber: 'RJ-14-EA-9999',
-        providerId: pendingProvider._id,
         ambulanceType: 'BLS',
         capabilities: ['First Aid Kit', 'Stretcher'],
         currentStatus: 'OFFLINE',
-        currentLatitude: 26.8880,
-        currentLongitude: 75.7350,
-        location: { type: 'Point', coordinates: [75.7350, 26.8880] },
+        currentLatitude: 26.9050,
+        currentLongitude: 75.7890,
+        location: { type: 'Point', coordinates: [75.7890, 26.9050] },
         locationUpdatedAt: new Date(),
-        serviceArea: 'Jaipur West',
+        serviceArea: 'Civil Lines, Jaipur',
         verificationStatus: 'PENDING',
         accountStatus: 'PENDING',
       },
@@ -455,14 +442,14 @@ export const seedDemoData = async () => {
   console.log(`⏳ Pending Ambulance ready: ${ambPending.vehicleNumber} (${ambPending.registrationNumber})`);
 
   // -------------------------------------------------------------------------
-  // 7. Seed Ambulance Drivers (Assigned On-Duty & Pending)
+  // 6. Seed Dedicated Ambulance Drivers (Assigned On-Duty & Pending)
   // -------------------------------------------------------------------------
   const driver1Email = 'demo.driver@resq.local';
   const driver1 = await AmbulanceDriverModel.findOneAndUpdate(
     { email: driver1Email },
     {
       $set: {
-        fullName: 'Rajesh Sharma (Demo Driver)',
+        fullName: 'Rajesh Kumar (Demo Driver - ALS)',
         email: driver1Email,
         phone: '9876543212',
         passwordHash,
@@ -470,13 +457,12 @@ export const seedDemoData = async () => {
         licenseNumber: 'DL-RJ-2024-998877',
         licenseVerificationStatus: 'VERIFIED',
         profileCompletionStatus: 'COMPLETE',
-        address: 'Tonk Phatak',
+        address: 'Tonk Phatak, JLN Marg',
         city: 'Jaipur',
         state: 'Rajasthan',
         country: 'India',
         registeredLatitude: 26.8950,
         registeredLongitude: 75.8020,
-        providerId: verifiedProvider._id,
         assignedAmbulanceId: amb1._id,
         availabilityStatus: 'ONLINE',
         isOnDuty: true,
@@ -492,7 +478,7 @@ export const seedDemoData = async () => {
     { email: driver2Email },
     {
       $set: {
-        fullName: 'Vikram Singh (Demo Driver)',
+        fullName: 'Vikram Singh (Demo Driver - BLS)',
         email: driver2Email,
         phone: '9876543222',
         passwordHash,
@@ -506,7 +492,6 @@ export const seedDemoData = async () => {
         country: 'India',
         registeredLatitude: 26.8620,
         registeredLongitude: 75.8110,
-        providerId: verifiedProvider._id,
         assignedAmbulanceId: amb2._id,
         availabilityStatus: 'ONLINE',
         isOnDuty: true,
@@ -517,12 +502,70 @@ export const seedDemoData = async () => {
   );
   console.log(`✅ Verified Driver 2 ready: ${driver2.fullName} (${driver2.email})`);
 
+  const driver3Email = 'driver.amit@resq.local';
+  const driver3 = await AmbulanceDriverModel.findOneAndUpdate(
+    { email: driver3Email },
+    {
+      $set: {
+        fullName: 'Amit Sharma (Demo Driver - Critical Care)',
+        email: driver3Email,
+        phone: '9876543223',
+        passwordHash,
+        authProvider: 'LOCAL',
+        licenseNumber: 'DL-RJ-2022-778899',
+        licenseVerificationStatus: 'VERIFIED',
+        profileCompletionStatus: 'COMPLETE',
+        address: 'Sector 6, Mansarovar',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        country: 'India',
+        registeredLatitude: 26.8570,
+        registeredLongitude: 75.7680,
+        assignedAmbulanceId: amb3._id,
+        availabilityStatus: 'ONLINE',
+        isOnDuty: true,
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  console.log(`✅ Verified Driver 3 ready: ${driver3.fullName} (${driver3.email})`);
+
+  const driver4Email = 'driver.sunil@resq.local';
+  const driver4 = await AmbulanceDriverModel.findOneAndUpdate(
+    { email: driver4Email },
+    {
+      $set: {
+        fullName: 'Sunil Verma (Demo Driver - Rapid Response)',
+        email: driver4Email,
+        phone: '9876543224',
+        passwordHash,
+        authProvider: 'LOCAL',
+        licenseNumber: 'DL-RJ-2021-332211',
+        licenseVerificationStatus: 'VERIFIED',
+        profileCompletionStatus: 'COMPLETE',
+        address: 'Block B, Vaishali Nagar',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        country: 'India',
+        registeredLatitude: 26.9015,
+        registeredLongitude: 75.7420,
+        assignedAmbulanceId: amb4._id,
+        availabilityStatus: 'ONLINE',
+        isOnDuty: true,
+        accountStatus: 'ACTIVE',
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  console.log(`✅ Verified Driver 4 ready: ${driver4.fullName} (${driver4.email})`);
+
   const pendingDriverEmail = 'pending.driver@resq.local';
   const pendingDriver = await AmbulanceDriverModel.findOneAndUpdate(
     { email: pendingDriverEmail },
     {
       $set: {
-        fullName: 'Amit Verma (Pending Driver)',
+        fullName: 'Manoj Meena (Demo Driver - Pending License)',
         email: pendingDriverEmail,
         phone: '9876543232',
         passwordHash,
@@ -536,7 +579,6 @@ export const seedDemoData = async () => {
         country: 'India',
         registeredLatitude: 26.9050,
         registeredLongitude: 75.7890,
-        providerId: pendingProvider._id,
         availabilityStatus: 'OFFLINE',
         isOnDuty: false,
         accountStatus: 'PENDING',
@@ -777,7 +819,6 @@ export const seedDemoData = async () => {
           longitude: 75.8055,
           status: 'RESOLVED',
           ambulanceId: amb1._id,
-          ambulanceProviderId: verifiedProvider._id,
           driverId: driver1._id,
           etaMinutes: 0,
           routeDistanceMeters: 4200,
@@ -785,7 +826,7 @@ export const seedDemoData = async () => {
             { status: 'RECEIVED', changedAt: new Date(now.getTime() - 86400000), actorId: citizen1._id, actorRole: 'USER' },
             { status: 'REVIEWING', changedAt: new Date(now.getTime() - 86280000), actorId: smsHospital._id, actorRole: 'HOSPITAL', previousStatus: 'RECEIVED' },
             { status: 'PREPARING', changedAt: new Date(now.getTime() - 86100000), actorId: smsHospital._id, actorRole: 'HOSPITAL', previousStatus: 'REVIEWING' },
-            { status: 'AMBULANCE_COORDINATION', changedAt: new Date(now.getTime() - 85800000), actorId: verifiedProvider._id, actorRole: 'AMBULANCE_PROVIDER', previousStatus: 'PREPARING' },
+            { status: 'AMBULANCE_COORDINATION', changedAt: new Date(now.getTime() - 85800000), actorId: smsHospital._id, actorRole: 'HOSPITAL', previousStatus: 'PREPARING' },
             { status: 'RESOLVED', changedAt: new Date(now.getTime() - 82800000), actorId: smsHospital._id, actorRole: 'HOSPITAL', previousStatus: 'AMBULANCE_COORDINATION' },
           ],
         },
@@ -815,7 +856,6 @@ export const seedDemoData = async () => {
       {
         $set: {
           emergencyRequestId: emgResolved._id,
-          providerId: verifiedProvider._id,
           ambulanceId: amb1._id,
           driverId: driver1._id,
           destinationHospitalId: smsHospital._id,
@@ -931,14 +971,12 @@ export const seedDemoData = async () => {
   console.log('=============================================================');
   console.log('🔑 Unified Demo Password: ' + DEMO_PASSWORD);
   console.log('-------------------------------------------------------------');
-  console.log('1. Admin:              ' + adminEmail + ' (or ' + (env.RESQ_ADMIN_PASSWORD ? 'configured env' : DEMO_PASSWORD) + ')');
-  console.log('2. Citizen (User):     ' + user1Email + ' / ' + user2Email);
-  console.log('3. Hospital (SMS):     demo.hospital@resq.local (and 5 other verified hospitals)');
-  console.log('4. Pending Hospital:   ' + pendingHospitalEmail + ' [For Admin Approval Testing]');
-  console.log('5. Ambulance Provider: ' + provider1Email);
-  console.log('6. Pending Provider:   ' + pendingProviderEmail + ' [For Admin Approval Testing]');
-  console.log('7. Ambulance Driver:   ' + driver1Email + ' (ALS) / ' + driver2Email + ' (BLS)');
-  console.log('8. Pending Driver:     ' + pendingDriverEmail + ' [For Admin Approval Testing]');
+  console.log('1. Admin:            ' + adminEmail + ' (or ' + (env.RESQ_ADMIN_PASSWORD ? 'configured env' : DEMO_PASSWORD) + ')');
+  console.log('2. Citizen (User):   ' + user1Email + ' / ' + user2Email);
+  console.log('3. Hospital (SMS):   demo.hospital@resq.local (and fortis, ehcc, apex, narayana, manipal)');
+  console.log('4. Pending Hospital: ' + pendingHospitalEmail + ' [For Admin Verification]');
+  console.log('5. Ambulance Driver: ' + driver1Email + ' (ALS) / ' + driver2Email + ' (BLS) / ' + driver3Email + ' (ALS) / ' + driver4Email + ' (BLS)');
+  console.log('6. Pending Driver:   ' + pendingDriverEmail + ' [For Admin License Verification]');
   console.log('=============================================================\n');
 };
 

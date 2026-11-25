@@ -42,7 +42,7 @@ export const FacilityHeader = ({
         <button
           type="button"
           onClick={handleBack}
-          aria-label="Back to facilities list"
+          aria-label="Back to hospital list"
           className="inline-flex items-center gap-2 text-xs font-mono text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-xl px-3.5 py-2 shadow-lg backdrop-blur-md transition-all cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-rose-400" aria-hidden="true" />
@@ -51,7 +51,7 @@ export const FacilityHeader = ({
 
         <button
           type="button"
-          aria-label="Share facility details"
+          aria-label="Share hospital details"
           onClick={handleShare}
           className="p-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white transition cursor-pointer"
         >

@@ -20,8 +20,8 @@ export const HospitalAnalyticsPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-100">Clinical & Operational Analytics</h1>
-          <p className="text-xs text-zinc-400 mt-1">Real-time emergency intake SLA, triage wait times, and facility capacity metrics</p>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-100">Hospital reports</h1>
+          <p className="text-xs text-zinc-400 mt-1">Emergency requests, patients, and open resources.</p>
         </div>
         <div className="flex items-center gap-2.5 text-xs font-mono text-emerald-300 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 backdrop-blur-xl shadow-lg shadow-emerald-950/20">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -36,7 +36,7 @@ export const HospitalAnalyticsPage = () => {
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl hover:border-white/20 transition-all group">
           <div className="pointer-events-none absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-teal-500/10 blur-xl group-hover:bg-teal-500/20 transition-all" />
           <div className="flex justify-between items-center text-xs font-mono uppercase tracking-wider text-zinc-400">
-            <span>Resolved Cases</span>
+            <span>Closed cases</span>
             <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
               <Clock className="h-4 w-4 text-teal-400" />
             </div>
@@ -46,7 +46,7 @@ export const HospitalAnalyticsPage = () => {
           </p>
           <p className="mt-1 text-[11px] text-teal-400 font-mono flex items-center gap-1.5">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-teal-400" />
-            Successfully coordinated cases
+            Cases handled
           </p>
         </div>
 
@@ -54,7 +54,7 @@ export const HospitalAnalyticsPage = () => {
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl hover:border-white/20 transition-all group">
           <div className="pointer-events-none absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-rose-500/10 blur-xl group-hover:bg-rose-500/20 transition-all" />
           <div className="flex justify-between items-center text-xs font-mono uppercase tracking-wider text-zinc-400">
-            <span>Total Intake</span>
+            <span>All emergency requests</span>
             <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
               <Activity className="h-4 w-4 text-rose-400" />
             </div>
@@ -63,7 +63,7 @@ export const HospitalAnalyticsPage = () => {
             {totalEmergencies}
           </p>
           <p className="mt-1 text-[11px] text-zinc-400 font-mono">
-            Logged in current cycle
+            Total requests
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export const HospitalAnalyticsPage = () => {
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl hover:border-white/20 transition-all group">
           <div className="pointer-events-none absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-blue-500/10 blur-xl group-hover:bg-blue-500/20 transition-all" />
           <div className="flex justify-between items-center text-xs font-mono uppercase tracking-wider text-zinc-400">
-            <span>Active Inpatients</span>
+            <span>Patients</span>
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
               <Users className="h-4 w-4 text-blue-400" />
             </div>
@@ -80,7 +80,7 @@ export const HospitalAnalyticsPage = () => {
             {totalPatients}
           </p>
           <p className="mt-1 text-[11px] text-zinc-400 font-mono">
-            Coordinated via ResQ registry
+            Listed in ResQ
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export const HospitalAnalyticsPage = () => {
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 shadow-xl hover:border-white/20 transition-all group">
           <div className="pointer-events-none absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-emerald-500/10 blur-xl group-hover:bg-emerald-500/20 transition-all" />
           <div className="flex justify-between items-center text-xs font-mono uppercase tracking-wider text-zinc-400">
-            <span>Active Coordination</span>
+            <span>Open cases</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <TrendingUp className="h-4 w-4 text-emerald-400" />
             </div>
@@ -98,21 +98,21 @@ export const HospitalAnalyticsPage = () => {
           </p>
           <p className="mt-1 text-[11px] text-amber-400 font-mono flex items-center gap-1.5">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            In-flight cases requiring attention
+            Cases that may need help
           </p>
         </div>
       </div>
 
-      {/* Resource & Bed Allocation Breakdown */}
+      {/* Beds and resources */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 sm:p-8 shadow-xl space-y-5">
         <div>
-          <h2 className="text-base font-semibold text-zinc-100 tracking-tight">Resource Allocation Summary</h2>
-          <p className="text-xs text-zinc-400 mt-0.5">Live allocation across specialized departments, wards, and intensive care units</p>
+          <h2 className="text-base font-semibold text-zinc-100 tracking-tight">Beds and resources</h2>
+          <p className="text-xs text-zinc-400 mt-0.5">Current numbers by department and care unit.</p>
         </div>
 
         {resourceEntries.length === 0 ? (
           <div className="p-10 text-center rounded-xl border border-dashed border-white/10 text-xs font-mono text-zinc-500 bg-white/[0.01]">
-            No resource allocations currently configured for this hospital.
+            No beds or resources have been listed.
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">

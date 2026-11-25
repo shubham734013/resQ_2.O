@@ -6,9 +6,9 @@ async function request<T>(path: string): Promise<T> {
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload && typeof payload === 'object' && 'error' in payload ? (payload as { error?: { message?: string; code?: string } }).error : undefined;
-    throw new Error(error?.message ?? 'Tracking information is temporarily unavailable.');
+    throw new Error(error?.message ?? 'Could not load trip details. Please try again.');
   }
-  if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new Error('Invalid tracking snapshot response.');
+  if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new Error('Trip details could not be read. Please try again.');
   return (payload as { data: T }).data;
 }
 

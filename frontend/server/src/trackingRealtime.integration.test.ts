@@ -59,6 +59,7 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
   const secondAmbulanceId = new Types.ObjectId();
   const secondDriverId = new Types.ObjectId();
   const emergencyId = new Types.ObjectId();
+  const acceptEmergencyId = new Types.ObjectId();
   const tripId = new Types.ObjectId();
   let secondTripId = new Types.ObjectId();
   const dispatchJobId = new Types.ObjectId();
@@ -207,6 +208,27 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     const inboxAfterAckData = (await inboxAfterAck.json() as { data: { items: Array<{ id: string; state: string }> } }).data;
     assert.equal(inboxAfterAckData.items.find((item) => item.id === firstPersistedAlert?.id)?.state, 'ACKNOWLEDGED', 'acknowledgement state survives a refresh');
 
+    await EmergencyRequestModel.create({
+      _id: acceptEmergencyId,
+      requestCode: 'TRK-ACCEPT-' + suffix.slice(-8).toUpperCase(),
+      userId,
+      hospitalId,
+      situationType: 'accident',
+      category: 'accident_injury',
+      reportedAt: new Date(),
+      location: 'Test pickup',
+      status: 'RECEIVED',
+    });
+    const acceptAlert = await recordHospitalCoordinationEvent({ emergencyId: String(acceptEmergencyId), type: 'EMERGENCY_RECEIVED' });
+    assert.ok(acceptAlert, 'new emergency creates an accept action');
+    const acceptResponse = await fetch(url + '/api/v1/hospital/coordination/notifications/' + acceptAlert.id + '/accept', {
+      method: 'POST',
+      headers: { ...hospitalCookie, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(acceptResponse.status, 200);
+    assert.equal((await EmergencyRequestModel.findById(acceptEmergencyId).select('status').lean().exec())?.status, 'REVIEWING');
+    assert.equal((await HospitalCoordinationNotificationModel.findById(acceptAlert.id).select('state').lean().exec())?.state, 'ACKNOWLEDGED');
 
     const userLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => userSocket.once('tracking:location', resolve));
     const hospitalLocation = new Promise<{ data: Record<string, unknown> }>((resolve) => hospitalSocket.once('tracking:location', resolve));
@@ -341,9 +363,9 @@ test('Socket.IO authorizes resource rooms, fans GPS to user/hospital, recovers v
     await Promise.all([
       TripModel.deleteMany({ _id: { $in: [tripId, secondTripId] } }),
       DispatchJobModel.deleteMany({ _id: dispatchJobId }),
-      HospitalCoordinationNotificationModel.deleteMany({ emergencyId }),
-      HospitalPatientModel.deleteMany({ emergencyId }),
-      EmergencyRequestModel.deleteMany({ _id: emergencyId }),
+      HospitalCoordinationNotificationModel.deleteMany({ emergencyId: { $in: [emergencyId, acceptEmergencyId] } }),
+      HospitalPatientModel.deleteMany({ emergencyId: { $in: [emergencyId, acceptEmergencyId] } }),
+      EmergencyRequestModel.deleteMany({ _id: { $in: [emergencyId, acceptEmergencyId] } }),
       AmbulanceDriverModel.deleteMany({ _id: { $in: [driverId, secondDriverId] } }),
       AmbulanceModel.deleteMany({ _id: { $in: [ambulanceId, secondAmbulanceId] } }),
       AmbulanceProviderModel.deleteMany({ _id: providerId }),

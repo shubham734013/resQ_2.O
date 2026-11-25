@@ -68,7 +68,7 @@ export const FacilityLocation = ({ facility, userLocation, className = '' }: Fac
               className="inline-flex items-center gap-1.5 font-mono text-xs text-rose-400 hover:text-rose-300 cursor-pointer"
             >
               <RefreshCw className="w-3 h-3" />
-              <span>Retry</span>
+              <span>Try again</span>
             </button>
           )}
         </div>

@@ -1,5 +1,5 @@
 import type {
-  AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationRequest, ApiErrorBody, AuthResponse,
+  AmbulanceDriverRegistrationRequest, ApiErrorBody, AuthResponse,
   AuthUser, CurrentUserResponse, HospitalRegistrationRequest, LoginRequest, SocialAuthRequest, UserRegistrationRequest,
 } from '../types/auth';
 import { API_BASE_URL, authenticatedFetch } from './apiConfig';
@@ -17,9 +17,7 @@ export const authApi={
  adminLogin:(input:LoginRequest):Promise<AuthResponse>=>postJson('/auth/admin/login',input),
  registerUser:(input:UserRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/user',input),
  registerHospital:(input:HospitalRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/hospital',input),
- registerAmbulanceProvider:(input:AmbulanceProviderRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/ambulance-provider',input),
  registerAmbulanceDriver:(input:AmbulanceDriverRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/ambulance-driver',input),
- listActiveAmbulanceProviders:():Promise<{success:true;data:Array<{id:string;name:string;registrationNumber:string;serviceType:string;city?:string;state?:string}>}>=>request('/auth/ambulance-providers'),
  socialLogin:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<AuthResponse>=>postJson(`/auth/${provider}`,input),
  linkSocial:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<{success:true;data:AuthUser}>=>postJson(`/auth/link/${provider}`,input),
  me:():Promise<CurrentUserResponse>=>request('/auth/me'),

@@ -1,13 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi, AuthApiError } from '../services/authApi';
-import type { AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationRequest, AuthState, AuthUser, HospitalRegistrationRequest, LoginRequest, SocialAuthRequest, UserRegistrationRequest, UserRole } from '../types/auth';
+import type { AmbulanceDriverRegistrationRequest, AuthState, AuthUser, HospitalRegistrationRequest, LoginRequest, SocialAuthRequest, UserRegistrationRequest, UserRole } from '../types/auth';
 
 interface AuthContextValue extends AuthState {
   role: UserRole | null;
   login:(input:LoginRequest)=>Promise<AuthUser>;
   socialLogin:(provider:'google'|'microsoft',input:SocialAuthRequest)=>Promise<AuthUser>;
-  register:{user:(input:UserRegistrationRequest)=>Promise<AuthUser>;hospital:(input:HospitalRegistrationRequest)=>Promise<AuthUser>;ambulanceProvider:(input:AmbulanceProviderRegistrationRequest)=>Promise<AuthUser>;ambulanceDriver:(input:AmbulanceDriverRegistrationRequest)=>Promise<AuthUser>};
+  register:{user:(input:UserRegistrationRequest)=>Promise<AuthUser>;hospital:(input:HospitalRegistrationRequest)=>Promise<AuthUser>;ambulanceDriver:(input:AmbulanceDriverRegistrationRequest)=>Promise<AuthUser>};
   logout:()=>Promise<void>;
   refreshUser:()=>Promise<AuthUser|null>;
 }
@@ -118,9 +118,8 @@ export const AuthProvider=({children}:{children:ReactNode})=>{
     }
   },[queryClient,setAuthenticatedUser]);
   const registerHospital=useCallback(async(input:HospitalRegistrationRequest)=>(await authApi.registerHospital(input)).data,[]);
-  const registerAmbulanceProvider=useCallback(async(input:AmbulanceProviderRegistrationRequest)=>(await authApi.registerAmbulanceProvider(input)).data,[]);
   const registerAmbulanceDriver=useCallback(async(input:AmbulanceDriverRegistrationRequest)=>(await authApi.registerAmbulanceDriver(input)).data,[]);
-  const value=useMemo<AuthContextValue>(()=>({...state,role:state.user?.role??null,login,socialLogin,register:{user:registerUser,hospital:registerHospital,ambulanceProvider:registerAmbulanceProvider,ambulanceDriver:registerAmbulanceDriver},logout,refreshUser}),[state,login,socialLogin,registerUser,registerHospital,registerAmbulanceProvider,registerAmbulanceDriver,logout,refreshUser]);
+  const value=useMemo<AuthContextValue>(()=>({...state,role:state.user?.role??null,login,socialLogin,register:{user:registerUser,hospital:registerHospital,ambulanceDriver:registerAmbulanceDriver},logout,refreshUser}),[state,login,socialLogin,registerUser,registerHospital,registerAmbulanceDriver,logout,refreshUser]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 // eslint-disable-next-line react-refresh/only-export-components

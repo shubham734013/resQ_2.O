@@ -31,8 +31,6 @@ export const publicRoutes = (
     <Route path={ROUTES.PUBLIC.REGISTER} element={<RegistrationRoleSelect />} />
     <Route path={ROUTES.PUBLIC.REGISTER_USER} element={<RegistrationPage kind="user" />} />
     <Route path={ROUTES.PUBLIC.REGISTER_HOSPITAL} element={<RegistrationPage kind="hospital" />} />
-    <Route path={ROUTES.PUBLIC.REGISTER_PROVIDER} element={<RegistrationPage kind="ambulance-provider" />} />
-    <Route path={ROUTES.PUBLIC.REGISTER_PROVIDER_LEGACY} element={<RegistrationPage kind="ambulance-provider" />} />
     <Route path={ROUTES.PUBLIC.REGISTER_DRIVER} element={<RegistrationPage kind="ambulance-driver" />} />
     <Route path={ROUTES.PUBLIC.REGISTER_DRIVER_LEGACY} element={<RegistrationPage kind="ambulance-driver" />} />
     <Route path={ROUTES.PUBLIC.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />

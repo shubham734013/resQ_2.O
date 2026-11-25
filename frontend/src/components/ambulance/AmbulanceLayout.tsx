@@ -20,10 +20,10 @@ export const AmbulanceLayout = ({ children }: { children: ReactNode }) => {
             </div>
             <div>
               <p className="text-sm font-semibold">ResQ Ambulance</p>
-              <p className="text-[11px] text-slate-500">Driver interface</p>
+              <p className="text-[11px] text-slate-500">Driver page</p>
             </div>
           </div>
-          <span className="text-[11px] font-medium text-slate-500">Live operations</span>
+          <span className="text-[11px] font-medium text-slate-500">Live updates</span>
         </div>
       </header>
       <div className="mx-auto flex min-h-[calc(100vh-61px)] w-full max-w-5xl flex-col">{children}</div>

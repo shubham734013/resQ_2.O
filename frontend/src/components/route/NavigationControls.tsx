@@ -42,7 +42,7 @@ export const NavigationControls = ({
   return (
     <div
       role="region"
-      aria-label="Navigation controls"
+      aria-label="Directions controls"
       className={`bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-3.5 ${className}`}
     >
       {/* Top Row: Metric Readouts (Remaining Time, ETA, Distance) */}
@@ -53,7 +53,7 @@ export const NavigationControls = ({
           </span>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>ETA {etaTime}</span>
+            <span>Arrive at {etaTime}</span>
           </div>
         </div>
 
@@ -63,7 +63,7 @@ export const NavigationControls = ({
             <span>{remainingDistance}</span>
           </div>
           <span className="text-[11px] text-slate-400 font-mono hidden sm:inline-block">
-            Step {currentStepIndex + 1}/{totalSteps}
+            Turn {currentStepIndex + 1} of {totalSteps}
           </span>
         </div>
       </div>
@@ -72,7 +72,7 @@ export const NavigationControls = ({
       <div className="flex items-center justify-between gap-2 text-xs">
         <div className="min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            {isEmergency ? 'Emergency Destination' : 'Heading To'}
+            {isEmergency ? 'Hospital' : 'Going to'}
           </span>
           <p className="font-semibold text-slate-900 truncate text-sm">
             {facilityName}
@@ -84,14 +84,14 @@ export const NavigationControls = ({
             icon={<LocateFixed className="w-4 h-4 text-slate-700" />}
             size="md"
             variant="default"
-            aria-label="Recenter map"
+            aria-label="Show your place on the map"
             onClick={onRecenter}
           />
           <IconButton
             icon={<Phone className="w-4 h-4 text-slate-700" />}
             size="md"
             variant="default"
-            aria-label={`Call facility ${facilityName} at ${facilityPhone}`}
+            aria-label={`Call ${facilityName} at ${facilityPhone}`}
             onClick={onCallFacility}
           />
         </div>
@@ -106,10 +106,10 @@ export const NavigationControls = ({
             fullWidth
             icon={<X className="w-4 h-4 text-rose-600" />}
             onClick={onEndNavigation}
-            aria-label="End navigation"
+            aria-label="Stop directions"
             className="text-rose-700 hover:text-rose-800 hover:border-rose-300 font-semibold"
           >
-            End navigation
+            Stop directions
           </Button>
         </div>
 
@@ -119,9 +119,9 @@ export const NavigationControls = ({
             size="md"
             fullWidth
             onClick={onNextStep}
-            aria-label={currentStepIndex + 1 >= totalSteps ? 'Arrive at destination' : 'Advance to next navigation instruction'}
+            aria-label={currentStepIndex + 1 >= totalSteps ? 'Arrive at the hospital' : 'Show the next step'}
           >
-            {currentStepIndex + 1 >= totalSteps ? 'Arrive at destination' : 'Next instruction'}
+            {currentStepIndex + 1 >= totalSteps ? 'Arrive at the hospital' : 'Next step'}
           </Button>
         </div>
       </div>

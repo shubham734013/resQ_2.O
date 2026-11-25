@@ -59,7 +59,7 @@ rejectRequest:(id:string)=>request<AmbulanceRequest>(`/ambulance-driver/requests
 getTrips:(p:Record<string,unknown>={})=>request<{items:Trip[];pagination:Pagination}>(`/ambulance-driver/trips${qs(p)}`),
 getTrip:(id:string)=>request<Trip>(`/ambulance-driver/trips/${encodeURIComponent(id)}`),
 arrivedPickup:(id:string)=>request<Trip>(`/ambulance-driver/trips/${encodeURIComponent(id)}/arrived-pickup`,{method:'POST'}),
-patientPickedUp:(id:string)=>request<Trip>(`/ambulance-driver/trips/${encodeURIComponent(id)}/patient-picked-up`,{method:'POST'}),
+patientPickedUp:(id:string,body?:{otp?:string;overrideReason?:string})=>request<Trip>(`/ambulance-driver/trips/${encodeURIComponent(id)}/patient-picked-up`,{method:'POST',body:body?JSON.stringify(body):undefined}),
 arrivedHospital:(id:string)=>request<Trip>(`/ambulance-driver/trips/${encodeURIComponent(id)}/arrived-hospital`,{method:'POST'}),
 completeTrip:(id:string)=>request<Trip>(`/ambulance-driver/trips/${encodeURIComponent(id)}/complete`,{method:'POST'}),
 };

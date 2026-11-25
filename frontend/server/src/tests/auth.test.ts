@@ -127,8 +127,8 @@ describe('authentication validation', () => {
   });
 });
 
-describe('role-based access control across all 5 roles', () => {
-  const roles = ['USER', 'HOSPITAL', 'AMBULANCE_PROVIDER', 'AMBULANCE_DRIVER', 'ADMIN'] as const;
+describe('role-based access control across all 4 roles', () => {
+  const roles = ['USER', 'HOSPITAL', 'AMBULANCE_DRIVER', 'ADMIN'] as const;
 
   for (const role of roles) {
     it(`allows access for dedicated role ${role}`, () => {

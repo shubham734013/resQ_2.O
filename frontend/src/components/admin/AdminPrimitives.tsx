@@ -31,7 +31,7 @@ export const AdminPage = ({
           className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2"
           style={{ color: 'rgba(255,255,255,0.28)' }}
         >
-          ResQ 2.O · Operations Command
+          ResQ Admin
         </p>
         <h2
           className="text-2xl sm:text-3xl font-light tracking-tight"
@@ -171,7 +171,7 @@ export const FilterBar = ({
       />
     </div>
     <Button type="button" variant="secondary" icon={<SlidersHorizontal className="h-4 w-4" />}>
-      Filters
+      Filter
     </Button>
   </div>
 );

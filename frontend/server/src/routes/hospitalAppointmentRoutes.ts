@@ -63,7 +63,6 @@ appointmentRouter.post(
 appointmentRouter.get(
   '/mine',
   authenticate,
-  authorizeRole('USER'),
   validateQuery(listAppointmentsQuerySchema),
   listMyAppointmentsController
 );

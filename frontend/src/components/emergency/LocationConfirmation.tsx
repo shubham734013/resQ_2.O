@@ -49,8 +49,8 @@ export const LocationConfirmation = ({
       });
       setIsChangingLocation(false);
       setCustomInput('');
-    } catch (error) {
-      setGeocodeError(error instanceof Error ? error.message : 'Address could not be located.');
+    } catch {
+      setGeocodeError('We could not find this address. Check it and try again.');
     } finally {
       setIsGeocoding(false);
     }
@@ -68,13 +68,13 @@ export const LocationConfirmation = ({
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
             <MapPin className="w-3.5 h-3.5" />
-            <span>Pickup Geolocation</span>
+            <span>Pickup place</span>
           </div>
           <h2 className="text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">
             Confirm your real location
           </h2>
           <p className="text-zinc-400 text-sm leading-relaxed max-w-xl">
-            ResQ requires precise coordinates from browser GPS or a verified geocoded address to calculate driving routes and find nearest facilities.
+            ResQ needs your phone's GPS or a confirmed address to find nearby hospitals and driving routes.
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export const LocationConfirmation = ({
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 shrink-0 text-amber-400" />
               <div className="space-y-1">
-                <p className="font-semibold text-amber-100 text-sm">GPS Access Unavailable</p>
+                <p className="font-semibold text-amber-100 text-sm">We cannot find your phone's location</p>
                 <p className="leading-relaxed text-zinc-400">
                   Automatic GPS is unavailable or blocked. Enter an address manually or retry permission so ResQ can resolve real coordinates.
                 </p>
@@ -97,7 +97,7 @@ export const LocationConfirmation = ({
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 text-xs font-semibold transition cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Retry GPS Detection</span>
+                <span>Try again</span>
               </button>
             )}
           </div>
@@ -144,7 +144,7 @@ export const LocationConfirmation = ({
                     GPS: {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
                   </span>
                   <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                    {selectedLocation.accuracy === 'high' ? 'High Precision GPS' : 'Approximate Area'}
+                    {selectedLocation.accuracy === 'high' ? 'Precise location' : 'Rough area'}
                   </span>
                 </div>
               )}
@@ -169,7 +169,7 @@ export const LocationConfirmation = ({
                       void applyAddress();
                     }
                   }}
-                  placeholder="e.g. MI Road, Jaipur, Rajasthan"
+                  placeholder="For example: MI Road, Jaipur"
                   className="flex-1 h-10 px-3.5 text-xs bg-white/[0.04] border border-white/10 rounded-xl text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-rose-500/50 transition-all"
                 />
                 <button
@@ -221,7 +221,7 @@ export const LocationConfirmation = ({
           onClick={() => onConfirmLocation(selectedLocation)}
           disabled={!valid || isGeocoding}
         >
-          <span>Confirm & Search Hospitals</span>
+          <span>Confirm place and find hospitals</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

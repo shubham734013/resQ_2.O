@@ -43,6 +43,21 @@ export interface HospitalEmergency {
   driverId?: string;
   patientId?: string;
   etaMinutes?: number;
+  patientName?: string;
+  patientPhone?: string;
+  patientAge?: number;
+  patientGender?: string;
+  severity?: 'CRITICAL' | 'URGENT' | 'STANDARD';
+  pickupOtpVerified?: boolean;
+  pickupOverrideReason?: string;
+  ambulanceRegistration?: string;
+  ambulanceVehicleNumber?: string;
+  ambulanceType?: string;
+  driverName?: string;
+  driverPhone?: string;
+  ambulanceLatitude?: number;
+  ambulanceLongitude?: number;
+  tripStatus?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -83,6 +98,7 @@ export interface HospitalEmergencySummary {
   AMBULANCE_COORDINATION: number;
   RESOLVED: number;
   CANCELLED: number;
+  patientsEnRouteByAmbulance: number;
 }
 
 export type HospitalCoordinationNotificationType =
@@ -121,11 +137,13 @@ export interface HospitalCoordinationDetail {
   emergency: {
     id: string; requestCode: string; category: string; situationType: string; reportedAt: string;
     status: HospitalEmergencyStatus; pickup: { label?: string; latitude?: number; longitude?: number }; etaMinutes?: number;
+    patientName?: string; patientPhone?: string; patientAge?: number; patientGender?: string;
   };
   patient: { caseId: string; coordinationStatus: HospitalPatientStatus; receivedAt: string; etaMinutes?: number } | null;
   trip: null | {
     id: string; status: string; acceptedAt?: string; arrivedAtPickupAt?: string; patientPickedUpAt?: string;
     arrivedAtHospitalAt?: string; completedAt?: string; createdAt: string; updatedAt: string;
+    driver?: { name?: string; phone?: string } | null;
     history: Array<{ status: string; changedAt: string; actorRole: string; previousStatus?: string }>;
   };
   ambulance: null | {

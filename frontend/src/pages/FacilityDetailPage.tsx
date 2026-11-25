@@ -50,7 +50,7 @@ export const FacilityDetailPage = () => {
         </div>
         <div className="flex items-center justify-center gap-2 text-xs font-mono text-zinc-500 py-4">
           <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
-          <span>Loading verified facility telemetry…</span>
+          <span>Loading trusted hospital details…</span>
         </div>
       </div>
     );
@@ -65,7 +65,7 @@ export const FacilityDetailPage = () => {
             <Building2 className="w-7 h-7" />
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-xl font-light text-zinc-100 tracking-tight">Facility Not Found</h2>
+            <h2 className="text-xl font-light text-zinc-100 tracking-tight">Hospital not found</h2>
             <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
               The healthcare facility with identifier <code className="bg-white/[0.06] border border-white/10 px-1.5 py-0.5 rounded font-mono text-rose-300">{id}</code> could not be located in our directory.
             </p>
@@ -77,7 +77,7 @@ export const FacilityDetailPage = () => {
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-semibold text-zinc-200 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Directory</span>
+              <span>Back to hospitals</span>
             </button>
             <button
               type="button"
@@ -132,7 +132,7 @@ export const FacilityDetailPage = () => {
             <div className="p-4 bg-white/[0.02] border border-white/10 rounded-2xl text-xs text-zinc-400 flex items-start gap-3 shadow-xl backdrop-blur-md">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                ResQ provides facility navigation and logistical coordination. Emergency intake is subject to live hospital triage protocol and bed availability.
+                ResQ can show the way and send care requests. The hospital decides if it can take emergency patients and has a bed.
               </p>
             </div>
           </div>

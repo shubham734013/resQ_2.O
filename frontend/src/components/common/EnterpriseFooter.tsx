@@ -14,7 +14,7 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
     <>
       <footer
         role="contentinfo"
-        aria-label="ResQ Enterprise Footer"
+        aria-label="ResQ footer"
         className={`bg-[#050507] text-zinc-400 border-t border-white/[0.08] ${className}`}
       >
         {/* Top Corporate Status Bar */}
@@ -23,11 +23,11 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Enterprise Dispatch Engine: 99.99% Target Uptime SLA</span>
+                <span>ResQ emergency service: 99.99% target uptime</span>
               </span>
               <span className="text-slate-600 hidden md:inline">|</span>
               <span className="text-slate-400 hidden md:inline">
-                Jaipur Metro Clinical & Fleet Network
+                Jaipur health and ambulance network
               </span>
             </div>
 
@@ -37,7 +37,7 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
                 onClick={() => setIsAboutOpen(true)}
                 className="hover:text-teal-400 transition-colors flex items-center gap-1 font-semibold cursor-pointer"
               >
-                <span>About ResQ Health Technologies</span>
+                <span>About ResQ</span>
                 <ExternalLink className="w-3 h-3" />
               </button>
               <span className="text-slate-700">|</span>
@@ -46,7 +46,7 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
                 className="hover:text-rose-400 transition-colors flex items-center gap-1 text-rose-300 font-bold"
               >
                 <Phone className="w-3 h-3 text-rose-400" />
-                <span>National Emergency: 112</span>
+                <span>Emergency help: 112</span>
               </a>
             </div>
           </div>
@@ -66,22 +66,22 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
                     ResQ Health Technologies™
                   </span>
                   <p className="text-[11px] text-teal-400 font-semibold uppercase tracking-wider">
-                    Enterprise Healthcare & Emergency Network
+                    Health and emergency help
                   </p>
                 </div>
               </div>
 
               <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-                Cloud-native clinical dispatch infrastructure delivering synchronized triage, ambulance CAD, bed telemetry, and scheduled outpatient appointments across healthcare systems.
+                ResQ helps people, hospitals, and ambulance teams share information, get emergency care ready, and book visits.
               </p>
 
               {/* Compliance & Trust Seals */}
               <div className="pt-2 flex flex-wrap items-center gap-2">
                 {[
-                  { label: 'HIPAA Ready', icon: ShieldCheck },
-                  { label: 'HL7 FHIR v4', icon: Activity },
-                  { label: 'ISO 27001', icon: Award },
-                  { label: 'NABH Aligned', icon: CheckCircle2 },
+                  { label: 'HIPAA ready: health privacy rules', icon: ShieldCheck },
+                  { label: 'HL7 FHIR v4: health data rules', icon: Activity },
+                  { label: 'ISO 27001: data safety rules', icon: Award },
+                  { label: 'NABH aligned: hospital care rules', icon: CheckCircle2 },
                 ].map(({ label, icon: Icon }) => (
                   <span
                     key={label}
@@ -97,27 +97,27 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
             {/* Column 1: Emergency & Dispatch */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-                Emergency Dispatch
+                Emergency help
               </h4>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>
                   <NavLink to="/sos" className="hover:text-white transition-colors">
-                    1-Click Emergency SOS
+                    Ask for emergency help
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/search" className="hover:text-white transition-colors">
-                    Verified Emergency Hospitals
+                    Checked emergency hospitals
                   </NavLink>
                 </li>
                 <li>
-                  <span className="text-slate-500">Realtime CAD Routing</span>
+                  <span className="text-slate-500">Ambulance directions</span>
                 </li>
                 <li>
-                  <span className="text-slate-500">Live Ambulance Telemetry</span>
+                  <span className="text-slate-500">Live ambulance updates</span>
                 </li>
                 <li>
-                  <span className="text-slate-500">Hospital Pre-Arrival Queue</span>
+                  <span className="text-slate-500">Hospital arrival list</span>
                 </li>
               </ul>
             </div>
@@ -125,31 +125,31 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
             {/* Column 2: Clinical Care & Appointments */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-                Hospital Network
+                Hospitals and care
               </h4>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>
                   <NavLink to="/appointments" className="hover:text-white transition-colors">
-                    Appointments & Care Requests
+                    Visits and care requests
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/search" className="hover:text-white transition-colors">
-                    Multi-Specialty Directory
+                    Find a hospital
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/saved" className="hover:text-white transition-colors">
-                    Saved Medical Facilities
+                    Saved hospitals
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/profile" className="hover:text-white transition-colors">
-                    Patient Medical Identity
+                    Your health details
                   </NavLink>
                 </li>
                 <li>
-                  <span className="text-slate-500">Bed & ICU Telemetry</span>
+                  <span className="text-slate-500">Open beds and ICU care</span>
                 </li>
               </ul>
             </div>
@@ -157,36 +157,36 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
             {/* Column 3: Enterprise Portals */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-                Enterprise Portals
+                Work pages
               </h4>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>
                   <NavLink to="/hospital" className="hover:text-teal-400 transition-colors flex items-center gap-1 font-semibold text-slate-300">
-                    <span>Hospital Command Center</span>
+                    <span>Hospital page</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/ambulance-provider" className="hover:text-teal-400 transition-colors flex items-center gap-1 font-semibold text-slate-300">
-                    <span>Fleet Provider CAD</span>
+                    <span>Ambulance service page</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/ambulance" className="hover:text-teal-400 transition-colors flex items-center gap-1 font-semibold text-slate-300">
-                    <span>Ambulance Driver Console</span>
+                    <span>Driver page</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/admin" className="hover:text-teal-400 transition-colors flex items-center gap-1 font-semibold text-slate-300">
-                    <span>Network Operations & Governance</span>
+                    <span>ResQ team page</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </NavLink>
                 </li>
                 <li>
                   <NavLink to="/login" className="hover:text-white transition-colors">
-                    Enterprise Staff Sign-In
+                    ResQ team sign-in
                   </NavLink>
                 </li>
               </ul>
@@ -196,19 +196,19 @@ export const EnterpriseFooter = ({ className = '' }: EnterpriseFooterProps) => {
           {/* Bottom Copyright and Legal Bar */}
           <div className="mt-10 pt-6 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
             <p>
-              &copy; {new Date().getFullYear()} ResQ Health Technologies Inc. All rights reserved. Enterprise Emergency Coordination Platform.
+              &copy; {new Date().getFullYear()} ResQ Health Technologies Inc. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <span className="hover:text-slate-400 cursor-pointer" onClick={() => setIsAboutOpen(true)}>
-                Platform Architecture
+                How ResQ works
               </span>
               <span>&bull;</span>
               <span className="hover:text-slate-400 cursor-pointer">
-                Security & Data Privacy
+                Safety and privacy
               </span>
               <span>&bull;</span>
               <span className="hover:text-slate-400 cursor-pointer">
-                Terms of Service
+                Terms of use
               </span>
             </div>
           </div>

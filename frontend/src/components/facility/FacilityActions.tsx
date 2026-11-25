@@ -72,10 +72,10 @@ export const FacilityActions = ({
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2.5 text-xs text-rose-300 backdrop-blur-md shadow-xl">
               <div className="flex items-center gap-2 font-semibold text-rose-200">
                 <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>Emergency Coordination Flow Active</span>
+                <span>Emergency help is open</span>
               </div>
               <p className="text-[11px] text-zinc-300 leading-relaxed">
-                You selected this facility from the Emergency Flow. Confirm coordination to lock in triage telemetry.
+                You chose this hospital for emergency help. Confirm to send your request.
               </p>
               <button
                 type="button"
@@ -96,7 +96,7 @@ export const FacilityActions = ({
                 className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-semibold text-zinc-200 transition cursor-pointer"
               >
                 <Building2 className="w-4 h-4 text-rose-400" />
-                <span>Request Care</span>
+                <span>Ask for care</span>
               </button>
               <button
                 type="button"
@@ -104,7 +104,7 @@ export const FacilityActions = ({
                 className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-semibold text-zinc-200 transition cursor-pointer"
               >
                 <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>Book Appointment</span>
+                <span>Book a visit</span>
               </button>
             </div>
           )}
@@ -140,7 +140,7 @@ export const FacilityActions = ({
               className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-xs shadow-lg shadow-rose-950/50 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer"
             >
               <Navigation className="w-4 h-4" />
-              <span>Get Directions</span>
+              <span>Get directions</span>
             </button>
           </div>
         </div>

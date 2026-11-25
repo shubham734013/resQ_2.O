@@ -1532,7 +1532,7 @@ export const planOrganizationBackfill = async (options: PlannerOptions = {}): Pr
       .map((d) => d.assignedAmbulanceId)
       .filter((id): id is Types.ObjectId => Boolean(id));
 
-    let batchAmbulanceMap = new Map<string, { providerId: Types.ObjectId }>();
+    let batchAmbulanceMap = new Map<string, { providerId?: Types.ObjectId }>();
     if (batchAmbulanceIds.length > 0) {
       const ambList = await AmbulanceModel.find(
         { _id: { $in: batchAmbulanceIds } },

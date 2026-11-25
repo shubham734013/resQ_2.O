@@ -18,11 +18,11 @@ export const UnauthorizedPage = () => {
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
       <section className="max-w-md text-center">
-        <p className="text-sm font-semibold text-slate-500">403</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950">Access denied</h1>
-        <p className="mt-2 text-slate-600">Your {roleTitle} account does not have permission to access this portal.</p>
+        <p className="text-sm font-semibold text-slate-500">No access</p>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950">You cannot open this page</h1>
+        <p className="mt-2 text-slate-600">Your {roleTitle} account cannot open this page.</p>
         <Link to={homePath} className="mt-6 inline-flex h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white">
-          Return to your portal
+          Back to your page
         </Link>
       </section>
     </main>

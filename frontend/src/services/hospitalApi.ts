@@ -103,6 +103,8 @@ export const hospitalApi = {
     request<HospitalCoordinationNotificationPage>(`/hospital/coordination/notifications${query(params)}`),
   acknowledgeCoordinationNotification: (id: string) =>
     request<HospitalCoordinationNotification>(`/hospital/coordination/notifications/${encodeURIComponent(id)}/acknowledge`, { method: 'POST', body: JSON.stringify({}) }),
+  acceptCoordinationNotification: (id: string) =>
+    request<HospitalCoordinationNotification>(`/hospital/coordination/notifications/${encodeURIComponent(id)}/accept`, { method: 'POST', body: JSON.stringify({}) }),
   getCoordinationDetail: (emergencyId: string) =>
     request<HospitalCoordinationDetail>(`/hospital/coordination/emergencies/${encodeURIComponent(emergencyId)}`),
 };

@@ -5,27 +5,27 @@ import { ROUTES } from '../../routes/routePaths';
 export const UserAmbulancesPage = () => {
   const fleets = [
     {
-      name: 'Jaipur Central EMS - ALS Fleet',
-      type: 'Advanced Life Support (ALS)',
-      capabilities: ['Ventilator', 'Defibrillator', 'Critical Cardiac Monitor', 'Paramedic Crew'],
+      name: 'Jaipur Central Ambulance Team',
+      type: 'Advanced ambulance care',
+      capabilities: ['Breathing machine', 'Heart shock device', 'Heart monitor', 'Trained ambulance team'],
       area: 'Jaipur Metro & JL Road',
       baseWait: '4 - 8 mins',
       phone: '108',
       verified: true,
     },
     {
-      name: 'Rajasthan Health State EMS - BLS Unit',
-      type: 'Basic Life Support (BLS)',
-      capabilities: ['Oxygen Supply', 'Spine Board', 'Trained EMT Driver'],
+      name: 'Rajasthan Ambulance Team',
+      type: 'Basic ambulance care',
+      capabilities: ['Oxygen', 'Back support board', 'Trained ambulance driver'],
       area: 'Malviya Nagar & Sanganer',
       baseWait: '6 - 10 mins',
       phone: '108',
       verified: true,
     },
     {
-      name: 'Apex Trauma Emergency Rapid Unit',
-      type: 'Trauma & Cardiac Care Unit',
-      capabilities: ['Trauma Surgeon Onboard', 'Telemetry Pre-alert', 'Portable Ultrasound'],
+      name: 'Apex Injury and Heart Care Team',
+      type: 'Injury and heart care',
+      capabilities: ['Injury doctor on board', 'Hospital alert before arrival', 'Portable scan machine'],
       area: 'Mansarovar & Tonk Road',
       baseWait: '5 - 9 mins',
       phone: '112',
@@ -40,13 +40,13 @@ export const UserAmbulancesPage = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono mb-2">
             <Ambulance className="h-3.5 w-3.5 text-rose-400" />
-            <span>Emergency Fleet & Dispatch</span>
+            <span>Emergency ambulances</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-light text-zinc-100 tracking-tight">
-            Ambulance Fleet & Emergency Dispatch
+            Example ambulance listings
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Certified Advanced and Basic Life Support fleets connected to the ResQ telemetry network.
+            These are examples, not live ambulance locations or open units. Call 112 for emergency help.
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export const UserAmbulancesPage = () => {
           className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-950/60 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0"
         >
           <AlertTriangle className="h-4 w-4 animate-pulse" />
-          <span>Trigger Emergency SOS</span>
+          <span>Ask for emergency help</span>
         </Link>
       </div>
 
@@ -75,7 +75,7 @@ export const UserAmbulancesPage = () => {
                 <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>ABDM Certified</span>
+                  <span>Example</span>
                 </span>
               </div>
 
@@ -92,7 +92,7 @@ export const UserAmbulancesPage = () => {
 
               {/* Onboard Equipment Micro-Tags */}
               <div className="pt-3 border-t border-white/5 space-y-2">
-                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Onboard Equipment:</p>
+                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Equipment:</p>
                 <div className="flex flex-wrap gap-1.5">
                   {fleet.capabilities.map((cap, ci) => (
                     <span
@@ -111,7 +111,7 @@ export const UserAmbulancesPage = () => {
               <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
                 <Clock className="h-3.5 w-3.5 text-rose-400" />
                 <span>
-                  Est. Wait: <strong className="text-zinc-200 font-semibold">{fleet.baseWait}</strong>
+                  Example wait: <strong className="text-zinc-200 font-semibold">{fleet.baseWait}</strong>
                 </span>
               </div>
 
@@ -120,7 +120,7 @@ export const UserAmbulancesPage = () => {
                 className="inline-flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white rounded-xl px-4 py-2 text-xs font-bold shadow-lg shadow-rose-950/40 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
               >
                 <Phone className="h-3 w-3" />
-                <span>Dial {fleet.phone}</span>
+                <span>Call {fleet.phone}</span>
               </a>
             </div>
           </div>

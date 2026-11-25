@@ -23,12 +23,10 @@ import type { AuthenticatedIdentity, SocialProvider, JwtClaims } from '../types/
 import type { AccountStatus, Role, VerificationStatus } from '../types/roles.js';
 import type {
   AmbulanceDriverRegistrationInput,
-  AmbulanceProviderRegistrationInput,
   HospitalRegistrationInput,
   LoginInput,
   UserRegistrationInput,
   DriverProfileInput,
-  ProviderProfileInput,
   UserProfileUpdateInput,
   AdminMfaDisableInput,
 } from '../schemas/auth.js';
@@ -115,16 +113,6 @@ const findHospitalAccountByEmail = async (email: string): Promise<AccountWithPas
     hospitalType: a.hospitalType,
   }) : null;
 };
-const findProviderAccountByEmail = async (email: string): Promise<AccountWithPassword|null> => {
-  const a = await AmbulanceProviderModel.findOne({email}).select('+passwordHash').exec();
-  return a ? accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', a.accountStatus, a.passwordHash, {
-    phone: a.phone,
-    verificationStatus: a.verificationStatus,
-    profileCompletionStatus: a.profileCompletionStatus,
-    registrationNumber: a.registrationNumber,
-    serviceType: a.serviceType,
-  }) : null;
-};
 const findDriverAccountByEmail = async (email: string): Promise<AccountWithPassword|null> => {
   const a = await AmbulanceDriverModel.findOne({email}).select('+passwordHash').exec();
   if (!a) return null;
@@ -152,7 +140,7 @@ const findDriverAccountByEmail = async (email: string): Promise<AccountWithPassw
 };
 const findAccountByEmail = async (email: string) => {
   const n = normalizeEmail(email);
-  for (const finder of [findUserAccountByEmail,findHospitalAccountByEmail,findProviderAccountByEmail,findDriverAccountByEmail]) {
+  for (const finder of [findUserAccountByEmail,findHospitalAccountByEmail,findDriverAccountByEmail]) {
     const a = await finder(n); if (a) return a;
   }
   return null;
@@ -171,16 +159,6 @@ const findByIdentity = async (identity: AuthenticatedIdentity): Promise<AccountW
         verificationStatus: a.verificationStatus,
         registrationNumber: a.registrationNumber,
         hospitalType: a.hospitalType,
-      }) : null;
-    }
-    case 'AMBULANCE_PROVIDER': {
-      const a = await AmbulanceProviderModel.findById(identity.id).select('+passwordHash').exec();
-      return a ? accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', a.accountStatus, a.passwordHash, {
-        phone: a.phone,
-        verificationStatus: a.verificationStatus,
-        profileCompletionStatus: a.profileCompletionStatus,
-        registrationNumber: a.registrationNumber,
-        serviceType: a.serviceType,
       }) : null;
     }
     case 'AMBULANCE_DRIVER': {
@@ -275,26 +253,12 @@ export const registerHospital=async(input:HospitalRegistrationInput)=>{
     hospitalType: a.hospitalType,
   }));
 };
-export const registerAmbulanceProvider=async(input:AmbulanceProviderRegistrationInput)=>{
-  await ensureUniqueContact(input.email,input.phone); await ensureUniqueRegistrationNumber(input.registrationNumber); const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
-  const a=await AmbulanceProviderModel.create({...input,email:normalizeEmail(input.email),passwordHash,verificationStatus:'PENDING',accountStatus:'PENDING',profileCompletionStatus:'COMPLETE',authProvider:'LOCAL'});
-  return publicIdentity(accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', 'PENDING', undefined, {
-    phone: a.phone,
-    verificationStatus: 'PENDING',
-    profileCompletionStatus: 'COMPLETE',
-    registrationNumber: a.registrationNumber,
-    serviceType: a.serviceType,
-  }));
-};
 export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInput)=>{
   await ensureUniqueContact(input.email,input.phone); await ensureUniqueLicenseNumber(input.licenseNumber);
-  if(!await AmbulanceProviderModel.exists({_id:input.providerId})) throw new AppError('PROVIDER_NOT_FOUND','Ambulance provider was not found',404);
-  const provider = await AmbulanceProviderModel.findOne({_id:input.providerId,accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).lean().exec();
-  if(!provider) throw new AppError('PROVIDER_NOT_OPERATIONAL','Driver cannot be registered against an inactive or unverified provider',409);
   let assignedAmbulanceVehicleNumber: string | undefined;
   if (input.assignedAmbulanceId) {
-    const ambulance = await AmbulanceModel.findOne({ _id: input.assignedAmbulanceId, providerId: input.providerId }).lean().exec();
-    if (!ambulance) throw new AppError('AMBULANCE_NOT_FOUND', 'Assigned ambulance does not exist or does not belong to the selected provider', 404);
+    const ambulance = await AmbulanceModel.findById(input.assignedAmbulanceId).lean().exec();
+    if (!ambulance) throw new AppError('AMBULANCE_NOT_FOUND', 'Assigned ambulance does not exist', 404);
     assignedAmbulanceVehicleNumber = ambulance.vehicleNumber || ambulance.registrationNumber;
   }
   const passwordHash=await bcrypt.hash(input.password,BCRYPT_ROUNDS);
@@ -308,7 +272,6 @@ export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInpu
     city: input.city,
     state: input.state,
     country: input.country,
-    providerId: input.providerId,
     assignedAmbulanceId: input.assignedAmbulanceId,
     licenseVerificationStatus: 'PENDING',
     accountStatus: 'PENDING',
@@ -320,8 +283,6 @@ export const registerAmbulanceDriver=async(input:AmbulanceDriverRegistrationInpu
     profileCompletionStatus: 'COMPLETE',
     licenseVerificationStatus: 'PENDING',
     licenseNumber: a.licenseNumber,
-    providerId: a.providerId.toString(),
-    providerName: provider.name,
     assignedAmbulanceId: a.assignedAmbulanceId?.toString(),
     assignedAmbulanceVehicleNumber,
   }));
@@ -333,9 +294,8 @@ export const login=async(input:LoginInput)=>{
   const a = input.roleHint ? await ({
     USER: findUserAccountByEmail,
     HOSPITAL: findHospitalAccountByEmail,
-    AMBULANCE_PROVIDER: findProviderAccountByEmail,
     AMBULANCE_DRIVER: findDriverAccountByEmail,
-  }[input.roleHint])(normalizeEmail(input.email)) : await findAccountByEmail(input.email);
+  }[input.roleHint as 'USER' | 'HOSPITAL' | 'AMBULANCE_DRIVER'])?.(normalizeEmail(input.email)) : await findAccountByEmail(input.email);
   if(!a||!a.passwordHash)throw INVALID_CREDENTIALS;
   if(!(await bcrypt.compare(input.password,a.passwordHash)))throw INVALID_CREDENTIALS;
   assertLoginAllowed(a.accountStatus);
@@ -555,45 +515,25 @@ export const getAdminMfaStatus = async (
   };
 };
 
-const createSocialAccount = async (identity: VerifiedSocialIdentity, role: 'USER' | 'AMBULANCE_PROVIDER'): Promise<AccountWithPassword> => {
+const createSocialAccount = async (identity: VerifiedSocialIdentity): Promise<AccountWithPassword> => {
   const normalized = normalizeEmail(identity.email);
-  if (role === 'USER') {
-    const a = await UserModel.create({
-      name: identity.name,
-      email: normalized,
-      authProvider: identity.provider,
-      providerSubject: identity.providerSubject,
-      role: 'USER',
-      accountStatus: 'ACTIVE',
-      emailVerified: true,
-      savedFacilityIds: [],
-    });
-    return accountFrom(a._id.toString(), a.email, a.name, 'USER', 'ACTIVE');
-  }
-  const registrationNumber = 'SOCIAL-' + randomUUID();
-  const a = await AmbulanceProviderModel.create({
+  const a = await UserModel.create({
     name: identity.name,
     email: normalized,
-    phone: '',
-    passwordHash: undefined,
     authProvider: identity.provider,
     providerSubject: identity.providerSubject,
-    registrationNumber,
-    serviceType: '',
-    profileCompletionStatus: 'INCOMPLETE',
-    verificationStatus: 'PENDING',
-    accountStatus: 'PENDING',
+    role: 'USER',
+    accountStatus: 'ACTIVE',
+    emailVerified: true,
+    savedFacilityIds: [],
   });
-  return accountFrom(a._id.toString(), a.email, a.name, 'AMBULANCE_PROVIDER', 'PENDING', undefined, {
-    verificationStatus: 'PENDING',
-    profileCompletionStatus: 'INCOMPLETE',
-  });
+  return accountFrom(a._id.toString(), a.email, a.name, 'USER', 'ACTIVE');
 };
 
 export const socialLogin = async (
   provider: SocialProvider,
   credential: string,
-  roleHint: 'USER' | 'AMBULANCE_PROVIDER' = 'USER',
+  _roleHint: 'USER' = 'USER',
 ) => {
   const verified = await verifySocialCredential(provider, credential);
   const normalizedEmail = normalizeEmail(verified.email);
@@ -646,7 +586,7 @@ export const socialLogin = async (
 
   // 4. New user onboarding via social sign-in
   try {
-    const account = await createSocialAccount({ ...verified, email: normalizedEmail }, roleHint);
+    const account = await createSocialAccount({ ...verified, email: normalizedEmail });
     await ExternalIdentityModel.create({
       provider,
       providerSubject: verified.providerSubject,
@@ -684,13 +624,6 @@ export const updateDriverProfile=async(identity:AuthenticatedIdentity,input:Driv
   a.fullName=input.fullName;a.phone=input.phone;a.licenseNumber=input.licenseNumber;a.address=input.address;a.city=input.city;a.state=input.state;a.country=input.country;a.registeredLatitude=input.registeredLatitude;a.registeredLongitude=input.registeredLongitude;a.profileCompletionStatus=driverFieldsComplete(input)?'COMPLETE':'INCOMPLETE';await a.save();
   return publicIdentity(accountFrom(a._id.toString(),a.email,a.fullName,'AMBULANCE_DRIVER',a.accountStatus,undefined,{profileCompletionStatus:a.profileCompletionStatus,licenseVerificationStatus:a.licenseVerificationStatus}));
 };
-export const updateProviderProfile=async(identity:AuthenticatedIdentity,input:ProviderProfileInput)=>{
-  if(identity.role!=='AMBULANCE_PROVIDER')throw new AppError('FORBIDDEN','Only providers can update provider profiles',403);const a=await AmbulanceProviderModel.findById(identity.id).exec();if(!a)throw new AppError('UNAUTHORIZED','Provider account was not found',401);
-  const duplicate=await AmbulanceProviderModel.findOne({registrationNumber:input.registrationNumber,_id:{$ne:a._id}}).exec();if(duplicate)throw new AppError('REGISTRATION_NUMBER_ALREADY_EXISTS','Registration number is already in use',409);
-  a.name=input.name;a.phone=input.phone;a.registrationNumber=input.registrationNumber;a.serviceType=input.serviceType;a.address=input.address;a.city=input.city;a.state=input.state;a.country=input.country;a.latitude=input.latitude;a.longitude=input.longitude;a.profileCompletionStatus='COMPLETE';await a.save();
-  return publicIdentity(accountFrom(a._id.toString(),a.email,a.name,'AMBULANCE_PROVIDER',a.accountStatus,undefined,{verificationStatus:a.verificationStatus,profileCompletionStatus:'COMPLETE'}));
-};
-
 export const getUserProfile=async(identity:AuthenticatedIdentity)=>{
   if(identity.role!=='USER')throw new AppError('FORBIDDEN','Only users can access the user profile',403);
   const user=await UserModel.findById(identity.id).select('-passwordHash').lean().exec();if(!user)throw new AppError('UNAUTHORIZED','User account was not found',401);

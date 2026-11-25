@@ -31,20 +31,23 @@ import type { AdminAccountStatus, AdminAmbulance, AdminAmbulanceDriver, AdminAmb
 import { adminApi } from '../services/adminApi';
 
 const Section = ({ children }: { children: ReactNode }) => <div className="w-full">{children}</div>;
-const ErrorBox = ({ message, retry }: { message: string; retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{message}</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Retry</Button></div>;
-const Loading = () => <div className="flex items-center justify-center p-12 text-sm text-slate-500">Loading live admin data…</div>;
+const ErrorBox = ({ message, retry }: { message: string; retry: () => void }) => <div className="flex items-center justify-between gap-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{message}</span><Button size="sm" variant="secondary" onClick={retry} icon={<RefreshCw className="h-4 w-4" />}>Try again</Button></div>;
+const Loading = () => <div className="flex items-center justify-center p-12 text-sm text-slate-500">Loading admin data…</div>;
 const Empty = ({ label }: { label: string }) => <div className="p-10 text-center text-sm text-slate-500">{label}</div>;
-const Status = ({ value }: { value: string }) => <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">{value}</span>;
-const Pager = ({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (page: number) => void }) => <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"><span>Page {page} of {Math.max(totalPages, 1)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onPage(page - 1)} icon={<ChevronLeft className="h-4 w-4" />}>Previous</Button><Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => onPage(page + 1)} icon={<ChevronRight className="h-4 w-4" />}>Next</Button></div></div>;
+const statusLabel = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+const Status = ({ value }: { value: string }) => <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">{statusLabel(value)}</span>;
+const Pager = ({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (page: number) => void }) => <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"><span>Page {page} of {Math.max(totalPages, 1)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onPage(page - 1)} icon={<ChevronLeft className="h-4 w-4" />}>Back</Button><Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => onPage(page + 1)} icon={<ChevronRight className="h-4 w-4" />}>Next</Button></div></div>;
 const Search = ({ value, onChange, placeholder = 'Search…' }: { value: string; onChange: (v: string) => void; placeholder?: string }) => <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />;
 const Select = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) => <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none">{children}</select>;
-const ConfirmAction = ({ label, onConfirm, disabled = false }: { label: string; onConfirm: () => void; disabled?: boolean }) => <Button size="sm" variant="secondary" disabled={disabled} onClick={() => { if (window.confirm(`Confirm: ${label}?`)) onConfirm(); }}>{label}</Button>;
-const message = (error: unknown): string => error instanceof Error ? error.message : 'The operation failed.';
+const ConfirmAction = ({ label, onConfirm, disabled = false }: { label: string; onConfirm: () => void; disabled?: boolean }) => <Button size="sm" variant="secondary" disabled={disabled} onClick={() => { if (window.confirm(`Are you sure you want to ${label.toLowerCase()}?`)) onConfirm(); }}>{label}</Button>;
+const message = (error: unknown): string => error instanceof Error && error.message === 'Failed to fetch'
+  ? 'Cannot connect. Check your internet and try again.'
+  : 'Something went wrong. Try again.';
 
 export const AdminOverviewPage = () => {
   const q = useAdminOverview();
-  if (q.isLoading) return <Section><AdminPage title="Operations overview" description="Live ResQ platform metrics."><Loading /></AdminPage></Section>;
-  if (q.isError || !q.data) return <Section><AdminPage title="Operations overview"><ErrorBox message={message(q.error)} retry={() => void q.refetch()} /></AdminPage></Section>;
+  if (q.isLoading) return <Section><AdminPage title="Overview" description="Current ResQ totals."><Loading /></AdminPage></Section>;
+  if (q.isError || !q.data) return <Section><AdminPage title="Overview"><ErrorBox message={message(q.error)} retry={() => void q.refetch()} /></AdminPage></Section>;
   const d = q.data;
   const metrics = [
     { label: 'Users', value: String(d.totalUsers), detail: `${d.activeUsers} active` },
@@ -52,71 +55,71 @@ export const AdminOverviewPage = () => {
     { label: 'Providers', value: String(d.totalAmbulanceProviders), detail: `${d.verifiedProviders} verified` },
     { label: 'Ambulances', value: String(d.totalAmbulances), detail: `${d.availableAmbulances ?? 0} available` },
     { label: 'Drivers', value: String(d.totalAmbulanceDrivers), detail: `${d.onlineDrivers ?? 0} online` },
-    { label: 'Emergency SOS', value: String(d.totalEmergencies ?? 0), detail: `${d.activeEmergencies ?? 0} active · ${d.resolvedEmergencies ?? 0} resolved` },
+    { label: 'Emergency requests', value: String(d.totalEmergencies ?? 0), detail: `${d.activeEmergencies ?? 0} open · ${d.resolvedEmergencies ?? 0} closed` },
     { label: 'Appointments', value: String(d.totalAppointments ?? 0), detail: `${d.pendingAppointments ?? 0} pending · ${d.confirmedAppointments ?? 0} confirmed` },
-    { label: 'Pending Review', value: String(d.pendingHospitals + d.pendingProviders + d.pendingDrivers), detail: 'Registrations awaiting review' },
+    { label: 'Waiting for review', value: String(d.pendingHospitals + d.pendingProviders + d.pendingDrivers), detail: 'New accounts to check' },
   ];
   return (
     <Section>
-      <AdminPage title="Operations overview" description="Live MongoDB-backed platform metrics & enterprise governance.">
+      <AdminPage title="Overview" description="Current totals from ResQ.">
         <MetricGrid metrics={metrics} />
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Panel title="Pending registrations">
+          <Panel title="Accounts to check">
             <div className="space-y-3 p-5 text-sm">
               <div className="flex justify-between"><span>Hospitals</span><b>{d.pendingHospitals}</b></div>
               <div className="flex justify-between"><span>Providers</span><b>{d.pendingProviders}</b></div>
               <div className="flex justify-between"><span>Drivers</span><b>{d.pendingDrivers}</b></div>
               <div className="border-t border-slate-100 pt-2 flex justify-between text-xs text-slate-500">
-                <span>Total Awaiting Verification</span>
+                <span>Total waiting</span>
                 <span className="font-semibold text-amber-700">{d.pendingHospitals + d.pendingProviders + d.pendingDrivers}</span>
               </div>
             </div>
           </Panel>
-          <Panel title="Emergency SOS triage">
+          <Panel title="Emergency requests">
             <div className="space-y-3 p-5 text-sm">
-              <div className="flex justify-between"><span>Active SOS Dispatches</span><b className="text-red-700">{d.activeEmergencies ?? 0}</b></div>
-              <div className="flex justify-between"><span>Resolved Emergencies</span><b className="text-emerald-700">{d.resolvedEmergencies ?? 0}</b></div>
-              <div className="flex justify-between"><span>Cancelled Requests</span><b className="text-slate-600">{d.cancelledEmergencies ?? 0}</b></div>
+              <div className="flex justify-between"><span>Open requests</span><b className="text-red-700">{d.activeEmergencies ?? 0}</b></div>
+              <div className="flex justify-between"><span>Closed emergencies</span><b className="text-emerald-700">{d.resolvedEmergencies ?? 0}</b></div>
+              <div className="flex justify-between"><span>Cancelled requests</span><b className="text-slate-600">{d.cancelledEmergencies ?? 0}</b></div>
               <div className="border-t border-slate-100 pt-2 flex justify-between text-xs text-slate-500">
-                <span>All-time SOS Volume</span>
+                <span>All emergency requests</span>
                 <span className="font-semibold">{d.totalEmergencies ?? 0}</span>
               </div>
             </div>
           </Panel>
-          <Panel title="Routine care & appointments">
+          <Panel title="Care and appointments">
             <div className="space-y-3 p-5 text-sm">
               <div className="flex justify-between"><span>Pending Appointments</span><b className="text-amber-700">{d.pendingAppointments ?? 0}</b></div>
               <div className="flex justify-between"><span>Confirmed Appointments</span><b className="text-teal-700">{d.confirmedAppointments ?? 0}</b></div>
-              <div className="flex justify-between"><span>Completed Visits</span><b className="text-emerald-700">{d.completedAppointments ?? 0}</b></div>
+              <div className="flex justify-between"><span>Done visits</span><b className="text-emerald-700">{d.completedAppointments ?? 0}</b></div>
               <div className="border-t border-slate-100 pt-2 flex justify-between text-xs text-slate-500">
-                <span>Direct Hospital Care Requests</span>
+                <span>Hospital care requests</span>
                 <span className="font-semibold">{d.totalCareRequests ?? 0}</span>
               </div>
             </div>
           </Panel>
         </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <Panel title="Ambulance fleet & telemetry readiness">
+          <Panel title="Ambulances and drivers">
             <div className="grid grid-cols-2 gap-4 p-5 text-sm">
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Ambulances</p>
                 <div className="flex justify-between"><span>Available</span><b className="text-emerald-700">{d.availableAmbulances ?? 0}</b></div>
-                <div className="flex justify-between"><span>Busy / On Trip</span><b className="text-amber-700">{d.busyAmbulances ?? 0}</b></div>
+                <div className="flex justify-between"><span>On a trip</span><b className="text-amber-700">{d.busyAmbulances ?? 0}</b></div>
                 <div className="flex justify-between"><span>Offline</span><b>{d.offlineAmbulances ?? 0}</b></div>
                 <div className="flex justify-between"><span>Maintenance</span><b>{d.maintenanceAmbulances ?? 0}</b></div>
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Drivers</p>
-                <div className="flex justify-between"><span>Online / On Duty</span><b className="text-emerald-700">{d.onlineDrivers ?? 0}</b></div>
-                <div className="flex justify-between"><span>Busy With Patient</span><b className="text-amber-700">{d.busyDrivers ?? 0}</b></div>
-                <div className="flex justify-between"><span>Offline</span><b>{d.offlineDrivers ?? 0}</b></div>
+                <div className="flex justify-between"><span>On duty</span><b className="text-emerald-700">{d.onlineDrivers ?? 0}</b></div>
+                <div className="flex justify-between"><span>On a trip</span><b className="text-amber-700">{d.busyDrivers ?? 0}</b></div>
+                <div className="flex justify-between"><span>Off duty</span><b>{d.offlineDrivers ?? 0}</b></div>
               </div>
             </div>
           </Panel>
-          <Panel title="Platform governance & accounts">
+          <Panel title="Accounts">
             <div className="space-y-3 p-5 text-sm">
               <div className="flex justify-between"><span>Active User Accounts</span><b className="text-emerald-700">{d.activeUsers}</b></div>
-              <div className="flex justify-between"><span>Suspended Accounts</span><b className="text-rose-700">{d.suspendedUsers}</b></div>
+              <div className="flex justify-between"><span>Paused accounts</span><b className="text-rose-700">{d.suspendedUsers}</b></div>
               <div className="flex justify-between"><span>Verified Hospitals</span><b>{d.verifiedHospitals} / {d.totalHospitals}</b></div>
               <div className="flex justify-between"><span>Verified Providers</span><b>{d.verifiedProviders} / {d.totalAmbulanceProviders}</b></div>
               <div className="flex justify-between"><span>Verified Drivers</span><b>{d.verifiedDrivers} / {d.totalAmbulanceDrivers}</b></div>
@@ -130,7 +133,7 @@ export const AdminOverviewPage = () => {
 
 export const AdminUsersPage = () => {
   const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const [role, setRole] = useState(''); const [page, setPage] = useState(1); const q = useAdminUsers({ page, limit: 20, search, status: status as AdminAccountStatus | undefined, role: role as AdminUser['role'] | undefined }); const mutation = useUpdateUserStatus();
-  return <Section><AdminPage title="User oversight" description="Search, inspect and manage registered accounts."><Panel title="Users"><div className="grid gap-2 border-b border-slate-200 p-4 md:grid-cols-[1fr_auto_auto]"><Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Name, email or phone" /><Select value={role} onChange={(v) => { setRole(v); setPage(1); }}><option value="">All roles</option><option>USER</option><option>HOSPITAL</option><option>AMBULANCE_PROVIDER</option><option>AMBULANCE_DRIVER</option><option>ADMIN</option></Select><Select value={status} onChange={(v) => { setStatus(v); setPage(1); }}><option value="">All statuses</option><option>ACTIVE</option><option>PENDING</option><option>SUSPENDED</option><option>REJECTED</option></Select></div>{q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No users match these filters." /> : <><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">User</th><th>Role</th><th>Status</th><th>Location</th><th>Verification</th><th>Action</th></tr></thead><tbody>{q.data.items.map((u) => <tr key={u.id} className="border-b border-slate-100"><td className="px-4 py-3"><b>{u.name}</b><div className="text-xs text-slate-500">{u.email} · {u.phone}</div></td><td><Status value={u.role} /></td><td><Status value={u.accountStatus} /></td><td>{u.city ?? '—'}, {u.state ?? '—'}</td><td>{u.emailVerified && u.phoneVerified ? 'Verified' : 'Partial'}</td><td><ConfirmAction label={u.accountStatus !== 'ACTIVE' ? 'Activate' : 'Suspend'} disabled={mutation.isPending} onConfirm={() => mutation.mutate({ id: u.id, status: u.accountStatus !== 'ACTIVE' ? 'ACTIVE' : 'SUSPENDED' })} /></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage} /></>}</Panel></AdminPage></Section>;
+  return <Section><AdminPage title="User oversight" description="Search, inspect and manage registered accounts."><Panel title="Users"><div className="grid gap-2 border-b border-slate-200 p-4 md:grid-cols-[1fr_auto_auto]"><Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Name, email or phone" /><Select value={role} onChange={(v) => { setRole(v); setPage(1); }}><option value="">All roles</option><option>USER</option><option>HOSPITAL</option><option>AMBULANCE_DRIVER</option><option>ADMIN</option></Select><Select value={status} onChange={(v) => { setStatus(v); setPage(1); }}><option value="">All statuses</option><option>ACTIVE</option><option>PENDING</option><option>SUSPENDED</option><option>REJECTED</option></Select></div>{q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No users match these filters." /> : <><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">User</th><th>Role</th><th>Status</th><th>Location</th><th>Verification</th><th>Action</th></tr></thead><tbody>{q.data.items.map((u) => <tr key={u.id} className="border-b border-slate-100"><td className="px-4 py-3"><b>{u.name}</b><div className="text-xs text-slate-500">{u.email} · {u.phone}</div></td><td><Status value={u.role} /></td><td><Status value={u.accountStatus} /></td><td>{u.city ?? '—'}, {u.state ?? '—'}</td><td>{u.emailVerified && u.phoneVerified ? 'Verified' : 'Partial'}</td><td><ConfirmAction label={u.accountStatus !== 'ACTIVE' ? 'Activate' : 'Suspend'} disabled={mutation.isPending} onConfirm={() => mutation.mutate({ id: u.id, status: u.accountStatus !== 'ACTIVE' ? 'ACTIVE' : 'SUSPENDED' })} /></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage} /></>}</Panel></AdminPage></Section>;
 };
 
 function ApprovalActions({ id, verification, accountStatus, verify, changeStatus }: { id: string; verification: AdminVerificationStatus; accountStatus: AdminAccountStatus; verify: (id: string, status: AdminVerificationStatus) => void; changeStatus: (id: string, status: Extract<AdminAccountStatus, 'ACTIVE' | 'SUSPENDED' | 'REJECTED'>) => void }) { return <div className="flex flex-wrap gap-2"><Status value={`V: ${verification}`} /><Status value={`A: ${accountStatus}`} />{verification !== 'VERIFIED' && <ConfirmAction label="Verify" onConfirm={() => verify(id, 'VERIFIED')} />}{verification !== 'REJECTED' && <ConfirmAction label="Reject" onConfirm={() => verify(id, 'REJECTED')} />}{accountStatus !== 'ACTIVE' ? <ConfirmAction label="Activate" onConfirm={() => changeStatus(id, 'ACTIVE')} /> : <ConfirmAction label="Suspend" onConfirm={() => changeStatus(id, 'SUSPENDED')} />}</div>; }
@@ -170,14 +173,14 @@ export const AdminHospitalsPage = () => {
       <AdminPage title="Hospital network" description="Real registrations with verified intake capabilities, status, and GIS network coverage.">
         {hospitalMarkers.length > 0 && (
           <div className="mb-6">
-            <Panel title="Hospital network radar" description="Live geographic coverage of registered hospital facilities.">
+            <Panel title="Hospitals on the map" description="Where hospitals have shared their location.">
               <div className="p-4">
                 <div className="min-h-[400px] h-[440px] w-full overflow-hidden rounded-xl border border-slate-200">
                   <MapView center={mapCenter} zoom={11} markers={hospitalMarkers} interactive className="h-full w-full" />
                 </div>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
-                  <span>{hospitalMarkers.length} hospital facility location(s) mapped</span>
-                  <span>24/7 ER Ready</span>
+                  <span>{hospitalMarkers.length} hospital locations</span>
+                  <span>Emergency care</span>
                 </div>
               </div>
             </Panel>
@@ -270,17 +273,17 @@ export const AdminAmbulancesPage = () => {
 
   return (
     <Section>
-      <AdminPage title="Ambulance network" description="Live fleet registrations, GIS fleet radar and real-time positioning data.">
+      <AdminPage title="Ambulances" description="Ambulance details and shared locations.">
         {ambulanceMarkers.length > 0 && (
           <div className="mb-6">
-            <Panel title="Fleet command radar" description="Live geographical positioning of ambulances reporting coordinates.">
+            <Panel title="Ambulances on the map" description="Where ambulances have shared their location.">
               <div className="p-4">
                 <div className="min-h-[400px] h-[440px] w-full overflow-hidden rounded-xl border border-slate-200">
                   <MapView center={mapCenter} zoom={12} markers={ambulanceMarkers} interactive className="h-full w-full" />
                 </div>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
-                  <span>{ambulanceMarkers.length} ambulance(s) transmitting live GPS coordinates</span>
-                  <span>Active Fleet Radar</span>
+                  <span>{ambulanceMarkers.length} ambulance locations</span>
+                  <span>Live locations</span>
                 </div>
               </div>
             </Panel>
@@ -288,7 +291,7 @@ export const AdminAmbulancesPage = () => {
         )}
         <Panel title="Ambulances">
           <div className="p-4">
-            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Registration, vehicle number or type" />
+            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Registration, vehicle number, or type" />
           </div>
           {q.isLoading ? <Loading /> : q.isError ? <ErrorBox message={message(q.error)} retry={() => void q.refetch()} /> : !q.data?.items.length ? <Empty label="No ambulances found." /> : (
             <>
@@ -310,13 +313,13 @@ export const AdminAmbulancesPage = () => {
                           <b>{a.registrationNumber}</b>
                           <div className="text-xs text-slate-500">{a.vehicleNumber} · {a.ambulanceType}</div>
                         </td>
-                        <td>{a.provider?.name ?? 'Unassigned'}</td>
-                        <td>{a.assignedDriver?.name ?? 'Unassigned'}</td>
+                        <td>{a.provider?.name ?? 'Not assigned'}</td>
+                        <td>{a.assignedDriver?.name ?? 'Not assigned'}</td>
                         <td>
                           <Status value={a.currentStatus} />
                           <div className="mt-1"><Status value={a.verificationStatus} /></div>
                         </td>
-                        <td>{a.currentLatitude !== undefined && a.currentLongitude !== undefined ? `${a.currentLatitude}, ${a.currentLongitude}` : 'No current location'}</td>
+                        <td>{a.currentLatitude !== undefined && a.currentLongitude !== undefined ? `${a.currentLatitude}, ${a.currentLongitude}` : 'No location shared'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -331,14 +334,14 @@ export const AdminAmbulancesPage = () => {
   );
 };
 
-export const AdminProvidersPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminProviders({page,limit:20,search}); const v=useUpdateProviderVerification(); const s=useUpdateProviderStatus(); return <Section><AdminPage title="Ambulance providers" description="Manage provider verification, account status and fleet relationships."><Panel title="Providers"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Provider, registration, email or phone"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No providers found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Provider</th><th>Location</th><th>Fleet</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((p:AdminAmbulanceProvider)=><tr key={p.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{p.name}</b><div className="text-xs text-slate-500">{p.registrationNumber} · {p.email}</div></td><td>{p.city??'—'}, {p.state??'—'}</td><td>{p.ambulanceCount}</td><td><Status value={p.verificationStatus}/><div className="mt-1"><Status value={p.accountStatus}/></div></td><td><ApprovalActions id={p.id} verification={p.verificationStatus} accountStatus={p.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
+export const AdminProvidersPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminProviders({page,limit:20,search}); const v=useUpdateProviderVerification(); const s=useUpdateProviderStatus(); return <Section><AdminPage title="Ambulance companies" description="Check company details and account status."><Panel title="Companies"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Company, registration, email, or phone"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No companies found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Company</th><th>City</th><th>Ambulances</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((p:AdminAmbulanceProvider)=><tr key={p.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{p.name}</b><div className="text-xs text-slate-500">{p.registrationNumber} · {p.email}</div></td><td>{p.city??'—'}, {p.state??'—'}</td><td>{p.ambulanceCount}</td><td><Status value={p.verificationStatus}/><div className="mt-1"><Status value={p.accountStatus}/></div></td><td><ApprovalActions id={p.id} verification={p.verificationStatus} accountStatus={p.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
 
-export const AdminDriversPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminDrivers({page,limit:20,search}); const v=useUpdateDriverVerification(); const s=useUpdateDriverStatus(); return <Section><AdminPage title="Ambulance drivers" description="Review driver verification, registered location and fleet assignment."><Panel title="Drivers"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Name, email, phone or license"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No drivers found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Driver</th><th>Provider</th><th>Ambulance</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((d:AdminAmbulanceDriver)=><tr key={d.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{d.fullName}</b><div className="text-xs text-slate-500">{d.email} · {d.licenseNumber}</div></td><td>{d.provider?.name??'Unassigned'}</td><td>{d.assignedAmbulance?.registrationNumber??'Unassigned'}</td><td>{d.city??'—'}, {d.state??'—'}</td><td><Status value={d.licenseVerificationStatus}/><div className="mt-1"><Status value={d.accountStatus}/></div></td><td><ApprovalActions id={d.id} verification={d.licenseVerificationStatus} accountStatus={d.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
+export const AdminDriversPage = () => { const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const q=useAdminDrivers({page,limit:20,search}); const v=useUpdateDriverVerification(); const s=useUpdateDriverStatus(); return <Section><AdminPage title="Drivers" description="Check driver details, work status, and assigned ambulance."><Panel title="Drivers"><div className="p-4"><Search value={search} onChange={(x)=>{setSearch(x);setPage(1)}} placeholder="Name, email, phone, or license"/></div>{q.isLoading?<Loading/>:q.isError?<ErrorBox message={message(q.error)} retry={()=>void q.refetch()}/>:!q.data?.items.length?<Empty label="No drivers found."/>:<><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-4 py-3">Driver</th><th>Company</th><th>Ambulance</th><th>City</th><th>Status</th><th>Actions</th></tr></thead><tbody>{q.data.items.map((d:AdminAmbulanceDriver)=><tr key={d.id} className="border-b border-slate-100 align-top"><td className="px-4 py-3"><b>{d.fullName}</b><div className="text-xs text-slate-500">{d.email} · {d.licenseNumber}</div></td><td>{d.provider?.name??'Not assigned'}</td><td>{d.assignedAmbulance?.registrationNumber??'Not assigned'}</td><td>{d.city??'—'}, {d.state??'—'}</td><td><Status value={d.licenseVerificationStatus}/><div className="mt-1"><Status value={d.accountStatus}/></div></td><td><ApprovalActions id={d.id} verification={d.licenseVerificationStatus} accountStatus={d.accountStatus} verify={(id,x)=>v.mutate({id,verificationStatus:x})} changeStatus={(id,x)=>s.mutate({id,status:x})}/></td></tr>)}</tbody></table></div><Pager {...q.data.pagination} onPage={setPage}/></>}</Panel></AdminPage></Section>; };
 
 export const AdminEmergenciesPage = () => {
   const queryClient = useQueryClient();
   const [manualDriverIds, setManualDriverIds] = useState<Record<string, string>>({});
-  const [escalationReason, setEscalationReason] = useState('No eligible driver available; operations intervention required.');
+  const [escalationReason, setEscalationReason] = useState('No driver is available. Please assign one.');
   const dispatchJobs = useQuery({ queryKey: ['admin-dispatch-jobs'], queryFn: () => adminApi.dispatchJobs({ limit: 50 }), refetchInterval: 5000 });
   const refreshDispatch = async () => { await queryClient.invalidateQueries({ queryKey: ['admin-dispatch-jobs'] }); await queryClient.invalidateQueries({ queryKey: ['admin-emergencies'] }); };
   const retryDispatch = useMutation({ mutationFn: (id: string) => adminApi.retryDispatchJob(id), onSuccess: refreshDispatch });
@@ -348,8 +351,8 @@ export const AdminEmergenciesPage = () => {
   const [status, setStatus] = useState<string>('');
   const [page, setPage] = useState(1);
   const q = useAdminEmergencies({ page, limit: 20, search: search || undefined, status: status || undefined });
-  if (q.isLoading) return <Section><AdminPage title="Emergency monitor"><Loading /></AdminPage></Section>;
-  if (q.isError || !q.data) return <Section><AdminPage title="Emergency monitor"><ErrorBox message={message(q.error)} retry={() => void q.refetch()} /></AdminPage></Section>;
+  if (q.isLoading) return <Section><AdminPage title="Emergency requests"><Loading /></AdminPage></Section>;
+  if (q.isError || !q.data) return <Section><AdminPage title="Emergency requests"><ErrorBox message={message(q.error)} retry={() => void q.refetch()} /></AdminPage></Section>;
   const rows = q.data.items.map((x) => ({
     id: x.requestCode,
     category: x.situationType,
@@ -361,18 +364,18 @@ export const AdminEmergenciesPage = () => {
   }));
   return (
     <Section>
-      <AdminPage title="Emergency monitor" description="Live MongoDB-backed emergency requests with operational relationships.">
+      <AdminPage title="Emergency requests" description="View emergency requests and their ambulance details.">
         <Panel title="Emergency requests">
           <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4">
-            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Request code, situation or object id" />
+            <Search value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Request code, emergency type, or ID" />
             <Select value={status} onChange={(v) => { setStatus(v); setPage(1); }}>
               <option value="">All statuses</option>
-              <option>RECEIVED</option>
-              <option>REVIEWING</option>
-              <option>PREPARING</option>
-              <option>AMBULANCE_COORDINATION</option>
-              <option>RESOLVED</option>
-              <option>CANCELLED</option>
+              <option value="RECEIVED">New</option>
+              <option value="REVIEWING">In review</option>
+              <option value="PREPARING">Getting ready</option>
+              <option value="AMBULANCE_COORDINATION">Ambulance on the way</option>
+              <option value="RESOLVED">Closed</option>
+              <option value="CANCELLED">Cancelled</option>
             </Select>
             <Button size="sm" variant="secondary" onClick={() => void q.refetch()} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
           </div>
@@ -385,27 +388,27 @@ export const AdminEmergenciesPage = () => {
             </>
           )}
         </Panel>
-        <Panel title="Automatic ambulance dispatch" description="Persistent offer attempts, server deadlines and recovery controls.">
+        <Panel title="Ambulance assignment" description="See offers and try again if no driver accepts.">
           {dispatchJobs.isLoading ? <Loading /> : dispatchJobs.isError ? <ErrorBox message={message(dispatchJobs.error)} retry={() => void dispatchJobs.refetch()} /> : !dispatchJobs.data?.length ? <Empty label="No dispatch jobs have been created." /> : (
             <div className="space-y-3 p-4">
               {dispatchJobs.data.map((job) => (
                 <article key={job.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div><p className="font-semibold">{job.requestCode ?? job.emergencyRequestId}</p><p className="mt-1 text-xs text-slate-500">{job.situationType ?? job.category} · Generation {job.generation} · {job.attempts.length} attempts</p></div>
+                    <div><p className="font-semibold">{job.requestCode ?? job.emergencyRequestId}</p><p className="mt-1 text-xs text-slate-500">{job.situationType ?? job.category} · Round {job.generation} · {job.attempts.length} tries</p></div>
                     <Status value={job.status} />
                   </div>
-                  {job.deadlineAt && <p className="mt-2 text-xs text-slate-600">Current server deadline: {new Date(job.deadlineAt).toLocaleString()}</p>}
+                  {job.deadlineAt && <p className="mt-2 text-xs text-slate-600">Offer ends: {new Date(job.deadlineAt).toLocaleString()}</p>}
                   {job.escalationReason && <p className="mt-2 text-xs text-amber-800">{job.escalationReason}</p>}
-                  {job.attempts.length > 0 && <div className="mt-3 space-y-2">{job.attempts.slice(-3).reverse().map((attempt) => <div key={attempt.attemptNumber + '-' + attempt.generation + '-' + attempt.driverId} className="rounded-lg bg-slate-50 p-3 text-xs"><div className="flex flex-wrap justify-between gap-2"><span className="font-semibold">Attempt {attempt.attemptNumber} · {attempt.status}</span><span>{attempt.routeSource === 'DRIVING' && attempt.etaSeconds ? Math.round(attempt.etaSeconds / 60) + ' min driving' : 'Straight-line fallback'}</span></div><p className="mt-1 text-slate-500">Driver {attempt.driverId} · {Math.round(attempt.routeDistanceMeters)} m · {attempt.reason ?? 'No additional reason'}</p></div>)}</div>}
+                  {job.attempts.length > 0 && <div className="mt-3 space-y-2">{job.attempts.slice(-3).reverse().map((attempt) => <div key={attempt.attemptNumber + '-' + attempt.generation + '-' + attempt.driverId} className="rounded-lg bg-slate-50 p-3 text-xs"><div className="flex flex-wrap justify-between gap-2"><span className="font-semibold">Try {attempt.attemptNumber} · {statusLabel(attempt.status)}</span><span>{attempt.routeSource === 'DRIVING' && attempt.etaSeconds ? Math.round(attempt.etaSeconds / 60) + ' min by road' : 'Estimated distance'}</span></div><p className="mt-1 text-slate-500">Driver ID {attempt.driverId} · {Math.round(attempt.routeDistanceMeters)} m · {attempt.reason ?? 'No reason given'}</p></div>)}</div>}
                   {['EXHAUSTED', 'ESCALATED'].includes(job.status) && <div className="mt-4 space-y-3 border-t border-slate-200 pt-3">
-                    <p className="text-xs font-semibold text-amber-900">No active offer. Choose a recovery action; hospital destination remains unchanged.</p>
+                    <p className="text-xs font-semibold text-amber-900">No driver has this request. Choose what to do next. The hospital will stay the same.</p>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" disabled={retryDispatch.isPending} onClick={() => retryDispatch.mutate(job.id)}>Retry dispatch</Button>
-                      <Button size="sm" variant="secondary" disabled={escalateDispatch.isPending || job.status !== 'EXHAUSTED'} onClick={() => escalateDispatch.mutate({id:job.id,reason:escalationReason})}>Escalate</Button>
+                      <Button size="sm" variant="secondary" disabled={retryDispatch.isPending} onClick={() => retryDispatch.mutate(job.id)}>Try again</Button>
+                      <Button size="sm" variant="secondary" disabled={escalateDispatch.isPending || job.status !== 'EXHAUSTED'} onClick={() => escalateDispatch.mutate({id:job.id,reason:escalationReason})}>Ask for help</Button>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                      <input aria-label="Driver ID for manual dispatch" value={manualDriverIds[job.id] ?? ''} onChange={(event) => setManualDriverIds((old) => ({...old,[job.id]:event.target.value.trim()}))} placeholder="Verified driver's MongoDB ID" className="h-10 rounded-lg border border-slate-300 px-3 text-xs" />
-                      <Button size="sm" variant="primary" disabled={manualDispatch.isPending || !/^[a-f\d]{24}$/i.test(manualDriverIds[job.id] ?? '')} onClick={() => manualDispatch.mutate({id:job.id,driverId:manualDriverIds[job.id]})}>Offer to driver</Button>
+                      <input aria-label="Driver ID for manual assignment" value={manualDriverIds[job.id] ?? ''} onChange={(event) => setManualDriverIds((old) => ({...old,[job.id]:event.target.value.trim()}))} placeholder="Driver ID" className="h-10 rounded-lg border border-slate-300 px-3 text-xs" />
+                      <Button size="sm" variant="primary" disabled={manualDispatch.isPending || !/^[a-f\d]{24}$/i.test(manualDriverIds[job.id] ?? '')} onClick={() => manualDispatch.mutate({id:job.id,driverId:manualDriverIds[job.id]})}>Assign driver</Button>
                     </div>
                     <input aria-label="Escalation reason" value={escalationReason} onChange={(event) => setEscalationReason(event.target.value)} className="h-10 w-full rounded-lg border border-slate-300 px-3 text-xs" />
                   </div>}
@@ -414,7 +417,7 @@ export const AdminEmergenciesPage = () => {
             </div>
           )}
           {(retryDispatch.isError || manualDispatch.isError || escalateDispatch.isError) && <p role="alert" className="px-4 pb-4 text-sm text-rose-700">{message(retryDispatch.error || manualDispatch.error || escalateDispatch.error)}</p>}
-          {(retryDispatch.isSuccess || manualDispatch.isSuccess || escalateDispatch.isSuccess) && <p role="status" className="px-4 pb-4 text-sm text-emerald-700">Dispatch action submitted successfully.</p>}
+          {(retryDispatch.isSuccess || manualDispatch.isSuccess || escalateDispatch.isSuccess) && <p role="status" className="px-4 pb-4 text-sm text-emerald-700">Done.</p>}
         </Panel>
       </AdminPage>
     </Section>
@@ -489,13 +492,13 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
     <Section>
       <AdminPage
         title={analytics ? 'Analytics' : 'Reports'}
-        description="Real MongoDB-backed operational reporting."
+        description="Reports for the dates you choose."
         action={
           <div className="flex gap-2 print:hidden">
             <Button size="sm" variant="secondary" onClick={() => window.print()}>Print</Button>
             <Button size="sm" variant="secondary" onClick={refresh} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
-            <Button size="sm" variant="secondary" onClick={exportJson} icon={<Download className="h-4 w-4" />}>Export JSON</Button>
-            <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Export CSV</Button>
+            <Button size="sm" variant="secondary" onClick={exportJson} icon={<Download className="h-4 w-4" />}>Save JSON file</Button>
+            <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Save CSV file</Button>
           </div>
         }
       >
@@ -508,15 +511,15 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
             ))}
             {preset === 'CUSTOM' && (
               <>
-                <label className="text-xs text-slate-500">From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="ml-1 h-9 rounded-md border border-slate-200 px-2 text-sm" /></label>
-                <label className="text-xs text-slate-500">To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="ml-1 h-9 rounded-md border border-slate-200 px-2 text-sm" /></label>
+                <label className="text-xs text-slate-500">Start date<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="ml-1 h-9 rounded-md border border-slate-200 px-2 text-sm" /></label>
+                <label className="text-xs text-slate-500">End date<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="ml-1 h-9 rounded-md border border-slate-200 px-2 text-sm" /></label>
               </>
             )}
             <Button size="sm" variant="secondary" onClick={refresh} icon={<RefreshCw className="h-4 w-4" />}>Refresh</Button>
-            <Button size="sm" variant="secondary" onClick={exportJson} icon={<Download className="h-4 w-4" />}>Export JSON</Button>
-            <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Export CSV</Button>
+            <Button size="sm" variant="secondary" onClick={exportJson} icon={<Download className="h-4 w-4" />}>Save JSON file</Button>
+            <Button size="sm" variant="primary" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>Save CSV file</Button>
           </div>
-          <div className="px-4 pb-4 text-xs text-slate-500">Selected range: {from} to {to} (UTC). Last updated: {new Date(d.generatedAt).toLocaleString()}.</div>
+          <div className="px-4 pb-4 text-xs text-slate-500">Dates: {from} to {to} (UTC). Last updated: {new Date(d.generatedAt).toLocaleString()}.</div>
         </Panel>
         <div className="mt-6">
           <MetricGrid metrics={[
@@ -536,9 +539,9 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
         ) : (
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <TrendChart title="Daily emergency volume" description="Requests grouped by UTC date." data={emergencies.data.trend.map((x) => ({ label: x._id, value: x.value }))} />
-            <CategoryChart title="Emergency status distribution" data={emergencies.data.status.map((x) => ({ label: x._id, value: x.value }))} />
-            <CategoryChart title="Situation distribution" data={emergencies.data.situations.map((x) => ({ label: x._id, value: x.value }))} />
-            <CategoryChart title="Hospital distribution" data={hospitalData} />
+            <CategoryChart title="Emergency status" data={emergencies.data.status.map((x) => ({ label: statusLabel(x._id), value: x.value }))} />
+            <CategoryChart title="Emergency type" data={emergencies.data.situations.map((x) => ({ label: x._id, value: x.value }))} />
+            <CategoryChart title="Requests by hospital" data={hospitalData} />
             <Panel title="Ambulance operations">
               <div className="grid grid-cols-2 gap-3 p-5 text-sm">
                 {operational.data.ambulanceStatus.map((x) => (
@@ -547,11 +550,11 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
               </div>
             </Panel>
             {analytics && (
-              <Panel title="Resolution and response">
+              <Panel title="How cases were handled">
                 <div className="space-y-3 p-5 text-sm">
-                  <div className="flex justify-between"><span>Resolution ratio</span><b>{operational.data.resolutionRatio === null ? 'Unavailable' : `${(operational.data.resolutionRatio * 100).toFixed(1)}%`}</b></div>
-                  <div className="flex justify-between"><span>Average RECEIVED → REVIEWING</span><b>{operational.data.responseToReview.averageMinutes === null ? 'Unavailable' : `${operational.data.responseToReview.averageMinutes.toFixed(1)} min`}</b></div>
-                  <div className="flex justify-between"><span>Samples</span><b>{operational.data.responseToReview.samples}</b></div>
+                  <div className="flex justify-between"><span>Cases closed</span><b>{operational.data.resolutionRatio === null ? 'Not known' : `${(operational.data.resolutionRatio * 100).toFixed(1)}%`}</b></div>
+                  <div className="flex justify-between"><span>Average time to review</span><b>{operational.data.responseToReview.averageMinutes === null ? 'Not known' : `${operational.data.responseToReview.averageMinutes.toFixed(1)} min`}</b></div>
+                  <div className="flex justify-between"><span>Cases counted</span><b>{operational.data.responseToReview.samples}</b></div>
                 </div>
               </Panel>
             )}
@@ -564,5 +567,5 @@ const ReportDashboard = ({ analytics = false }: { analytics?: boolean }) => {
 
 export const AdminReportsPage = () => <ReportDashboard />;
 export const AdminAnalyticsPage = () => <ReportDashboard analytics />;
-export const AdminSettingsPage = () => <Section><AdminPage title="Settings" description="Operational settings are not part of this management API scope."><Panel title="Status"><div className="p-5 text-sm text-slate-600">Admin authentication and authorization remain enforced by the backend. No settings are persisted by this feature.</div></Panel></AdminPage></Section>;
+export const AdminSettingsPage = () => <Section><AdminPage title="Settings" description="There are no admin settings to change here."><Panel title="Account safety"><div className="p-5 text-sm text-slate-600">The system checks who can sign in and what they can do. Settings are not saved on this page.</div></Panel></AdminPage></Section>;
 export default AdminOverviewPage;

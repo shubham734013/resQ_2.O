@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createEmergencyRequestSchema, emergencyDiscoveryQuerySchema } from './schemas/emergency.js';
+import { createEmergencyRequestSchema, emergencyDiscoveryQuerySchema, EMERGENCY_CATEGORY_IDS } from './schemas/emergency.js';
 import { HOSPITAL_EMERGENCY_STATUSES } from './models/EmergencyRequest.js';
 
 process.env.NODE_ENV = 'test';
@@ -9,7 +9,7 @@ process.env.JWT_SECRET ??= 'test-only-jwt-secret-that-is-long-enough';
 process.env.JWT_REFRESH_SECRET ??= 'test-only-refresh-secret-that-is-long-enough';
 process.env.RESQ_ADMIN_EMAIL ??= 'admin@example.test';
 process.env.RESQ_ADMIN_PASSWORD ??= 'test-only-password-long';
-const { hospitalMatchesSituation } = await import('./services/emergencyService.js');
+const { hospitalMatchesSituation, rankEmergencyHospitalCandidates } = await import('./services/emergencyService.js');
 
 const validRequest = {
   hospitalId: '507f1f77bcf86cd799439011',
@@ -51,6 +51,25 @@ test('hospital capability matching is category-aware', () => {
   assert.equal(hospitalMatchesSituation({ hospitalType: 'Orthopaedic Clinic', services: ['Bone care'], capabilities: ['Fracture care'] }, 'Chest Pain'), false);
   assert.equal(hospitalMatchesSituation({ hospitalType: 'Trauma Center', services: ['Trauma Care'], capabilities: [] }, 'Accident / Injury'), true);
   assert.equal(hospitalMatchesSituation({ hospitalType: 'General Hospital', services: ['Cardiology & Cath Lab'], capabilities: [] }, 'Severe chest pain and shortness of breath'), true);
+});
+
+test('demo emergency hospital services match every SOS category', () => {
+  const demoHospital = {
+    hospitalType: 'Government Multispeciality & Trauma (Demo)',
+    services: ['Emergency'],
+    capabilities: [],
+  };
+  assert.equal(EMERGENCY_CATEGORY_IDS.every((category) => hospitalMatchesSituation(demoHospital, category)), true);
+});
+
+test('SOS discovery keeps the demo hospital in the limited results and ranks it first', () => {
+  const candidates = [
+    { hospital: { _id: 'nearby-hospital' }, straightLineDistanceMeters: 500 },
+    { hospital: { _id: 'demo-hospital' }, straightLineDistanceMeters: 50000 },
+    { hospital: { _id: 'far-hospital' }, straightLineDistanceMeters: 90000 },
+  ];
+  const ranked = rankEmergencyHospitalCandidates(candidates, 2, 'demo-hospital');
+  assert.deepEqual(ranked.map(({ hospital }) => String(hospital._id)), ['demo-hospital', 'nearby-hospital']);
 });
 
 test('SOS reuses the existing emergency status enum', () => {

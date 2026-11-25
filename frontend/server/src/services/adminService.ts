@@ -205,7 +205,7 @@ export const updateAmbulanceVerification=async(id:string,verificationStatus:Veri
   safeId(id);
   const x=await AmbulanceModel.findById(id).lean().exec();
   if(!x)throw new AppError('NOT_FOUND','Ambulance not found',404);
-  if(verificationStatus==='VERIFIED'){const provider=await AmbulanceProviderModel.findOne({_id:x.providerId,accountStatus:'ACTIVE',verificationStatus:'VERIFIED'}).select('_id').lean().exec();if(!provider)throw new AppError('PROVIDER_NOT_OPERATIONAL','Ambulance provider must be active and verified before ambulance verification',409);if(!x.registrationNumber||!x.vehicleNumber||!x.ambulanceType)throw new AppError('AMBULANCE_INVALID','Required ambulance registration data is incomplete',409);}
+  if(verificationStatus==='VERIFIED'){if(!x.registrationNumber||!x.vehicleNumber||!x.ambulanceType)throw new AppError('AMBULANCE_INVALID','Required ambulance registration data is incomplete',409);}
   const updateDoc: Record<string, unknown> = { verificationStatus };
   if (verificationStatus === 'VERIFIED' && x.accountStatus === 'PENDING') {
     updateDoc.accountStatus = 'ACTIVE';

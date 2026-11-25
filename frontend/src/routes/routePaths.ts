@@ -15,8 +15,6 @@ export const ROUTES = {
     REGISTER: '/register',
     REGISTER_USER: '/register/user',
     REGISTER_HOSPITAL: '/hospital/register',
-    REGISTER_PROVIDER: '/provider/register',
-    REGISTER_PROVIDER_LEGACY: '/ambulance-provider/register',
     REGISTER_DRIVER: '/driver/register',
     REGISTER_DRIVER_LEGACY: '/ambulance-driver/register',
     FORGOT_PASSWORD: '/forgot-password',
@@ -62,23 +60,6 @@ export const ROUTES = {
     PROFILE: '/hospital/profile',
     SETTINGS: '/hospital/settings',
   },
-  PROVIDER: {
-    BASE: '/provider',
-    DASHBOARD: '/provider/dashboard',
-    AMBULANCES: '/provider/ambulances',
-    AMBULANCE_DETAIL: (id: string = ':ambulanceId') => `/provider/ambulances/${id}`,
-    DRIVERS: '/provider/drivers',
-    DRIVER_DETAIL: (id: string = ':driverId') => `/provider/drivers/${id}`,
-    REQUESTS: '/provider/requests',
-    REQUEST_DETAIL: (id: string = ':requestId') => `/provider/requests/${id}`,
-    DISPATCH: '/provider/dispatch',
-    TRIPS: '/provider/trips',
-    TRIP_DETAIL: (id: string = ':tripId') => `/provider/trips/${id}`,
-    ANALYTICS: '/provider/analytics',
-    NOTIFICATIONS: '/provider/notifications',
-    PROFILE: '/provider/profile',
-    SETTINGS: '/provider/settings',
-  },
   DRIVER: {
     BASE: '/driver',
     DASHBOARD: '/driver/dashboard',
@@ -98,8 +79,6 @@ export const ROUTES = {
     USER_DETAIL: (id: string = ':userId') => `/admin/users/${id}`,
     HOSPITALS: '/admin/hospitals',
     HOSPITAL_DETAIL: (id: string = ':hospitalId') => `/admin/hospitals/${id}`,
-    PROVIDERS: '/admin/providers',
-    PROVIDER_DETAIL: (id: string = ':providerId') => `/admin/providers/${id}`,
     DRIVERS: '/admin/drivers',
     DRIVER_DETAIL: (id: string = ':driverId') => `/admin/drivers/${id}`,
     AMBULANCES: '/admin/ambulances',
@@ -119,7 +98,6 @@ export const ROUTES = {
 export const ROLE_HOMES: Record<UserRole, string> = {
   USER: ROUTES.USER.DASHBOARD,
   HOSPITAL: ROUTES.HOSPITAL.DASHBOARD,
-  AMBULANCE_PROVIDER: ROUTES.PROVIDER.DASHBOARD,
   AMBULANCE_DRIVER: ROUTES.DRIVER.DASHBOARD,
   ADMIN: ROUTES.ADMIN.DASHBOARD,
 };
@@ -138,9 +116,6 @@ export const isPathAllowedForRole = (role: UserRole, pathname: string): boolean 
   }
   if (role === 'HOSPITAL') {
     return pathname.startsWith('/hospital');
-  }
-  if (role === 'AMBULANCE_PROVIDER') {
-    return pathname.startsWith('/provider') || pathname.startsWith('/ambulance-provider') || pathname === '/ambulance/provider';
   }
   if (role === 'AMBULANCE_DRIVER') {
     return pathname.startsWith('/driver') || pathname.startsWith('/ambulance');

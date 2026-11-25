@@ -1,15 +1,15 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types/auth';
-import { ROUTES } from './routePaths';
+import { ROUTES, getRoleHome } from './routePaths';
 import { PendingApprovalPage } from '../pages/public/PendingApprovalPage';
 
 export const AuthLoading = () => (
   <main className="min-h-screen bg-slate-50 flex items-center justify-center px-6" aria-busy="true">
     <div className="text-center" role="status" aria-live="polite">
       <div className="mx-auto mb-3 h-9 w-9 rounded-full border-2 border-slate-300 border-t-teal-600 animate-spin" />
-      <p className="text-sm font-semibold text-slate-700">Verifying authorized session…</p>
-      <p className="mt-1 text-xs text-slate-400">ResQ Healthcare Security Infrastructure</p>
+      <p className="text-sm font-semibold text-slate-700">Checking your sign-in…</p>
+      <p className="mt-1 text-xs text-slate-400">ResQ keeps your account safe</p>
     </div>
   </main>
 );
@@ -47,7 +47,7 @@ export const RoleRoute = ({ allowedRoles }: { allowedRoles: UserRole[] }) => {
   }
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to={ROUTES.PUBLIC.UNAUTHORIZED} replace state={{ from: location.pathname, userRole: user.role }} />;
+    return <Navigate to={getRoleHome(user.role)} replace />;
   }
 
   return <Outlet />;

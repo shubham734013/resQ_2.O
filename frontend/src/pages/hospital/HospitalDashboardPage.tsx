@@ -75,36 +75,36 @@ const timeAgo = (dateStr: string) => {
 
 /* ─── Department bed data ────────────────────────────────────────────── */
 const DEPT_CONFIG = [
-  { key: 'ICU',            label: 'ICU',           total: 20 },
-  { key: 'General Ward',   label: 'General Ward',  total: 60 },
+  { key: 'ICU',            label: 'Intensive care (ICU)', total: 20 },
+  { key: 'General Ward',   label: 'General ward',  total: 60 },
   { key: 'Emergency',      label: 'Emergency',     total: 20 },
-  { key: 'Private Rooms',  label: 'Private Rooms', total: 10 },
+  { key: 'Private Rooms',  label: 'Private rooms', total: 10 },
   { key: 'Isolation',      label: 'Isolation',     total: 10 },
 ];
 
 /* ─── Department status ─────────────────────────────────────────────── */
 const DEPT_STATUS = [
   { name: 'Emergency',        info: '8 patients',  status: 'Busy',      style: { bg: 'rgba(244,63,94,0.10)', color: '#fb7185' } },
-  { name: 'ICU',              info: '12 / 20 beds', status: '75%',      style: { bg: 'rgba(245,158,11,0.10)', color: '#fbbf24' } },
-  { name: 'General Medicine', info: '18 patients', status: 'Moderate',  style: { bg: 'rgba(245,158,11,0.10)', color: '#fbbf24' } },
-  { name: 'Surgery',          info: '6 patients',  status: 'Available', style: { bg: 'rgba(16,185,129,0.10)', color: '#34d399' } },
-  { name: 'Pediatrics',       info: '4 patients',  status: 'Available', style: { bg: 'rgba(16,185,129,0.10)', color: '#34d399' } },
+  { name: 'Intensive care',   info: '12 / 20 beds', status: '75%',      style: { bg: 'rgba(245,158,11,0.10)', color: '#fbbf24' } },
+  { name: 'General Medicine', info: '18 patients', status: 'Medium', style: { bg: 'rgba(245,158,11,0.10)', color: '#fbbf24' } },
+  { name: 'Surgery',          info: '6 patients',  status: 'Open', style: { bg: 'rgba(16,185,129,0.10)', color: '#34d399' } },
+  { name: 'Children',         info: '4 patients',  status: 'Open', style: { bg: 'rgba(16,185,129,0.10)', color: '#34d399' } },
 ];
 
 /* ─── On-Duty Staff ─────────────────────────────────────────────────── */
 const ON_DUTY_STAFF = [
   { name: 'Dr. Ankit Sharma', dept: 'Emergency',  status: 'Online',   initials: 'AS', color: 'rgba(244,63,94,0.15)'  },
-  { name: 'Dr. Priya Singh',  dept: 'Cardiology', status: 'Online',   initials: 'PS', color: 'rgba(59,130,246,0.15)' },
-  { name: 'Dr. Rohan Mehta',  dept: 'Orthopedics',status: 'Online',   initials: 'RM', color: 'rgba(16,185,129,0.15)' },
-  { name: 'Dr. Neha Verma',   dept: 'Pediatrics', status: 'On Leave', initials: 'NV', color: 'rgba(245,158,11,0.15)' },
+  { name: 'Dr. Priya Singh',  dept: 'Heart care', status: 'Online',   initials: 'PS', color: 'rgba(59,130,246,0.15)' },
+  { name: 'Dr. Rohan Mehta',  dept: 'Bone care', status: 'Online',   initials: 'RM', color: 'rgba(16,185,129,0.15)' },
+  { name: 'Dr. Neha Verma',   dept: 'Children', status: 'On leave', initials: 'NV', color: 'rgba(245,158,11,0.15)' },
 ];
 
 /* ─── Today's Appointments ──────────────────────────────────────────── */
 const TODAY_APPTS = [
-  { time: '09:00 AM', title: 'OPD – General Medicine',  patient: 'Rahul Sharma', status: 'Checked In' },
-  { time: '10:30 AM', title: 'Cardiology Consultation', patient: 'Priya Mehta',  status: 'Upcoming'   },
-  { time: '11:00 AM', title: 'Orthopedics Follow-up',   patient: 'Amit Kumar',   status: 'Upcoming'   },
-  { time: '12:30 PM', title: 'Pediatrics Consultation', patient: 'Neha Gupta',   status: 'Upcoming'   },
+  { time: '09:00 AM', title: 'General medicine visit',  patient: 'Rahul Sharma', status: 'Arrived' },
+  { time: '10:30 AM', title: 'Heart checkup', patient: 'Priya Mehta',  status: 'Coming'   },
+  { time: '11:00 AM', title: 'Bone checkup',   patient: 'Amit Kumar',   status: 'Coming'   },
+  { time: '12:30 PM', title: 'Child checkup', patient: 'Neha Gupta',  status: 'Coming'   },
 ];
 
 /* ─── Shared glass card style ────────────────────────────────────────── */
@@ -231,7 +231,7 @@ export const HospitalDashboardPage = () => {
                   className="text-[10px] font-bold tracking-widest uppercase font-mono"
                   style={{ color: '#fb7185', letterSpacing: '0.15em' }}
                 >
-                  Hospital Panel
+                  Hospital home
                 </span>
                 <span className="h-px flex-1 max-w-[40px]" style={{ background: 'rgba(244,63,94,0.3)' }} />
                 <span
@@ -242,15 +242,12 @@ export const HospitalDashboardPage = () => {
                   }
                 >
                   <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
-                  {isOnline ? 'Online & Receiving' : 'Offline'}
+                  {isOnline ? 'Open for emergencies' : 'Closed to emergencies'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
                 Welcome, {hospitalName}
               </h1>
-              <p className="mt-1.5 text-sm leading-relaxed max-w-lg" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                Manage emergency requests, patient appointments, bed availability, and hospital operations from your command hub.
-              </p>
             </div>
 
             {/* Live clock */}
@@ -292,10 +289,10 @@ export const HospitalDashboardPage = () => {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(251,113,133,0.7)' }}>Emergency Requests</p>
+                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(251,113,133,0.7)' }}>Open requests</p>
                 <p className="mt-2 text-3xl font-light text-zinc-100 tracking-tight">{activeEmergencies.length || 12}</p>
                 <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  +4 new today
+                  4 new today
                   <span className="flex items-center gap-0.5 text-rose-400">
                     <TrendingDown className="h-2.5 w-2.5" /> 33%
                   </span>
@@ -317,10 +314,10 @@ export const HospitalDashboardPage = () => {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(96,165,250,0.7)' }}>Total Patients</p>
+                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(96,165,250,0.7)' }}>Patients</p>
                 <p className="mt-2 text-3xl font-light text-zinc-100 tracking-tight">{totalPatients || 248}</p>
                 <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  +18 today
+                  18 new today
                   <span className="flex items-center gap-0.5 text-emerald-400">
                     <TrendingUp className="h-2.5 w-2.5" /> 12%
                   </span>
@@ -342,11 +339,11 @@ export const HospitalDashboardPage = () => {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(52,211,153,0.7)' }}>Available Beds</p>
+                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(52,211,153,0.7)' }}>Open beds</p>
                 <p className="mt-2 text-3xl font-light text-zinc-100 tracking-tight">
                   {availableBeds} <span className="text-lg font-light" style={{ color: 'rgba(255,255,255,0.30)' }}>/ {totalBeds}</span>
                 </p>
-                <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{occupancyPct}% occupied</p>
+                <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{occupancyPct}% in use</p>
               </div>
               <div
                 className="flex h-11 w-11 items-center justify-center rounded-xl"
@@ -367,7 +364,7 @@ export const HospitalDashboardPage = () => {
                 <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(167,139,250,0.7)' }}>Today's Appointments</p>
                 <p className="mt-2 text-3xl font-light text-zinc-100 tracking-tight">36</p>
                 <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  +8 upcoming
+                  8 coming up
                   <span className="flex items-center gap-0.5 text-emerald-400">
                     <TrendingUp className="h-2.5 w-2.5" /> 20%
                   </span>
@@ -402,7 +399,7 @@ export const HospitalDashboardPage = () => {
                   >
                     <Activity className="h-3.5 w-3.5 text-rose-400" />
                   </span>
-                  <h2 className="text-sm font-semibold text-zinc-100">Live Incoming Requests</h2>
+                  <h2 className="text-sm font-semibold text-zinc-100">New requests</h2>
                   {activeEmergencies.length > 0 && (
                     <span
                       className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white animate-pulse"
@@ -416,7 +413,7 @@ export const HospitalDashboardPage = () => {
                   className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition"
                   onClick={() => navigate(ROUTES.HOSPITAL.REQUESTS)}
                 >
-                  View All →
+                  View all →
                 </button>
               </div>
 
@@ -443,7 +440,7 @@ export const HospitalDashboardPage = () => {
                           }
                       }
                     >
-                      {tab}
+                      {tab === 'Transfer' ? 'Patient move' : tab === 'Appointment' ? 'Visit' : tab}
                       <span
                         className="text-[10px] font-bold"
                         style={{ color: activeTab === tab ? 'rgba(251,113,133,0.6)' : 'rgba(255,255,255,0.25)' }}
@@ -468,8 +465,8 @@ export const HospitalDashboardPage = () => {
                 ) : filteredRequests.length === 0 ? (
                   <div className="py-10 text-center">
                     <CheckCircle2 className="mx-auto h-8 w-8 mb-2" style={{ color: 'rgba(255,255,255,0.15)' }} />
-                    <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>No active requests</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.20)' }}>All clear — no emergencies pending.</p>
+                    <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>No open requests</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.20)' }}>No emergencies need help right now.</p>
                   </div>
                 ) : (
                   filteredRequests.map((req) => {
@@ -535,16 +532,16 @@ export const HospitalDashboardPage = () => {
               {/* Bed Occupancy Donut */}
               <div className="rounded-2xl p-5" style={glassCard}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-zinc-200">Bed Occupancy</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200">Beds in use</h3>
                   <button
                     className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition"
                     onClick={() => navigate(ROUTES.HOSPITAL.AVAILABILITY)}
                   >
-                    Manage →
+                    Change →
                   </button>
                 </div>
 
-                <p className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>TOTAL BEDS</p>
+                <p className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>ALL BEDS</p>
                 <p className="text-2xl font-light text-zinc-100 mb-4">{totalBeds}</p>
 
                 {/* Donut ring */}
@@ -592,12 +589,12 @@ export const HospitalDashboardPage = () => {
               {/* Department Beds */}
               <div className="rounded-2xl p-5" style={glassCard}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-zinc-200">Dept. Beds</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200">Beds by department</h3>
                   <button
                     className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition"
                     onClick={() => navigate('/hospital/beds')}
                   >
-                    View All →
+                    View all →
                   </button>
                 </div>
                 <div className="space-y-3">
@@ -627,7 +624,7 @@ export const HospitalDashboardPage = () => {
               {/* On-Duty Staff */}
               <div className="rounded-2xl p-5" style={glassCard}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-zinc-200">On-Duty Staff</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200">Staff at work</h3>
                   <button
                     className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition"
                     onClick={() => navigate('/hospital/staff')}
@@ -671,7 +668,7 @@ export const HospitalDashboardPage = () => {
             <div className="rounded-2xl p-5" style={glassCard}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-200">Hospital Status</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200">Emergency care status</h3>
                   <p
                     className="text-xs font-semibold mt-1.5 flex items-center gap-1.5"
                     style={{ color: isOnline ? '#34d399' : 'rgba(255,255,255,0.40)' }}
@@ -680,7 +677,7 @@ export const HospitalDashboardPage = () => {
                       className={`h-2 w-2 rounded-full ${isOnline ? 'animate-pulse' : ''}`}
                       style={{ background: isOnline ? '#10b981' : 'rgba(255,255,255,0.30)' }}
                     />
-                    {isOnline ? 'Online & Receiving Requests' : 'Offline — Not Accepting'}
+                    {isOnline ? 'Taking emergency requests' : 'Not taking emergency requests'}
                   </p>
                 </div>
                 <div
@@ -701,12 +698,12 @@ export const HospitalDashboardPage = () => {
                 className="flex items-center justify-between px-4 pt-3 pb-2"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
               >
-                <h3 className="text-sm font-semibold text-zinc-200">Nearby Ambulances & Route</h3>
+                <h3 className="text-sm font-semibold text-zinc-200">Nearby ambulances</h3>
                 <button
                   className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition"
                   onClick={() => navigate(ROUTES.HOSPITAL.EMERGENCY)}
                 >
-                  View All →
+                  View all →
                 </button>
               </div>
               {/* Map / Satellite toggle */}
@@ -744,7 +741,7 @@ export const HospitalDashboardPage = () => {
               >
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-rose-500" />Hospitals</span>
                 <span className="flex items-center gap-1"><Ambulance className="h-3 w-3 text-amber-500" />Ambulances</span>
-                <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Your Location</span>
+                <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Your hospital</span>
               </div>
             </div>
 
@@ -752,16 +749,16 @@ export const HospitalDashboardPage = () => {
             <div className="rounded-2xl p-5" style={glassCard}>
               <div className="flex items-center gap-2 mb-4">
                 <Zap className="h-4 w-4 text-amber-400" />
-                <h3 className="text-sm font-semibold text-zinc-200">Quick Actions</h3>
+                <h3 className="text-sm font-semibold text-zinc-200">Quick actions</h3>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { icon: BedDouble,  label: 'Update\nBeds',        color: 'rgba(59,130,246,0.12)', tc: '#60a5fa', path: ROUTES.HOSPITAL.AVAILABILITY    },
-                  { icon: Calendar,   label: 'Manage\nAppts',        color: 'rgba(139,92,246,0.12)', tc: '#a78bfa', path: ROUTES.HOSPITAL.APPOINTMENTS     },
-                  { icon: Building2,  label: 'Add\nDept',            color: 'rgba(16,185,129,0.12)', tc: '#34d399', path: ROUTES.HOSPITAL.SERVICES          },
-                  { icon: FileText,   label: 'Patient\nRecords',     color: 'rgba(244,63,94,0.12)',  tc: '#fb7185', path: ROUTES.HOSPITAL.PATIENTS           },
-                  { icon: Ambulance,  label: 'Request\nAmbulance',   color: 'rgba(245,158,11,0.12)', tc: '#fbbf24', path: ROUTES.HOSPITAL.EMERGENCY          },
-                  { icon: Megaphone,  label: 'Broadcast\nAlert',     color: 'rgba(20,184,166,0.12)', tc: '#2dd4bf', path: ROUTES.HOSPITAL.NOTIFICATIONS      },
+                  { icon: BedDouble,  label: 'Set\nbeds',        color: 'rgba(59,130,246,0.12)', tc: '#60a5fa', path: ROUTES.HOSPITAL.AVAILABILITY    },
+                  { icon: Calendar,   label: 'Appointments',        color: 'rgba(139,92,246,0.12)', tc: '#a78bfa', path: ROUTES.HOSPITAL.APPOINTMENTS     },
+                  { icon: Building2,  label: 'Add a\nservice',            color: 'rgba(16,185,129,0.12)', tc: '#34d399', path: ROUTES.HOSPITAL.SERVICES          },
+                  { icon: FileText,   label: 'Patient\nlist',     color: 'rgba(244,63,94,0.12)',  tc: '#fb7185', path: ROUTES.HOSPITAL.PATIENTS           },
+                  { icon: Ambulance,  label: 'Ambulance\nhelp',   color: 'rgba(245,158,11,0.12)', tc: '#fbbf24', path: ROUTES.HOSPITAL.EMERGENCY          },
+                  { icon: Megaphone,  label: 'Send an\nalert',     color: 'rgba(20,184,166,0.12)', tc: '#2dd4bf', path: ROUTES.HOSPITAL.NOTIFICATIONS      },
                 ].map((action) => (
                   <button
                     key={action.label}
@@ -788,12 +785,12 @@ export const HospitalDashboardPage = () => {
             {/* Today's Appointments */}
             <div className="rounded-2xl p-5" style={glassCard}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-zinc-200">Today's Appointments</h3>
+                <h3 className="text-sm font-semibold text-zinc-200">Today's visits</h3>
                 <button
                   className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition"
                   onClick={() => navigate(ROUTES.HOSPITAL.APPOINTMENTS)}
                 >
-                  View All →
+                  View all →
                 </button>
               </div>
               <div className="space-y-3">
@@ -830,8 +827,8 @@ export const HospitalDashboardPage = () => {
             {/* Department Status */}
             <div className="rounded-2xl p-5" style={glassCard}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-zinc-200">Department Status</h3>
-                <button className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition">View All →</button>
+                <h3 className="text-sm font-semibold text-zinc-200">Department status</h3>
+                <button className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition">View all →</button>
               </div>
               <div className="space-y-3">
                 {DEPT_STATUS.map((dept) => (
@@ -873,8 +870,8 @@ export const HospitalDashboardPage = () => {
                   <Phone className="h-5 w-5 text-rose-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-zinc-200">Need Help?</p>
-                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.40)' }}>Contact ResQ Support</p>
+                  <p className="text-xs font-bold text-zinc-200">Need help?</p>
+                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.40)' }}>Get help from ResQ</p>
                 </div>
                 <a
                   href="tel:112"
@@ -884,7 +881,7 @@ export const HospitalDashboardPage = () => {
                     boxShadow: '0 4px 16px rgba(244,63,94,0.25)',
                   }}
                 >
-                  Contact Support
+                  Get help
                 </a>
               </div>
             </div>

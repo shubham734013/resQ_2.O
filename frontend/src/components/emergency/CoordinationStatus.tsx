@@ -13,6 +13,9 @@ import {
   AlertTriangle,
   X,
   AlertOctagon,
+  KeyRound,
+  ShieldCheck,
+  XCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Facility } from '../../types/facility';
@@ -74,8 +77,8 @@ export const CoordinationStatus = ({
                   : ready
                     ? 'Received by hospital queue'
                     : isCreatingRequest
-                      ? 'Creating emergency request'
-                      : 'Emergency request not created';
+                      ? 'Sending your emergency request'
+                      : 'Emergency request not sent';
 
   const callHospital = () => {
     if (facility.phone) window.location.href = `tel:${facility.phone.replace(/[^0-9+]/g, '')}`;
@@ -103,8 +106,8 @@ export const CoordinationStatus = ({
       await queryClient.invalidateQueries({ queryKey: ['emergency-request', emergencyRequestId] });
       setShowExitModal(false);
       onExit();
-    } catch (err) {
-      setCancelError(err instanceof Error ? err.message : 'Could not cancel emergency request.');
+    } catch {
+      setCancelError('We could not cancel the emergency request. Try again.');
     } finally {
       setIsCancelling(false);
     }
@@ -120,16 +123,13 @@ export const CoordinationStatus = ({
               {statusLabel}
             </span>
           </div>
-          <h2 className="mt-3 text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Emergency Coordination</h2>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Selected destination: <strong className="text-white font-semibold">{facility.name}</strong>.
-          </p>
+          <h2 className="mt-3 text-2xl md:text-3xl font-light text-zinc-100 tracking-tight">Emergency request</h2>
         </div>
 
         {/* Destination Card in Dark Glass */}
         <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-5 sm:p-6 flex items-start justify-between gap-4 shadow-xl">
           <div className="min-w-0">
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-rose-400 block mb-1">Destination Facility</span>
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-rose-400 block mb-1">Hospital</span>
             <h3 className="font-bold text-white text-base sm:text-lg truncate">{facility.name}</h3>
             <p className="text-xs text-zinc-400 truncate mt-1">{facility.address || 'Address unavailable'}</p>
           </div>
@@ -144,42 +144,93 @@ export const CoordinationStatus = ({
 
         {ready && (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 sm:p-6 space-y-1.5 backdrop-blur-xl">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-300">Hospital Request Reference</p>
-              <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                ACTIVE QUEUE
-              </span>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-300">Hospital request number</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                  ACTIVE QUEUE
+                </span>
+                {isCancellable && (
+                  <button
+                    type="button"
+                    onClick={handleExitClick}
+                    className="text-[11px] font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 px-2.5 py-0.5 rounded-md border border-rose-500/40 transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Cancel request</span>
+                  </button>
+                )}
+              </div>
             </div>
             <p className="font-mono text-lg font-bold text-emerald-100 pt-1 tracking-wider">{data?.requestCode ?? emergencyRequestId}</p>
             <p className="text-xs text-zinc-400 leading-relaxed pt-1">
-              Persisted in the hospital&apos;s active triage telemetry queue. Emergency team is notified and reviewing clinical resources.
+              Your request is in the hospital&apos;s list. The emergency team has been told and is checking what care is needed.
             </p>
+          </div>
+        )}
+
+        {data?.pickupOtp && (
+          <div className="rounded-2xl border border-indigo-500/40 bg-indigo-500/10 p-5 sm:p-6 space-y-3 backdrop-blur-xl shadow-xl">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <KeyRound className="w-4 h-4 text-indigo-400" />
+                Pickup Verification Code (OTP)
+              </span>
+              {data.pickupOtpVerified ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  VERIFIED BY DRIVER
+                </span>
+              ) : (
+                <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-full border border-amber-500/30">
+                  AWAITING AMBULANCE ARRIVAL
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div className="font-mono text-3xl sm:text-4xl font-extrabold tracking-[0.25em] text-white bg-black/50 px-5 py-2.5 rounded-xl border border-white/15 select-all shadow-inner">
+                {data.pickupOtp}
+              </div>
+              <p className="text-xs text-indigo-200/90 max-w-xs font-light leading-relaxed">
+                {data.pickupOtpVerified
+                  ? 'The ambulance team confirmed your pickup. You are on your way to the hospital.'
+                  : 'Give this 6-digit code to the ambulance driver when they arrive. This lets you get in.'}
+              </p>
+            </div>
           </div>
         )}
 
         {data?.dispatch && (
           <div role="status" className={`rounded-2xl border p-5 sm:p-6 space-y-2 backdrop-blur-xl ${data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED' ? 'border-amber-500/30 bg-amber-500/10' : 'border-sky-500/30 bg-sky-500/10'}`}>
-            <p className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">Ambulance Dispatch State</p>
+            <p className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">Ambulance request status</p>
             <p className="text-base font-bold text-white">
-              {data.dispatch.status === 'OFFERED' ? 'A driver is being offered this request' :
-                data.dispatch.status === 'ACCEPTED' ? 'A driver accepted the request' :
-                  data.dispatch.status === 'EXHAUSTED' ? 'No eligible driver is currently available' :
-                    data.dispatch.status === 'ESCALATED' ? 'Dispatch escalated for manual intervention' :
-                      data.dispatch.status === 'CANCELLED' ? 'Dispatch cancelled' :
-                        data.dispatch.status === 'SEARCHING' ? 'Searching eligible drivers and ambulances' : 'Dispatch queued'}
+              {data.dispatch.status === 'OFFERED' ? 'The request was sent to a driver' :
+                data.dispatch.status === 'ACCEPTED' ? 'A driver accepted your request' :
+                  data.dispatch.status === 'EXHAUSTED' ? 'No nearby driver is free now' :
+                    data.dispatch.status === 'ESCALATED' ? 'A dispatcher needs to help with this request' :
+                      data.dispatch.status === 'CANCELLED' ? 'The ambulance request was canceled' :
+                        data.dispatch.status === 'SEARCHING' ? 'Looking for an ambulance and driver' : 'Your ambulance request is waiting'}
             </p>
-            <p className="text-xs text-zinc-400">{data.dispatch.message ?? `Dispatch attempts: ${data.dispatch.attemptCount}`}</p>
+            <p className="text-xs text-zinc-400">{data.dispatch.message ?? `Search tries: ${data.dispatch.attemptCount}`}</p>
             {(data.dispatch.status === 'EXHAUSTED' || data.dispatch.status === 'ESCALATED') && (
               <div className="mt-3 flex flex-wrap items-center gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => { window.location.href = 'tel:112'; }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md cursor-pointer transition"
                 >
                   <Phone className="h-3.5 w-3.5" />
                   <span>Call 112</span>
                 </button>
-                <span className="text-[11px] text-amber-300 font-medium">Keep your phone available. Hospital selection remains locked.</span>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-zinc-200 text-xs font-semibold border border-white/10 shadow-md cursor-pointer transition"
+                >
+                  <ArrowRight className="h-3.5 w-3.5" />
+                  <span>Choose another hospital</span>
+                </button>
+                <span className="text-[11px] text-amber-300 font-medium w-full">Your request is open. You can also choose another nearby hospital.</span>
               </div>
             )}
           </div>
@@ -195,8 +246,8 @@ export const CoordinationStatus = ({
         )}
         {request.isError && requestSubmitted && (
           <div role="alert" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 backdrop-blur-md">
-            The request ID is retained, but its latest status could not be loaded. Your request has not been cancelled.
-            <button type="button" onClick={() => void request.refetch()} className="ml-2 font-semibold underline text-amber-100 cursor-pointer">Retry status</button>
+            We could not load the latest status. Your request is still open.
+            <button type="button" onClick={() => void request.refetch()} className="ml-2 font-semibold underline text-amber-100 cursor-pointer">Check again</button>
           </div>
         )}
 
@@ -207,15 +258,14 @@ export const CoordinationStatus = ({
           </span>
           <ol className="space-y-4 text-xs">
             {[
-              { label: 'Finding care', detail: 'Verified facilities ranked from confirmed coordinates.', done: true },
-              { label: 'Facility selected', detail: 'Destination selected from verified hospital directory.', done: true },
+              { label: 'Finding care', done: true },
+              { label: 'Hospital chosen', done: true },
               {
-                label: 'Emergency request',
-                detail: ready ? 'Request persisted to hospital command operations.' : 'Waiting for request persistence.',
+                label: 'Send emergency request',
                 done: ready,
                 current: isCreatingRequest,
               },
-              { label: 'Ready for navigation', detail: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' ? 'Hospital coordinates locked for turn-by-turn navigation.' : 'Hospital coordinates unavailable.', done: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' },
+              { label: 'Ready for directions', done: typeof facility.latitude === 'number' && typeof facility.longitude === 'number' },
             ].map((step, index) => (
               <li key={step.label} className="flex items-start gap-3.5">
                 <div className="mt-0.5 shrink-0">
@@ -231,7 +281,6 @@ export const CoordinationStatus = ({
                 </div>
                 <div>
                   <span className={`font-semibold block ${step.done ? 'text-white' : 'text-zinc-500'}`}>{step.label}</span>
-                  <span className="text-[11px] text-zinc-400 leading-relaxed block mt-0.5">{step.detail}</span>
                 </div>
               </li>
             ))}
@@ -241,7 +290,7 @@ export const CoordinationStatus = ({
         <div className="p-4 bg-white/[0.02] border border-white/10 rounded-2xl text-xs text-zinc-400 flex items-start gap-3">
           <Info className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong className="text-zinc-200">Notice:</strong> ResQ coordinates navigation and rapid hospital handoff. Hospital intake triage and ambulance deployment remain subject to live provider triage.
+            <strong className="text-zinc-200">Important:</strong> ResQ can help you contact a hospital and find the way. The hospital decides if it can take you. Ambulance help depends on what local services can provide.
           </p>
         </div>
       </div>
@@ -255,7 +304,7 @@ export const CoordinationStatus = ({
             className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-sm shadow-lg shadow-rose-950/60 transition cursor-pointer disabled:opacity-50"
           >
             <Navigation className="w-4 h-4" />
-            <span>Start Navigation</span>
+            <span>Start directions</span>
           </button>
           <button
             type="button"
@@ -264,9 +313,21 @@ export const CoordinationStatus = ({
             className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-200 font-semibold text-sm transition cursor-pointer disabled:opacity-50"
           >
             <Phone className="w-4 h-4" />
-            <span>Call Hospital</span>
+            <span>Call the hospital</span>
           </button>
         </div>
+
+        {isCancellable && (
+          <button
+            type="button"
+            onClick={handleExitClick}
+            disabled={isCancelling}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold text-xs shadow-md transition cursor-pointer disabled:opacity-50"
+          >
+            <XCircle className="w-4 h-4 text-rose-400" />
+            <span>{isCancelling ? 'Cancelling Emergency Request…' : 'Cancel Emergency Request'}</span>
+          </button>
+        )}
         <div className="flex items-center justify-between text-xs pt-1 px-1">
           <button
             type="button"
@@ -276,14 +337,14 @@ export const CoordinationStatus = ({
             className="text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1.5 cursor-pointer"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Direct emergency dial (112)</span>
+            <span>Call emergency services (112)</span>
           </button>
           <button
             type="button"
             onClick={handleExitClick}
             className="text-zinc-400 hover:text-zinc-200 font-medium flex items-center gap-1 cursor-pointer transition-colors"
           >
-            <span>Exit Emergency Flow</span>
+            <span>Leave emergency help</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
@@ -299,8 +360,8 @@ export const CoordinationStatus = ({
                   <AlertOctagon className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">Emergency Coordination Active</h3>
-                  <p className="text-xs font-mono text-zinc-400">Request code: {data?.requestCode ?? 'In progress'}</p>
+                  <h3 className="font-bold text-white text-base">Emergency request is open</h3>
+                  <p className="text-xs font-mono text-zinc-400">Request number: {data?.requestCode ?? 'In progress'}</p>
                 </div>
               </div>
               <button
@@ -313,7 +374,7 @@ export const CoordinationStatus = ({
             </div>
 
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Your emergency coordination is currently active with <strong className="text-white">{facility.name}</strong>. Choose whether to leave this screen while keeping coordination active, or cancel the request entirely.
+              Your emergency request is open with <strong className="text-white">{facility.name}</strong>. You can leave this page and keep the request open, or cancel it.
             </p>
 
             {cancelError && (
@@ -332,7 +393,7 @@ export const CoordinationStatus = ({
                 }}
                 className="w-full text-left p-3.5 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] transition cursor-pointer"
               >
-                <p className="text-xs font-bold text-white">Leave Screen (Keep Active)</p>
+                <p className="text-xs font-bold text-white">Leave this page (keep request open)</p>
                 <p className="text-[11px] text-zinc-400 mt-0.5">
                   The hospital remains alerted. You can monitor status anytime in your Profile.
                 </p>
@@ -346,10 +407,10 @@ export const CoordinationStatus = ({
               >
                 <p className="text-xs font-bold text-rose-300 flex items-center gap-2">
                   {isCancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  Cancel Emergency Coordination
+                  Cancel emergency request
                 </p>
                 <p className="text-[11px] text-rose-300/70 mt-0.5">
-                  Releases the hospital queue slot and notifies coordinating dispatchers.
+                  Removes your request from the hospital queue and tells the dispatch team.
                 </p>
               </button>
             </div>

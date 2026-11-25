@@ -3,14 +3,11 @@ import {
   adminLoginController,
   driverProfileController,
   linkSocialController,
-  listActiveProvidersController,
   loginController,
   logoutController,
   meController,
-  providerProfileController,
   refreshController,
   registerAmbulanceDriverController,
-  registerAmbulanceProviderController,
   registerHospitalController,
   registerUserController,
   socialLoginController,
@@ -29,13 +26,11 @@ import { validateBody } from '../middlewares/validate.js';
 import { rateLimit } from '../middlewares/rateLimit.js';
 import {
   ambulanceDriverRegistrationSchema,
-  ambulanceProviderRegistrationSchema,
   hospitalRegistrationSchema,
   loginSchema,
   userRegistrationSchema,
   socialAuthSchema,
   driverProfileSchema,
-  providerProfileSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   adminMfaVerifyLoginSchema,
@@ -52,11 +47,9 @@ authRouter.get('/', (_: Request, res: Response) => {
   res.json({ message: 'Please log in via /login endpoint' });
 });
 
-authRouter.get('/ambulance-providers', listActiveProvidersController);
 authRouter.post('/register', authLimiter, validateBody(userRegistrationSchema), registerUserController);
 authRouter.post('/register/user', authLimiter, validateBody(userRegistrationSchema), registerUserController);
 authRouter.post('/register/hospital', authLimiter, validateBody(hospitalRegistrationSchema), registerHospitalController);
-authRouter.post('/register/ambulance-provider', authLimiter, validateBody(ambulanceProviderRegistrationSchema), registerAmbulanceProviderController);
 authRouter.post('/register/ambulance-driver', authLimiter, validateBody(ambulanceDriverRegistrationSchema), registerAmbulanceDriverController);
 
 authRouter.post('/login/user', authLimiter, validateBody(loginSchema), (req: Request, res: Response, next: NextFunction) => {
@@ -89,18 +82,17 @@ authRouter.post('/microsoft', authLimiter, validateBody(socialAuthSchema), (req:
   void socialLoginController(req, res).catch(next);
 });
 
-authRouter.post('/link/google', authenticate, authorizeRole('USER', 'AMBULANCE_PROVIDER'), validateBody(socialAuthSchema), (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/link/google', authenticate, authorizeRole('USER'), validateBody(socialAuthSchema), (req: Request, res: Response, next: NextFunction) => {
   req.params.provider = 'GOOGLE';
   void linkSocialController(req, res).catch(next);
 });
 
-authRouter.post('/link/microsoft', authenticate, authorizeRole('USER', 'AMBULANCE_PROVIDER'), validateBody(socialAuthSchema), (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/link/microsoft', authenticate, authorizeRole('USER'), validateBody(socialAuthSchema), (req: Request, res: Response, next: NextFunction) => {
   req.params.provider = 'MICROSOFT';
   void linkSocialController(req, res).catch(next);
 });
 
 authRouter.patch('/driver/profile', authenticate, authorizeRole('AMBULANCE_DRIVER'), validateBody(driverProfileSchema), driverProfileController);
-authRouter.patch('/provider/profile', authenticate, authorizeRole('AMBULANCE_PROVIDER'), validateBody(providerProfileSchema), providerProfileController);
 
 authRouter.post('/forgot-password', authLimiter, validateBody(forgotPasswordSchema), forgotPasswordController);
 authRouter.post('/reset-password', authLimiter, validateBody(resetPasswordSchema), resetPasswordController);

@@ -19,7 +19,8 @@ import {
   MapPin,
   CheckCircle2,
 } from 'lucide-react';
-import { ROUTES } from '../../routes/routePaths';
+import { ROUTES, getRoleHome } from '../../routes/routePaths';
+import { useAuth } from '../../context/AuthContext';
 
 interface TelemetryEvent {
   id: string;
@@ -36,37 +37,56 @@ const INITIAL_EVENTS: TelemetryEvent[] = [
   {
     id: 'EV-8841',
     code: 'PRIORITY_ALPHA',
-    category: 'Acute Cardiac Distress',
+    category: 'Serious heart problem',
     location: 'Sector 4, Malviya Nagar',
     coordinates: '26.8532° N, 75.8174° E',
     eta: '3m 12s',
     status: 'IN_TRANSIT',
-    time: '42s ago',
+    time: '42 seconds ago',
   },
   {
     id: 'EV-8840',
     code: 'PRIORITY_BRAVO',
-    category: 'Pediatric Trauma Pre-Alert',
+    category: 'Child with a serious injury',
     location: 'C-Scheme Metro Crossing',
     coordinates: '26.9102° N, 75.8016° E',
     eta: '1m 45s',
     status: 'DISPATCHED',
-    time: '1m ago',
+    time: '1 minute ago',
   },
   {
     id: 'EV-8839',
     code: 'PRIORITY_CHARLIE',
-    category: 'Multi-Vehicle Extrication',
+    category: 'Road crash with several vehicles',
     location: 'NH-48 Highway Bypass',
     coordinates: '26.9741° N, 75.7622° E',
     eta: 'Arrived at ER',
     status: 'ARRIVED',
-    time: '3m ago',
+    time: '3 minutes ago',
   },
 ];
 
 export const LandingPage = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+
+  const handleSosClick = () => {
+    if (isAuthenticated && user) {
+      if (user.role === 'HOSPITAL') {
+        navigate(ROUTES.HOSPITAL.DASHBOARD);
+        return;
+      }
+      if (user.role === 'AMBULANCE_DRIVER') {
+        navigate(ROUTES.DRIVER.DASHBOARD);
+        return;
+      }
+      if (user.role === 'ADMIN') {
+        navigate(ROUTES.ADMIN.DASHBOARD);
+        return;
+      }
+    }
+    navigate(ROUTES.USER.EMERGENCY);
+  };
 
   // Mouse spotlight coordinates
   const heroRef = useRef<HTMLDivElement>(null);
@@ -113,11 +133,11 @@ export const LandingPage = () => {
                   resQ 2.O
                 </span>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  Crisis v2.4
+                  Emergency help
                 </span>
               </div>
               <span className="text-[11px] font-mono text-zinc-400 tracking-wider">
-                Emergency Response Fabric
+                Emergency help
               </span>
             </div>
           </Link>
@@ -128,42 +148,53 @@ export const LandingPage = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="text-zinc-300 font-medium">resQ Network: Active & Operational</span>
+            <span className="text-zinc-300 font-medium">ResQ is working</span>
             <span className="text-zinc-600">|</span>
-            <span className="font-mono text-[11px] text-zinc-400">{systemPing}ms ping</span>
+            <span className="font-mono text-[11px] text-zinc-400">{systemPing} milliseconds to update</span>
           </div>
 
           {/* Nav Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
-            <a href="#capabilities" className="hover:text-white transition-colors">Capabilities</a>
-            <a href="#telemetry" className="hover:text-white transition-colors">Live Telemetry</a>
-            <a href="#protocol" className="hover:text-white transition-colors">Crisis Protocol</a>
-            <a href="#architecture" className="hover:text-white transition-colors">Architecture</a>
+            <a href="#capabilities" className="hover:text-white transition-colors">What ResQ does</a>
+            <a href="#telemetry" className="hover:text-white transition-colors">Live updates</a>
+            <a href="#protocol" className="hover:text-white transition-colors">How it works</a>
+            <a href="#architecture" className="hover:text-white transition-colors">About ResQ</a>
           </nav>
 
           {/* Quick Action CTAs */}
           <div className="flex items-center gap-3 sm:gap-4">
-            <Link
-              to={ROUTES.PUBLIC.LOGIN}
-              className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/[0.05] transition-colors"
-            >
-              Sign In
-            </Link>
+            {isAuthenticated && user ? (
+              <Link
+                to={getRoleHome(user.role)}
+                className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-white bg-white/[0.08] hover:bg-white/[0.15] border border-white/10 hover:border-white/20 transition-all shadow-sm"
+              >
+                My account
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to={ROUTES.PUBLIC.LOGIN}
+                  className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/[0.05] transition-colors"
+                >
+                  Sign In
+                </Link>
 
-            <Link
-              to={ROUTES.PUBLIC.REGISTER}
-              className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-semibold text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 hover:border-white/20 transition-all shadow-sm"
-            >
-              Create Account
-            </Link>
+                <Link
+                  to={ROUTES.PUBLIC.REGISTER}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-semibold text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 hover:border-white/20 transition-all shadow-sm"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
 
             <button
               type="button"
-              onClick={() => navigate(ROUTES.USER.EMERGENCY)}
+              onClick={handleSosClick}
               className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-md shadow-rose-600/30 btn-shimmer transition-all cursor-pointer"
             >
               <ShieldAlert className="h-4 w-4 animate-pulse" />
-              <span className="hidden xs:inline">SOS</span>
+              <span className="hidden xs:inline">{user && user.role !== 'USER' ? 'My work page' : 'Get help'}</span>
             </button>
           </div>
         </div>
@@ -201,11 +232,11 @@ export const LandingPage = () => {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
             </span>
             <span className="text-xs font-semibold text-zinc-200 tracking-wide">
-              resQ Network: Active & Operational
+              ResQ is working
             </span>
             <span className="text-zinc-600">•</span>
             <span className="text-xs font-mono text-amber-400/90 font-medium">
-              Mean Dispatch SLA: 3m 42s
+              Average time to send help: 3 minutes 42 seconds
             </span>
           </motion.div>
 
@@ -216,9 +247,9 @@ export const LandingPage = () => {
             transition={{ duration: 0.7, delay: 0.1 }}
             className="text-4xl sm:text-6xl lg:text-7xl font-extralight tracking-tight text-white leading-[1.08] mb-8"
           >
-            Zero-Latency Crisis Orchestration.{' '}
+            Get help without delay.{' '}
             <span className="font-semibold block mt-2 text-gradient-crimson">
-              Synchronized in Real-Time.
+              Teams work together.
             </span>
           </motion.h1>
 
@@ -229,7 +260,7 @@ export const LandingPage = () => {
             transition={{ duration: 0.7, delay: 0.2 }}
             className="text-lg sm:text-xl text-zinc-400 font-light leading-relaxed max-w-3xl mx-auto mb-12"
           >
-            Unifying citizen SOS triggers, paramedic live telematics, and hospital trauma command into a synchronized, zero-friction emergency response fabric.
+            ResQ helps people, ambulance teams, and hospitals work together when someone needs urgent medical care.
           </motion.p>
 
           {/* Dual Call-to-Action Buttons */}
@@ -242,11 +273,11 @@ export const LandingPage = () => {
             {/* Primary Crimson Shimmer Button */}
             <button
               type="button"
-              onClick={() => navigate(ROUTES.USER.EMERGENCY)}
+              onClick={handleSosClick}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-base font-bold text-white bg-gradient-to-r from-rose-600 via-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-xl shadow-rose-600/35 border border-rose-400/30 btn-shimmer active:scale-[0.98] transition-all cursor-pointer"
             >
               <ShieldAlert className="h-5 w-5 text-white animate-pulse" />
-              <span>Report Emergency Now</span>
+              <span>{user && user.role !== 'USER' ? 'Go to my work page' : 'Ask for emergency help'}</span>
               <ArrowRight className="h-4 w-4 ml-1 opacity-80" />
             </button>
 
@@ -256,7 +287,7 @@ export const LandingPage = () => {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-base font-semibold text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-xl border border-white/10 hover:border-white/20 shadow-lg active:scale-[0.98] transition-all cursor-pointer"
             >
               <Compass className="h-5 w-5 text-amber-400" />
-              <span>Explore Network / Dispatch</span>
+              <span>See live updates</span>
             </a>
           </motion.div>
 
@@ -269,15 +300,15 @@ export const LandingPage = () => {
           >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>Sub-45s Dispatch Matching</span>
+              <span>Find an ambulance in under 45 seconds</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>HIPAA & ISO 27001 Certified</span>
+              <span>HIPAA and ISO 27001 certified (health privacy and data safety)</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>99.99% Benchmark Uptime</span>
+              <span>Aims to work 99.99% of the time</span>
             </div>
           </motion.div>
 
@@ -293,14 +324,14 @@ export const LandingPage = () => {
             <div>
               <p className="overline mb-3 text-rose-400 flex items-center gap-2">
                 <Radio className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
-                Live Fleet & Clinical Telemetry
+                Live ambulance and care updates
               </p>
               <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white">
-                Synchronized Regional Dispatch Feed
+                Live help updates in Jaipur
               </h2>
             </div>
             <p className="text-sm text-zinc-400 max-w-md font-light leading-relaxed">
-              Real-time stream of geolocation pings, hospital trauma alerts, and fleet status across the urban network.
+              See ambulance locations, hospital alerts, and which teams are ready to help.
             </p>
           </div>
 
@@ -309,20 +340,20 @@ export const LandingPage = () => {
             
             <div className="spotlight-card p-8">
               <div className="flex items-center justify-between text-zinc-400 mb-4">
-                <span className="text-xs uppercase font-mono tracking-wider">Avg Response SLA</span>
+                <span className="text-xs uppercase font-mono tracking-wider">Average time to respond</span>
                 <Clock className="h-4 w-4 text-amber-400" />
               </div>
               <div className="text-3xl sm:text-4xl font-light text-white tracking-tight font-mono mb-2">
-                3m 42s
+                3 minutes 42 seconds
               </div>
               <div className="flex items-center gap-2 text-xs text-emerald-400">
-                <span>↓ 18s vs provincial benchmark</span>
+                <span>18 seconds faster than the local average</span>
               </div>
             </div>
 
             <div className="spotlight-card p-8">
               <div className="flex items-center justify-between text-zinc-400 mb-4">
-                <span className="text-xs uppercase font-mono tracking-wider">Active Fleet Units</span>
+                <span className="text-xs uppercase font-mono tracking-wider">Ambulances ready</span>
                 <Ambulance className="h-4 w-4 text-rose-400" />
               </div>
               <div className="text-3xl sm:text-4xl font-light text-white tracking-tight font-mono mb-2">
@@ -330,33 +361,33 @@ export const LandingPage = () => {
               </div>
               <div className="flex items-center gap-2 text-xs text-zinc-400">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>ALS / BLS units connected</span>
+                <span>Advanced and basic care ambulances online</span>
               </div>
             </div>
 
             <div className="spotlight-card p-8">
               <div className="flex items-center justify-between text-zinc-400 mb-4">
-                <span className="text-xs uppercase font-mono tracking-wider">ER Triage Readiness</span>
+                <span className="text-xs uppercase font-mono tracking-wider">Emergency rooms ready</span>
                 <Building2 className="h-4 w-4 text-sapphire" />
               </div>
               <div className="text-3xl sm:text-4xl font-light text-white tracking-tight font-mono mb-2">
                 98.4%
               </div>
               <div className="flex items-center gap-2 text-xs text-zinc-400">
-                <span>24 verified trauma centers</span>
+                <span>24 checked injury care hospitals</span>
               </div>
             </div>
 
             <div className="spotlight-card p-8">
               <div className="flex items-center justify-between text-zinc-400 mb-4">
-                <span className="text-xs uppercase font-mono tracking-wider">Telemetry Latency</span>
+                <span className="text-xs uppercase font-mono tracking-wider">Update speed</span>
                 <Wifi className="h-4 w-4 text-emerald-400" />
               </div>
               <div className="text-3xl sm:text-4xl font-light text-white tracking-tight font-mono mb-2">
-                {systemPing}ms
+                {systemPing} milliseconds
               </div>
               <div className="flex items-center gap-2 text-xs text-emerald-400">
-                <span>Zero-packet loss WebSocket</span>
+                <span>Live updates are working</span>
               </div>
             </div>
 
@@ -368,10 +399,10 @@ export const LandingPage = () => {
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2 w-2 rounded-full bg-rose-500 animate-ping" />
                 <span className="text-xs font-mono uppercase tracking-widest text-zinc-300">
-                  Active Dispatch Corridor (Jaipur Metro)
+                  Active emergency calls (Jaipur)
                 </span>
               </div>
-              <span className="text-xs font-mono text-zinc-500">Auto-refresh: 1000ms</span>
+              <span className="text-xs font-mono text-zinc-500">Updates every second</span>
             </div>
 
             <div className="space-y-4">
@@ -403,7 +434,7 @@ export const LandingPage = () => {
                   <div className="flex items-center gap-4 self-end md:self-center">
                     <div className="text-right">
                       <span className="text-xs font-mono font-medium text-amber-400 block">
-                        ETA {ev.eta}
+                        {ev.status === 'ARRIVED' ? 'At the hospital' : `May arrive in ${ev.eta}`}
                       </span>
                       <span className="text-[10px] font-mono text-zinc-500">{ev.time}</span>
                     </div>
@@ -417,7 +448,11 @@ export const LandingPage = () => {
                           : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                       }`}
                     >
-                      {ev.status}
+                      {ev.status === 'IN_TRANSIT'
+                        ? 'On the way'
+                        : ev.status === 'DISPATCHED'
+                        ? 'Ambulance sent'
+                        : 'Arrived'}
                     </span>
                   </div>
                 </div>
@@ -434,12 +469,12 @@ export const LandingPage = () => {
 
           {/* Section Heading */}
           <div className="text-center max-w-3xl mx-auto mb-20">
-            <p className="overline mb-3 text-rose-400">Intelligent Architecture</p>
+            <p className="overline mb-3 text-rose-400">How ResQ helps</p>
             <h2 className="text-3xl sm:text-5xl font-light tracking-tight text-white mb-6">
-              Engineered for Seconds That Matter.
+              Every second matters.
             </h2>
             <p className="text-base sm:text-lg text-zinc-400 font-light leading-relaxed">
-              Every millisecond saved translates directly to surviving trauma, stroke, and cardiac arrest. ResQ re-architects the entire emergency workflow.
+              Fast care can help people after an injury, stroke, or heart problem. ResQ helps teams act sooner.
             </p>
           </div>
 
@@ -452,16 +487,16 @@ export const LandingPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-8 group-hover:scale-110 transition-transform">
                   <Zap className="h-6 w-6" />
                 </div>
-                <p className="overline mb-2 text-rose-400">Algorithmic Pairing</p>
+                <p className="overline mb-2 text-rose-400">Find a nearby ambulance</p>
                 <h3 className="text-2xl font-light text-white tracking-tight mb-4">
-                  Autonomous Fleet Dispatch
+                  Send an ambulance
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  Continuous geospatial scoring matches the closest certified Advanced Life Support (ALS) vehicle within 45 seconds, factoring in live traffic flow and hospital ICU vacancies.
+                  ResQ looks for a nearby available ambulance that can give the right kind of care. It checks traffic and open hospital beds.
                 </p>
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
-                <span>Matching latency: &lt; 45s</span>
+                <span>Find an ambulance in under 45 seconds</span>
                 <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -472,16 +507,16 @@ export const LandingPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-8 group-hover:scale-110 transition-transform">
                   <Activity className="h-6 w-6" />
                 </div>
-                <p className="overline mb-2 text-amber-400">Clinical Telematics</p>
+                <p className="overline mb-2 text-amber-400">Help hospitals get ready</p>
                 <h3 className="text-2xl font-light text-white tracking-tight mb-4">
-                  Hospital Trauma Pre-Alerts
+                  Tell hospitals someone is coming
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  Emergency rooms receive real-time telemetry, ECG vitals, and incoming patient ETA prior to arrival, allowing surgical and trauma squads to scrub in before the ambulance doors open.
+                  Hospitals can see health signs and when the ambulance may arrive, so care teams can get ready.
                 </p>
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
-                <span>Pre-arrival prep: 100% sync</span>
+                <span>Hospital gets an early notice</span>
                 <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -492,16 +527,16 @@ export const LandingPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-8 group-hover:scale-110 transition-transform">
                   <Navigation className="h-6 w-6" />
                 </div>
-                <p className="overline mb-2 text-rose-400">Zero-Friction Access</p>
+                <p className="overline mb-2 text-rose-400">Ask for help</p>
                 <h3 className="text-2xl font-light text-white tracking-tight mb-4">
-                  1-Tap Citizen Geolocation
+                  Share your location
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  Pinpoint sub-meter GPS beaconing instantly relays user coordinates and medical history to regional emergency dispatchers with zero redundant voice friction.
+                  ResQ can share your location and saved health details with the team helping you.
                 </p>
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
-                <span>Location accuracy: ± 3.2m</span>
+                <span>ResQ aims to find your location within 3.2 meters</span>
                 <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -512,16 +547,16 @@ export const LandingPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-sapphire-dim border border-blue-500/20 flex items-center justify-center text-blue-400 mb-8 group-hover:scale-110 transition-transform">
                   <Lock className="h-6 w-6" />
                 </div>
-                <p className="overline mb-2 text-blue-400">Defense-in-Depth</p>
+                <p className="overline mb-2 text-blue-400">Keep health details safe</p>
                 <h3 className="text-2xl font-light text-white tracking-tight mb-4">
-                  Zero-Trust Clinical Security
+                  Protect your health details
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  End-to-end encrypted medical data pipelines adhering to HIPAA and ISO 27001 guidelines, complete with immutable audit logs and role-based access gates.
+                  ResQ locks health details when it sends or saves them. Only people who need these details for care can see them. ResQ follows HIPAA and ISO 27001 safety rules.
                 </p>
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
-                <span>AES-256 telemetry corridor</span>
+                <span>Strong data lock (AES-256)</span>
                 <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -532,16 +567,16 @@ export const LandingPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-emerald-dim border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-8 group-hover:scale-110 transition-transform">
                   <Wifi className="h-6 w-6" />
                 </div>
-                <p className="overline mb-2 text-emerald-400">Resilient Backbone</p>
+                <p className="overline mb-2 text-emerald-400">When phone service is weak</p>
                 <h3 className="text-2xl font-light text-white tracking-tight mb-4">
-                  Mesh Edge Survivability
+                  Try another way to send help
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  Designed for crisis conditions. Offline-capable edge caching and automated fallback pathways guarantee emergency packet delivery even during cellular network degradation.
+                  ResQ may try to send an emergency message by text if phone data is not working. This may not work everywhere. Call 112 if someone needs help now.
                 </p>
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
-                <span>Offline queue sync: Guaranteed</span>
+                <span>May send a text if data fails</span>
                 <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -552,16 +587,16 @@ export const LandingPage = () => {
                 <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-8 group-hover:scale-110 transition-transform">
                   <ShieldCheck className="h-6 w-6" />
                 </div>
-                <p className="overline mb-2 text-amber-400">Cross-Platform Governance</p>
+                <p className="overline mb-2 text-amber-400">Teams work together</p>
                 <h3 className="text-2xl font-light text-white tracking-tight mb-4">
-                  Unified Agency Command
+                  Connect care teams
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed font-light">
-                  A single pane of glass uniting hospitals, private and public ambulance fleets, and municipal first-responders with zero departmental communication silos.
+                  ResQ helps hospitals, ambulance teams, and local emergency helpers share updates.
                 </p>
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
-                <span>Universal role-based access</span>
+                <span>Each person sees what they need</span>
                 <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -576,46 +611,46 @@ export const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
 
           <div className="text-center max-w-3xl mx-auto mb-20">
-            <p className="overline mb-3 text-rose-400">Operational Lifecycle</p>
+            <p className="overline mb-3 text-rose-400">How it works</p>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white mb-4">
-              Synchronized 4-Stage Protocol
+              Four steps to get help
             </h2>
             <p className="text-sm sm:text-base text-zinc-400 font-light leading-relaxed">
-              From first beacon activation to surgical handoff: every transition is automated and telemetrically verified.
+              ResQ shares your request, looks for an ambulance, and lets the hospital get ready.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
             
             <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.08] relative">
-              <span className="text-xs font-mono text-rose-400 font-bold mb-4 block">01 / STAGE</span>
-              <h4 className="text-lg font-medium text-white mb-2">Instant Beacon</h4>
+              <span className="text-xs font-mono text-rose-400 font-bold mb-4 block">STEP 1</span>
+              <h4 className="text-lg font-medium text-white mb-2">Ask for help</h4>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Citizen presses SOS. High-accuracy GPS coordinates and pre-configured medical profile are broadcast in under 200ms.
+                Ask for help in ResQ. It can share your location and saved health details.
               </p>
             </div>
 
             <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.08] relative">
-              <span className="text-xs font-mono text-amber-400 font-bold mb-4 block">02 / STAGE</span>
-              <h4 className="text-lg font-medium text-white mb-2">Fleet Matching</h4>
+              <span className="text-xs font-mono text-amber-400 font-bold mb-4 block">STEP 2</span>
+              <h4 className="text-lg font-medium text-white mb-2">Find an ambulance</h4>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Nearest certified ALS unit is locked and dispatched with turn-by-turn dynamic routing and green-corridor priority.
+                ResQ looks for a nearby ambulance and sends directions to its driver.
               </p>
             </div>
 
             <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.08] relative">
-              <span className="text-xs font-mono text-blue-400 font-bold mb-4 block">03 / STAGE</span>
-              <h4 className="text-lg font-medium text-white mb-2">Live Telematics</h4>
+              <span className="text-xs font-mono text-blue-400 font-bold mb-4 block">STEP 3</span>
+              <h4 className="text-lg font-medium text-white mb-2">Share health updates</h4>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Vital signs, audio notes, and precise ETA stream directly from the ambulance into the receiving hospital's triage room.
+                The ambulance team can share health signs and notes with the hospital.
               </p>
             </div>
 
             <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.08] relative">
-              <span className="text-xs font-mono text-emerald-400 font-bold mb-4 block">04 / STAGE</span>
-              <h4 className="text-lg font-medium text-white mb-2">Clinical Handoff</h4>
+              <span className="text-xs font-mono text-emerald-400 font-bold mb-4 block">STEP 4</span>
+              <h4 className="text-lg font-medium text-white mb-2">Hospital gets ready</h4>
               <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                Trauma bay is scrubbed and bed allocated prior to physical arrival. Zero delay in patient transfer to critical care.
+                The hospital can get a room and care team ready before the ambulance arrives.
               </p>
             </div>
 
@@ -634,33 +669,45 @@ export const LandingPage = () => {
             <div className="pointer-events-none absolute inset-0 -top-24 bg-rose-500/10 rounded-full blur-[100px]" />
 
             <div className="relative z-10">
-              <span className="overline text-rose-400 mb-4 inline-block">Deploy ResQ 2.O</span>
+              <span className="overline text-rose-400 mb-4 inline-block">Join ResQ 2.O</span>
               <h2 className="text-3xl sm:text-5xl font-light tracking-tight text-white mb-6">
-                Ready to Safeguard Your Community?
+                Ready to help your community?
               </h2>
               <p className="text-base sm:text-lg text-zinc-300 font-light max-w-2xl mx-auto mb-10 leading-relaxed">
-                Join certified hospitals, fleet operators, and over 120,000 citizens connected to Rajasthan's zero-latency emergency network.
+                Join hospitals, ambulance teams, and people across Rajasthan who use ResQ.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  to={ROUTES.PUBLIC.REGISTER}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-xl shadow-rose-600/30 btn-shimmer transition-all"
-                >
-                  <span>Create Account</span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+                {isAuthenticated && user ? (
+                  <Link
+                    to={getRoleHome(user.role)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-xl shadow-rose-600/30 btn-shimmer transition-all"
+                  >
+                    <span>Open my account</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      to={ROUTES.PUBLIC.REGISTER}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-xl shadow-rose-600/30 btn-shimmer transition-all"
+                    >
+                      <span>Sign up</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
 
-                <Link
-                  to={ROUTES.PUBLIC.LOGIN}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-sm font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all"
-                >
-                  <span>Sign In to Portal</span>
-                </Link>
+                    <Link
+                      to={ROUTES.PUBLIC.LOGIN}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-sm font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all"
+                    >
+                      <span>Sign in</span>
+                    </Link>
+                  </>
+                )}
               </div>
 
               <div className="mt-8 text-xs font-mono text-zinc-500">
-                National Emergency Hotline: Call 112 for immediate dispatch
+                If someone needs help now, call 112.
               </div>
             </div>
 
@@ -679,14 +726,14 @@ export const LandingPage = () => {
             </div>
             <span className="text-zinc-300 font-sans font-bold">resQ 2.O</span>
             <span className="text-zinc-600">•</span>
-            <span>Emergency Crisis Telemetry & Dispatch Infrastructure</span>
+            <span>Emergency help for people and care teams</span>
           </div>
 
           <div className="flex items-center gap-6 text-zinc-400">
             <Link to="/about" className="hover:text-white transition-colors">About</Link>
-            <Link to="/help" className="hover:text-white transition-colors">Support & Help</Link>
-            <Link to="/contact" className="hover:text-white transition-colors">Contact Operations</Link>
-            <Link to={ROUTES.PUBLIC.LOGIN} className="hover:text-white transition-colors">Portal Sign In</Link>
+            <Link to="/help" className="hover:text-white transition-colors">Help</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact us</Link>
+            <Link to={ROUTES.PUBLIC.LOGIN} className="hover:text-white transition-colors">Sign in</Link>
           </div>
 
           <div>

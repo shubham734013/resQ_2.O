@@ -17,7 +17,8 @@
     "typecheck:all": "npm run typecheck && npm run typecheck:server",
     "build:all": "npm run build && npm run build:server",
     "test": "npm --prefix server run test",
-    "seed:demo": "npm --prefix server run seed:demo"
+    "seed:demo": "npm --prefix server run seed:demo",
+    "reset:test": "npm --prefix server run reset:test"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.29.0",
@@ -25,8 +26,10 @@
     "@react-oauth/google": "^0.13.5",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.104.1",
+    "@types/leaflet": "^1.9.23",
     "country-state-city": "^3.2.1",
     "framer-motion": "^14.0.0",
+    "leaflet": "^1.9.4",
     "lenis": "^1.3.27",
     "lucide-react": "^1.50.0",
     "react": "^19.2.8",

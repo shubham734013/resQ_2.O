@@ -43,6 +43,21 @@ export interface HospitalEmergency {
   driverId?: string;
   patientId?: string;
   etaMinutes?: number;
+  patientName?: string;
+  patientPhone?: string;
+  patientAge?: number;
+  patientGender?: string;
+  severity?: 'CRITICAL' | 'URGENT' | 'STANDARD';
+  pickupOtpVerified?: boolean;
+  pickupOverrideReason?: string;
+  ambulanceRegistration?: string;
+  ambulanceVehicleNumber?: string;
+  ambulanceType?: string;
+  driverName?: string;
+  driverPhone?: string;
+  ambulanceLatitude?: number;
+  ambulanceLongitude?: number;
+  tripStatus?: string;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

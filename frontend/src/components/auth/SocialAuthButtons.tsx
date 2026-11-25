@@ -50,23 +50,23 @@ const loadScript = (src: string): Promise<void> =>
   });
 
 interface Props {
-  roleHint: 'USER' | 'AMBULANCE_PROVIDER';
+  roleHint: 'USER';
   onSuccess: (user: AuthUser) => void;
   onError: (message: string) => void;
 }
 
 const messageFor = (error: unknown) => {
   if (error instanceof AuthApiError) {
-    if (error.code === 'ROLE_MISMATCH') return 'This social account is already linked to another ResQ role.';
-    if (error.code === 'ACCOUNT_PENDING') return 'Your ResQ account is awaiting operational approval.';
-    if (error.code === 'ACCOUNT_SUSPENDED') return 'Your account has been suspended. Please contact ResQ support.';
-    if (error.code === 'ACCOUNT_REJECTED') return 'Your account registration was not approved.';
-    if (error.code === 'SOCIAL_AUTH_NOT_CONFIGURED') return 'Social login is not configured on the server.';
-    if (error.code === 'INVALID_SOCIAL_CREDENTIAL') return 'Social credential could not be verified. Please try again.';
-    if (error.code === 'SOCIAL_PROVIDER_UNAVAILABLE') return 'Authentication service is temporarily unavailable. Please try again.';
-    if (error.status >= 500) return 'ResQ is temporarily unavailable. Please try again.';
+    if (error.code === 'ROLE_MISMATCH') return 'This sign-in is linked to a different ResQ account type.';
+    if (error.code === 'ACCOUNT_PENDING') return 'Your ResQ account is waiting for approval.';
+    if (error.code === 'ACCOUNT_SUSPENDED') return 'Your account is paused. Please contact ResQ support.';
+    if (error.code === 'ACCOUNT_REJECTED') return 'Your sign-up was not approved.';
+    if (error.code === 'SOCIAL_AUTH_NOT_CONFIGURED') return 'This sign-in option is not set up yet. Please contact ResQ support.';
+    if (error.code === 'INVALID_SOCIAL_CREDENTIAL') return 'We could not check your sign-in. Please try again.';
+    if (error.code === 'SOCIAL_PROVIDER_UNAVAILABLE') return 'This sign-in option is not working right now. Please try again.';
+    if (error.status >= 500) return 'ResQ is not working right now. Please try again.';
   }
-  return error instanceof Error ? error.message : 'Social sign-in failed. Please try again.';
+  return 'We could not sign you in. Please try again.';
 };
 
 // Module-level idempotent guard to prevent duplicate Google Identity Services initialize warnings
@@ -136,7 +136,7 @@ export const SocialAuthButtons = ({ roleHint, onSuccess, onError }: Props) => {
   // Handle Microsoft Entra / MSA Login via official @azure/msal-browser
   const handleMicrosoft = async () => {
     if (!isMsalConfigured) {
-      onError('Microsoft sign-in requires VITE_MICROSOFT_CLIENT_ID in your environment.');
+      onError('Microsoft sign-in is not set up yet. Please contact ResQ support.');
       return;
     }
     setLoading('microsoft');
@@ -144,7 +144,7 @@ export const SocialAuthButtons = ({ roleHint, onSuccess, onError }: Props) => {
       await ensureMsalInitialized();
       const result = await msalInstance.loginPopup(loginRequest);
       if (!result.idToken) {
-        throw new Error('Microsoft did not return an identity token.');
+        throw new Error('Microsoft could not confirm your sign-in. Please try again.');
       }
       const user = await socialLogin('microsoft', { credential: result.idToken, roleHint });
       onSuccess(user);
@@ -166,7 +166,7 @@ export const SocialAuthButtons = ({ roleHint, onSuccess, onError }: Props) => {
 
   const handleGoogleClick = () => {
     if (!googleClientId) {
-      onError('Google sign-in requires VITE_GOOGLE_CLIENT_ID in your environment.');
+      onError('Google sign-in is not set up yet. Please contact ResQ support.');
       return;
     }
     // Programmatically click the initialized hidden Google button or prompt
@@ -176,7 +176,7 @@ export const SocialAuthButtons = ({ roleHint, onSuccess, onError }: Props) => {
     } else if (window.google?.accounts?.id?.prompt) {
       window.google.accounts.id.prompt();
     } else {
-      onError('Google authentication is initializing. Please try again in a moment.');
+      onError('Google sign-in is starting. Please try again soon.');
     }
   };
 
@@ -185,7 +185,7 @@ export const SocialAuthButtons = ({ roleHint, onSuccess, onError }: Props) => {
       <div className="relative my-6 flex items-center">
         <div className="flex-1 border-t border-white/10" />
         <span className="px-3 text-[10px] font-mono tracking-widest text-zinc-500 uppercase">
-          Or continue with
+          Or use
         </span>
         <div className="flex-1 border-t border-white/10" />
       </div>

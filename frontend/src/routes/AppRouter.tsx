@@ -2,7 +2,6 @@ import { Route, Routes } from 'react-router-dom';
 import { publicRoutes } from './PublicRoutes';
 import { userRoutes } from './UserRoutes';
 import { hospitalRoutes } from './HospitalRoutes';
-import { providerRoutes } from './ProviderRoutes';
 import { driverRoutes } from './DriverRoutes';
 import { adminRoutes } from './AdminRoutes';
 import { compatibilityRedirectRoutes } from './CompatibilityRedirects';
@@ -23,16 +22,13 @@ export const AppRouter = () => {
       {/* 4. Dedicated Hospital Command Center Namespace: /hospital/* */}
       {hospitalRoutes}
 
-      {/* 5. Dedicated Ambulance Provider Fleet Management Namespace: /provider/* */}
-      {providerRoutes}
-
-      {/* 6. Dedicated Paramedic / Ambulance Driver Console Namespace: /driver/* */}
+      {/* 5. Dedicated Paramedic / Ambulance Driver Console Namespace: /driver/* */}
       {driverRoutes}
 
-      {/* 7. Dedicated Administrator & Governance Namespace: /admin/* */}
+      {/* 6. Dedicated Administrator & Governance Namespace: /admin/* */}
       {adminRoutes}
 
-      {/* 8. 404 Catch-All Route */}
+      {/* 7. 404 Catch-All Route */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

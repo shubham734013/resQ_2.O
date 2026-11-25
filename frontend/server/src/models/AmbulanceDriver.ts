@@ -7,7 +7,7 @@ export type DriverProfileCompletionStatus = 'INCOMPLETE'|'COMPLETE';
 export interface AmbulanceDriverDocument {
   fullName: string; email: string; phone: string; passwordHash: string; authProvider: AuthProvider; providerSubject?: string; licenseNumber: string;
   licenseVerificationStatus: VerificationStatus; profileCompletionStatus: DriverProfileCompletionStatus; address?: string; city?: string; state?: string; country?: string;
-  registeredLatitude?: number; registeredLongitude?: number; providerId: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus; isOnDuty?: boolean; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
+  registeredLatitude?: number; registeredLongitude?: number; providerId?: Types.ObjectId; assignedAmbulanceId?: Types.ObjectId; availabilityStatus: DriverAvailabilityStatus; isOnDuty?: boolean; dispatchReservationId?: Types.ObjectId; dispatchReservationExpiresAt?: Date;
   accountStatus: AccountStatus; passwordResetTokenHash?: string; passwordResetExpiresAt?: Date; createdAt: Date; updatedAt: Date;
 }
 const schema = new Schema<AmbulanceDriverDocument>({
@@ -16,7 +16,7 @@ const schema = new Schema<AmbulanceDriverDocument>({
   licenseNumber: { type: String, required: true, unique: true }, licenseVerificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING' },
   profileCompletionStatus: { type: String, enum: ['INCOMPLETE','COMPLETE'], default: 'INCOMPLETE', index: true },
   address: String, city: String, state: String, country: String, registeredLatitude: Number, registeredLongitude: Number,
-  providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: true, index: true }, assignedAmbulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance', index: true },
+  providerId: { type: Schema.Types.ObjectId, ref: 'AmbulanceProvider', required: false, index: true }, assignedAmbulanceId: { type: Schema.Types.ObjectId, ref: 'Ambulance', index: true },
   availabilityStatus: { type: String, enum: DRIVER_AVAILABILITY_STATUSES, default: 'OFFLINE' },
   isOnDuty: { type: Boolean, default: false, index: true },
   dispatchReservationId: { type: Schema.Types.ObjectId, ref: 'DispatchJob', index: true },
