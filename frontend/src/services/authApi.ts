@@ -1,0 +1,31 @@
+import type {
+  AmbulanceDriverRegistrationRequest, AmbulanceProviderRegistrationRequest, ApiErrorBody, AuthResponse,
+  AuthUser, CurrentUserResponse, HospitalRegistrationRequest, LoginRequest, SocialAuthRequest, UserRegistrationRequest,
+} from '../types/auth';
+import { API_BASE_URL, authenticatedFetch } from './apiConfig';
+
+export class AuthApiError extends Error {
+  readonly status:number; readonly code:string;
+  constructor(status:number,code:string,message:string){super(message);this.name='AuthApiError';this.status=status;this.code=code;}
+}
+const isApiErrorBody=(value:unknown):value is ApiErrorBody=>{if(!value||typeof value!=='object')return false;const body=value as Record<string,unknown>;const error=body.error;if(!error||typeof error!=='object')return false;const e=error as Record<string,unknown>;return body.success===false&&typeof e.code==='string'&&typeof e.message==='string';};
+const parseResponse=async<T>(response:Response):Promise<T>=>{const type=response.headers.get('content-type')??'';const body:unknown=type.includes('application/json')?await response.json():null;if(!response.ok){if(isApiErrorBody(body))throw new AuthApiError(response.status,body.error.code,body.error.message);throw new AuthApiError(response.status,'REQUEST_FAILED','The request could not be completed.');}return body as T;};
+const request=async<T>(path:string,init:RequestInit={}):Promise<T>=>{const response=await authenticatedFetch(`${API_BASE_URL}${path}`,{...init,headers:{'Content-Type':'application/json',...(init.headers??{})}});return parseResponse<T>(response);};
+const postJson=<T>(path:string,body:unknown):Promise<T>=>request<T>(path,{method:'POST',body:JSON.stringify(body)});
+export const authApi={
+ login:(input:LoginRequest):Promise<AuthResponse>=>postJson('/auth/login',input),
+ adminLogin:(input:LoginRequest):Promise<AuthResponse>=>postJson('/auth/admin/login',input),
+ registerUser:(input:UserRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/user',input),
+ registerHospital:(input:HospitalRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/hospital',input),
+ registerAmbulanceProvider:(input:AmbulanceProviderRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/ambulance-provider',input),
+ registerAmbulanceDriver:(input:AmbulanceDriverRegistrationRequest):Promise<{success:true;data:AuthUser}>=>postJson('/auth/register/ambulance-driver',input),
+ listActiveAmbulanceProviders:():Promise<{success:true;data:Array<{id:string;name:string;registrationNumber:string;serviceType:string;city?:string;state?:string}>}>=>request('/auth/ambulance-providers'),
+ socialLogin:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<AuthResponse>=>postJson(`/auth/${provider}`,input),
+ linkSocial:(provider:'google'|'microsoft',input:SocialAuthRequest):Promise<{success:true;data:AuthUser}>=>postJson(`/auth/link/${provider}`,input),
+ me:():Promise<CurrentUserResponse>=>request('/auth/me'),
+ logout:():Promise<{success:true;data:{loggedOut:boolean}}>=>postJson('/auth/logout',{}),
+ refresh:():Promise<AuthResponse>=>postJson('/auth/refresh',{}),
+ forgotPassword:(input:{email:string}):Promise<{success:true;data:{message:string}}>=>postJson('/auth/forgot-password',input),
+ resetPassword:(input:{token:string;password:string}):Promise<{success:true;data:{message:string}}>=>postJson('/auth/reset-password',input),
+};
+export const getAuthApiBaseUrl=():string=>API_BASE_URL;
