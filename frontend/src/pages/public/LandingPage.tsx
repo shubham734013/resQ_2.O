@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ShieldAlert,
-  Radio,
   Activity,
   Ambulance,
   Building2,
@@ -17,7 +16,6 @@ import {
   Compass,
   Zap,
   MapPin,
-  CheckCircle2,
 } from 'lucide-react';
 import { ROUTES, getRoleHome } from '../../routes/routePaths';
 import { useAuth } from '../../context/AuthContext';
@@ -142,17 +140,6 @@ export const LandingPage = () => {
             </div>
           </Link>
 
-          {/* Operational Status Pill (Desktop) */}
-          <div className="hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-xs">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="text-zinc-300 font-medium">ResQ is working</span>
-            <span className="text-zinc-600">|</span>
-            <span className="font-mono text-[11px] text-zinc-400">{systemPing} milliseconds to update</span>
-          </div>
-
           {/* Nav Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
             <a href="#capabilities" className="hover:text-white transition-colors">What ResQ does</a>
@@ -220,26 +207,6 @@ export const LandingPage = () => {
 
         <div className="relative max-w-6xl mx-auto px-6 lg:px-12 text-center">
 
-          {/* Operational Status Pill */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/[0.04] backdrop-blur-xl border border-white/10 shadow-lg shadow-black/40 mb-8"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
-            </span>
-            <span className="text-xs font-semibold text-zinc-200 tracking-wide">
-              ResQ is working
-            </span>
-            <span className="text-zinc-600">•</span>
-            <span className="text-xs font-mono text-amber-400/90 font-medium">
-              Average time to send help: 3 minutes 42 seconds
-            </span>
-          </motion.div>
-
           {/* Hero Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -252,16 +219,6 @@ export const LandingPage = () => {
               Teams work together.
             </span>
           </motion.h1>
-
-          {/* Subheading with generous line-height */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            className="text-lg sm:text-xl text-zinc-400 font-light leading-relaxed max-w-3xl mx-auto mb-12"
-          >
-            ResQ helps people, ambulance teams, and hospitals work together when someone needs urgent medical care.
-          </motion.p>
 
           {/* Dual Call-to-Action Buttons */}
           <motion.div
@@ -291,27 +248,6 @@ export const LandingPage = () => {
             </a>
           </motion.div>
 
-          {/* Live Micro-Badge Row */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-mono text-zinc-400"
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>Find an ambulance in under 45 seconds</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>HIPAA and ISO 27001 certified (health privacy and data safety)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>Aims to work 99.99% of the time</span>
-            </div>
-          </motion.div>
-
         </div>
       </section>
 
@@ -322,17 +258,10 @@ export const LandingPage = () => {
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
             <div>
-              <p className="overline mb-3 text-rose-400 flex items-center gap-2">
-                <Radio className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
-                Live ambulance and care updates
-              </p>
               <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white">
                 Live help updates in Jaipur
               </h2>
             </div>
-            <p className="text-sm text-zinc-400 max-w-md font-light leading-relaxed">
-              See ambulance locations, hospital alerts, and which teams are ready to help.
-            </p>
           </div>
 
           {/* 4 Telemetry Metrics Cards */}
@@ -473,9 +402,6 @@ export const LandingPage = () => {
             <h2 className="text-3xl sm:text-5xl font-light tracking-tight text-white mb-6">
               Every second matters.
             </h2>
-            <p className="text-base sm:text-lg text-zinc-400 font-light leading-relaxed">
-              Fast care can help people after an injury, stroke, or heart problem. ResQ helps teams act sooner.
-            </p>
           </div>
 
           {/* 3-Column Bento Grid with generous card margins (gap-8) */}
@@ -725,8 +651,6 @@ export const LandingPage = () => {
               <ShieldAlert className="h-3.5 w-3.5" />
             </div>
             <span className="text-zinc-300 font-sans font-bold">resQ 2.O</span>
-            <span className="text-zinc-600">•</span>
-            <span>Emergency help for people and care teams</span>
           </div>
 
           <div className="flex items-center gap-6 text-zinc-400">
